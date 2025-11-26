@@ -1,0 +1,360 @@
+/**
+ * Signup Page Styles
+ * DJT HAIKA EV Charging App
+ * Enhanced UI with clear visibility
+ */
+
+.signup-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════
+   BACKGROUND
+   ═══════════════════════════════════════════ */
+.signup-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+.signup-bg .bg-gradient-ev {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, #14532D 0%, #166534 40%, #22C55E 80%, #4ADE80 100%);
+}
+
+/* ═══════════════════════════════════════════
+   SIGNUP CARD
+   ═══════════════════════════════════════════ */
+.signup-card {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 420px;
+  background: white;
+  border-radius: 2rem;
+  padding: 2.5rem 1.75rem;
+  box-shadow: 
+    0 25px 60px rgba(20, 83, 45, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+  animation: cardAppear 0.6s ease-out;
+}
+
+@keyframes cardAppear {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ═══════════════════════════════════════════
+   LOGO SECTION
+   ═══════════════════════════════════════════ */
+.signup-card .logo-section {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.signup-card .logo-circle {
+  width: 5rem;
+  height: 5rem;
+  margin: 0 auto 1rem;
+  position: relative;
+}
+
+.signup-card .logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
+  padding: 0.625rem;
+  box-shadow: 0 8px 25px rgba(34, 197, 94, 0.35);
+}
+
+.signup-card .app-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.signup-card .brand-text {
+  background: linear-gradient(135deg, #14532D 0%, #22C55E 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.signup-card .app-subtitle {
+  font-size: 0.95rem;
+  color: #6B7280;
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════
+   FORM STEP
+   ═══════════════════════════════════════════ */
+.signup-card .form-step {
+  animation: stepSlideIn 0.4s ease-out;
+}
+
+@keyframes stepSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.signup-card .step-header {
+  text-align: center;
+  margin-bottom: 1.75rem;
+}
+
+.signup-card .step-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #14532D;
+  margin: 0 0 0.5rem;
+}
+
+.signup-card .step-header p {
+  font-size: 0.9rem;
+  color: #6B7280;
+  margin: 0;
+}
+
+/* ═══════════════════════════════════════════
+   MESSAGES
+   ═══════════════════════════════════════════ */
+.signup-card .message {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.875rem 1rem;
+  border-radius: 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 1.25rem;
+}
+
+.signup-card .error-message {
+  background: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+}
+
+.signup-card .success-message {
+  background: #F0FDF4;
+  color: #16A34A;
+  border: 1px solid #BBF7D0;
+}
+
+/* ═══════════════════════════════════════════
+   FORM GROUP
+   ═══════════════════════════════════════════ */
+.signup-card .form-group {
+  margin-bottom: 1.25rem;
+}
+
+.signup-card .form-group label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.signup-card .input-wrapper {
+  position: relative;
+}
+
+.signup-card .input-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #22C55E;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.signup-card .form-input {
+  width: 100%;
+  padding: 1rem 1rem 1rem 3.25rem;
+  font-size: 1rem;
+  font-weight: 500;
+  background: #F0FDF4;
+  border: 2px solid #BBF7D0;
+  border-radius: 1rem;
+  color: #14532D;
+  outline: none;
+  transition: all 0.25s ease;
+}
+
+.signup-card .form-input:focus {
+  border-color: #22C55E;
+  background: white;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.15);
+}
+
+.signup-card .form-input::placeholder {
+  color: #9CA3AF;
+  font-weight: 400;
+}
+
+/* ═══════════════════════════════════════════
+   SUBMIT BUTTON - PRIMARY CTA
+   ═══════════════════════════════════════════ */
+.signup-card .submit-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1.125rem 1.5rem;
+  background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
+  border: none;
+  border-radius: 1rem;
+  color: white;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.35);
+  margin-top: 0.75rem;
+}
+
+.signup-card .submit-btn:hover:not(:disabled) {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 30px rgba(34, 197, 94, 0.45);
+}
+
+.signup-card .submit-btn:active:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.signup-card .submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.signup-card .spin {
+  animation: spinRotate 0.8s linear infinite;
+}
+
+@keyframes spinRotate {
+  to { transform: rotate(360deg); }
+}
+
+/* ═══════════════════════════════════════════
+   BACK BUTTON - SECONDARY
+   ═══════════════════════════════════════════ */
+.signup-card .back-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.5rem;
+  background: transparent;
+  border: 2px solid #E5E7EB;
+  border-radius: 1rem;
+  color: #6B7280;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  margin-top: 1rem;
+}
+
+.signup-card .back-btn:hover {
+  border-color: #22C55E;
+  color: #22C55E;
+  background: #F0FDF4;
+}
+
+/* ═══════════════════════════════════════════
+   OTP SECTION
+   ═══════════════════════════════════════════ */
+.signup-card .otp-group {
+  margin-bottom: 1.5rem;
+}
+
+.signup-card .otp-inputs {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.signup-card .otp-input {
+  width: 3.75rem;
+  height: 4rem;
+  font-size: 1.75rem;
+  font-weight: 800;
+  text-align: center;
+  background: #F0FDF4;
+  border: 2px solid #BBF7D0;
+  border-radius: 1rem;
+  color: #14532D;
+  outline: none;
+  transition: all 0.25s ease;
+}
+
+.signup-card .otp-input:focus {
+  border-color: #22C55E;
+  background: white;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.15);
+  transform: scale(1.05);
+}
+
+.signup-card .otp-input.filled {
+  border-color: #22C55E;
+  background: #DCFCE7;
+}
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════ */
+@media (max-width: 380px) {
+  .signup-card {
+    padding: 2rem 1.25rem;
+  }
+  
+  .signup-card .logo-circle {
+    width: 4rem;
+    height: 4rem;
+  }
+  
+  .signup-card .app-title {
+    font-size: 1.5rem;
+  }
+  
+  .signup-card .otp-input {
+    width: 3rem;
+    height: 3.5rem;
+    font-size: 1.5rem;
+  }
+  
+  .signup-card .otp-inputs {
+    gap: 0.75rem;
+  }
+}

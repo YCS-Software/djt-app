@@ -1,0 +1,496 @@
+/**
+ * Home Page Styles
+ * DJT HAIKA EV Charging App
+ */
+
+.home-page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #14532D 0%, #166534 12%, #F0FDF4 25%, #F0FDF4 100%);
+  padding-bottom: 6rem;
+}
+
+.home-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--ev-bg-app);
+}
+
+.loading-spinner {
+  width: 3rem;
+  height: 3rem;
+  border: 3px solid var(--ev-border);
+  border-top-color: var(--ev-primary);
+  border-radius: 50%;
+  animation: ev-spin 0.8s linear infinite;
+}
+
+/* ═══════════════════════════════════════════
+   HEADER SECTION - COMPACT
+   ═══════════════════════════════════════════ */
+.home-header {
+  padding: 1.25rem 1.25rem 2rem;
+  color: white;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.375rem;
+}
+
+.header-left {
+  flex: 1;
+}
+
+.greeting-text {
+  font-size: 0.875rem;
+  opacity: 0.9;
+  margin: 0 0 0.125rem;
+}
+
+.user-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+  color: white !important;
+  line-height: 1.2;
+}
+
+.profile-btn {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.profile-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(1.05);
+}
+
+.tagline {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8rem;
+  opacity: 0.8;
+  margin: 0;
+}
+
+/* ═══════════════════════════════════════════
+   MAIN CONTENT
+   ═══════════════════════════════════════════ */
+.home-content {
+  padding: 0 1rem;
+  margin-top: -0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ═══════════════════════════════════════════
+   WALLET CARD - COMPACT (60% height)
+   ═══════════════════════════════════════════ */
+.wallet-card {
+  background: linear-gradient(135deg, #16A34A 0%, #14532D 100%);
+  border-radius: 1rem;
+  padding: 0.875rem 1.25rem;
+  box-shadow: 0 6px 20px rgba(20, 83, 45, 0.25);
+  animation: ev-slide-up 0.4s ease-out;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.wallet-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.wallet-icon-wrap {
+  width: 2.75rem;
+  height: 2.75rem;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.wallet-label {
+  display: none;
+}
+
+.wallet-balance {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  color: white;
+  flex: 1;
+  gap: 0.5rem;
+}
+
+.wallet-amount-row {
+  display: flex;
+  align-items: baseline;
+}
+
+.wallet-balance .currency {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-right: 0.125rem;
+}
+
+.wallet-balance .amount {
+  font-size: 1.875rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.add-money-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.4rem 0.875rem;
+  background: rgba(255, 255, 255, 0.95);
+  border: none;
+  border-radius: 2rem;
+  color: #16A34A;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.add-money-btn:hover {
+  background: white;
+  transform: scale(1.05);
+}
+
+/* ═══════════════════════════════════════════
+   SCAN QR BUTTON - PROMINENT & CENTERED
+   ═══════════════════════════════════════════ */
+.scan-section {
+  animation: ev-slide-up 0.5s ease-out;
+  animation-delay: 0.1s;
+  animation-fill-mode: backwards;
+}
+
+.scan-qr-btn {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 1rem;
+  padding: 1.5rem 1.25rem;
+  background: white;
+  border: 3px solid #22C55E;
+  border-radius: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 
+    0 8px 25px rgba(34, 197, 94, 0.2),
+    0 0 0 4px rgba(34, 197, 94, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.scan-qr-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.03) 0%, rgba(34, 197, 94, 0.08) 100%);
+  pointer-events: none;
+}
+
+.scan-qr-btn:hover {
+  border-color: #16A34A;
+  box-shadow: 
+    0 12px 35px rgba(34, 197, 94, 0.3),
+    0 0 0 6px rgba(34, 197, 94, 0.15);
+  transform: translateY(-3px);
+}
+
+.scan-qr-btn:active {
+  transform: translateY(-1px);
+}
+
+.scan-icon-container {
+  position: relative;
+  width: 5rem;
+  height: 5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scan-icon {
+  position: relative;
+  z-index: 2;
+  width: 4.5rem;
+  height: 4.5rem;
+  background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
+  border-radius: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4);
+}
+
+.scan-ring {
+  position: absolute;
+  border-radius: 1.25rem;
+  border: 3px solid #22C55E;
+  opacity: 0.4;
+  animation: scan-pulse 2s ease-out infinite;
+}
+
+.ring-1 {
+  width: 100%;
+  height: 100%;
+  animation-delay: 0s;
+}
+
+.ring-2 {
+  width: 100%;
+  height: 100%;
+  animation-delay: 1s;
+}
+
+@keyframes scan-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.scan-text {
+  text-align: center;
+}
+
+.scan-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #14532D;
+  margin-bottom: 0.375rem;
+}
+
+.scan-subtitle {
+  display: block;
+  font-size: 0.875rem;
+  color: #6B7280;
+}
+
+.scan-zap {
+  color: #22C55E;
+  animation: zap-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes zap-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.85);
+  }
+}
+
+/* ═══════════════════════════════════════════
+   SHORTCUTS SECTION
+   ═══════════════════════════════════════════ */
+.shortcuts-section {
+  animation: ev-slide-up 0.6s ease-out;
+  animation-delay: 0.2s;
+  animation-fill-mode: backwards;
+}
+
+.section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #14532D;
+  margin-bottom: 0.75rem;
+}
+
+.shortcuts-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.shortcut-card {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem;
+  background: white;
+  border: 1px solid #E5E7EB;
+  border-radius: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(20, 83, 45, 0.04);
+}
+
+.shortcut-card:hover {
+  border-color: #22C55E;
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.1);
+}
+
+.shortcut-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.shortcut-content {
+  flex: 1;
+  text-align: left;
+  min-width: 0;
+}
+
+.shortcut-title {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #14532D;
+  margin-bottom: 0.125rem;
+}
+
+.shortcut-subtitle {
+  display: block;
+  font-size: 0.75rem;
+  color: #6B7280;
+}
+
+.shortcut-arrow {
+  color: #9CA3AF;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.shortcut-card:hover .shortcut-arrow {
+  transform: translateX(4px);
+  color: #22C55E;
+}
+
+/* ═══════════════════════════════════════════
+   ECO IMPACT CARD
+   ═══════════════════════════════════════════ */
+.eco-card {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  background: linear-gradient(135deg, #DCFCE7 0%, #BBF7D0 100%);
+  border: 1px solid #86EFAC;
+  border-radius: 1rem;
+  animation: ev-slide-up 0.7s ease-out;
+  animation-delay: 0.3s;
+  animation-fill-mode: backwards;
+}
+
+.eco-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #22C55E;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.2);
+  flex-shrink: 0;
+}
+
+.eco-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.eco-title {
+  display: block;
+  font-size: 0.75rem;
+  color: #166534;
+  margin-bottom: 0.125rem;
+}
+
+.eco-value {
+  display: block;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #14532D;
+}
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════ */
+@media (max-width: 360px) {
+  .home-header {
+    padding: 1rem 1rem 1.75rem;
+  }
+  
+  .user-name {
+    font-size: 1.375rem;
+  }
+  
+  .wallet-balance .amount {
+    font-size: 2rem;
+  }
+  
+  .scan-icon-container {
+    width: 4.5rem;
+    height: 4.5rem;
+  }
+  
+  .scan-icon {
+    width: 4rem;
+    height: 4rem;
+  }
+  
+  .scan-title {
+    font-size: 1.125rem;
+  }
+}
+
+@media (min-width: 400px) {
+  .home-content {
+    padding: 0 1.25rem;
+  }
+  
+  .home-header {
+    padding: 1.5rem 1.25rem 2.25rem;
+  }
+}

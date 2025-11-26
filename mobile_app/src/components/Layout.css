@@ -1,0 +1,15 @@
+/**
+ * Layout Component Styles
+ * DJT HAIKA EV Charging App
+ */
+
+.app-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-content {
+  flex: 1;
+  position: relative;
+}

@@ -1,0 +1,579 @@
+/**
+ * Login Page Styles
+ * DJT HAIKA EV Charging App
+ * Enhanced UI with clear button visibility
+ */
+
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════
+   ANIMATED BACKGROUND
+   ═══════════════════════════════════════════ */
+.login-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+.bg-gradient-ev {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, #14532D 0%, #166534 40%, #22C55E 80%, #4ADE80 100%);
+}
+
+.floating-icons {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.floating-icons .icon {
+  position: absolute;
+  color: rgba(255, 255, 255, 0.08);
+}
+
+.icon-1 {
+  top: 10%;
+  left: 8%;
+  width: 80px;
+  height: 80px;
+}
+
+.icon-2 {
+  top: 55%;
+  right: 5%;
+  width: 60px;
+  height: 60px;
+}
+
+.icon-3 {
+  bottom: 15%;
+  left: 15%;
+  width: 50px;
+  height: 50px;
+}
+
+.pulse-animation {
+  animation: iconPulse 4s ease-in-out infinite;
+}
+
+.float-animation {
+  animation: iconFloat 5s ease-in-out infinite;
+}
+
+.slide-animation {
+  animation: iconSlide 6s ease-in-out infinite;
+}
+
+@keyframes iconPulse {
+  0%, 100% { opacity: 0.08; transform: scale(1); }
+  50% { opacity: 0.15; transform: scale(1.15); }
+}
+
+@keyframes iconFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-25px) rotate(5deg); }
+}
+
+@keyframes iconSlide {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(25px); }
+}
+
+.charging-lines {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.line {
+  position: absolute;
+  width: 3px;
+  height: 150px;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  border-radius: 4px;
+  animation: lineMove 4s linear infinite;
+}
+
+.line-1 { left: 15%; animation-delay: 0s; }
+.line-2 { left: 50%; animation-delay: 1.3s; }
+.line-3 { left: 85%; animation-delay: 2.6s; }
+
+@keyframes lineMove {
+  0% { top: -150px; opacity: 0; }
+  30% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════
+   LOGIN CARD
+   ═══════════════════════════════════════════ */
+.login-card {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 400px;
+  background: white;
+  border-radius: 2rem;
+  padding: 2.5rem 1.75rem;
+  box-shadow: 
+    0 25px 60px rgba(20, 83, 45, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+  animation: cardAppear 0.6s ease-out;
+}
+
+@keyframes cardAppear {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ═══════════════════════════════════════════
+   LOGO SECTION
+   ═══════════════════════════════════════════ */
+.logo-section {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.logo-circle {
+  position: relative;
+  width: 6rem;
+  height: 6rem;
+  margin: 0 auto 1.25rem;
+}
+
+.logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
+  padding: 0.75rem;
+  box-shadow: 0 8px 25px rgba(34, 197, 94, 0.35);
+}
+
+.charging-ring {
+  position: absolute;
+  inset: -6px;
+  border: 3px solid transparent;
+  border-top-color: #22C55E;
+  border-right-color: #22C55E;
+  border-radius: 50%;
+  animation: ringRotate 1.5s linear infinite;
+}
+
+@keyframes ringRotate {
+  to { transform: rotate(360deg); }
+}
+
+.app-title {
+  font-size: 2rem;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.ev-text {
+  color: #14532D;
+}
+
+.station-text {
+  color: #22C55E;
+}
+
+.app-subtitle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #6B7280;
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+
+.inline-icon {
+  color: #22C55E;
+}
+
+/* ═══════════════════════════════════════════
+   FORM STEP
+   ═══════════════════════════════════════════ */
+.form-step {
+  animation: stepSlideIn 0.4s ease-out;
+}
+
+@keyframes stepSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.step-header {
+  text-align: center;
+  margin-bottom: 1.75rem;
+}
+
+.step-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #14532D;
+  margin: 0 0 0.5rem;
+}
+
+.step-header p {
+  font-size: 0.9rem;
+  color: #6B7280;
+  margin: 0;
+}
+
+/* ═══════════════════════════════════════════
+   INPUT GROUP
+   ═══════════════════════════════════════════ */
+.input-group {
+  margin-bottom: 1.25rem;
+}
+
+.input-wrapper {
+  position: relative;
+}
+
+.input-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #22C55E;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-input {
+  width: 100%;
+  padding: 1rem 1rem 1rem 3.25rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  background: #F0FDF4;
+  border: 2px solid #BBF7D0;
+  border-radius: 1rem;
+  color: #14532D;
+  outline: none;
+  transition: all 0.25s ease;
+}
+
+.mobile-input:focus {
+  border-color: #22C55E;
+  background: white;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.15);
+}
+
+.mobile-input::placeholder {
+  color: #9CA3AF;
+  font-weight: 500;
+  letter-spacing: normal;
+}
+
+.mobile-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════════
+   MESSAGES
+   ═══════════════════════════════════════════ */
+.message {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.875rem 1rem;
+  border-radius: 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 1.25rem;
+}
+
+.error-message {
+  background: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+}
+
+.success-message {
+  background: #F0FDF4;
+  color: #16A34A;
+  border: 1px solid #BBF7D0;
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+
+/* ═══════════════════════════════════════════
+   SUBMIT BUTTON - PRIMARY CTA
+   ═══════════════════════════════════════════ */
+.submit-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1.125rem 1.5rem;
+  background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
+  border: none;
+  border-radius: 1rem;
+  color: white;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.35);
+  margin-top: 0.5rem;
+}
+
+.submit-btn:hover:not(:disabled) {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 30px rgba(34, 197, 94, 0.45);
+}
+
+.submit-btn:active:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.spin {
+  animation: spinRotate 0.8s linear infinite;
+}
+
+@keyframes spinRotate {
+  to { transform: rotate(360deg); }
+}
+
+/* ═══════════════════════════════════════════
+   INFO TEXT
+   ═══════════════════════════════════════════ */
+.info-text {
+  text-align: center;
+  padding: 0.875rem 1rem;
+  background: linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%);
+  border-radius: 0.875rem;
+  font-size: 0.8rem;
+  color: #166534;
+  margin-top: 1.25rem;
+  border: 1px solid #BBF7D0;
+}
+
+.info-text p {
+  margin: 0;
+}
+
+/* ═══════════════════════════════════════════
+   SIGNUP SECTION - CREATE ACCOUNT
+   ═══════════════════════════════════════════ */
+.signup-section {
+  text-align: center;
+  margin-top: 2rem;
+  padding-top: 1.75rem;
+  border-top: 2px solid #E5E7EB;
+}
+
+.signup-section p {
+  font-size: 0.9rem;
+  color: #6B7280;
+  margin: 0 0 1rem;
+  font-weight: 500;
+}
+
+.signup-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.875rem 2rem;
+  background: white;
+  border: 2px solid #22C55E;
+  border-radius: 0.875rem;
+  color: #16A34A;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
+}
+
+.signup-btn:hover {
+  background: #22C55E;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.3);
+}
+
+/* ═══════════════════════════════════════════
+   OTP SECTION
+   ═══════════════════════════════════════════ */
+.otp-group {
+  margin-bottom: 1.5rem;
+}
+
+.otp-inputs {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.otp-input {
+  width: 3.75rem;
+  height: 4rem;
+  font-size: 1.75rem;
+  font-weight: 800;
+  text-align: center;
+  background: #F0FDF4;
+  border: 2px solid #BBF7D0;
+  border-radius: 1rem;
+  color: #14532D;
+  outline: none;
+  transition: all 0.25s ease;
+}
+
+.otp-input:focus {
+  border-color: #22C55E;
+  background: white;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.15);
+  transform: scale(1.05);
+}
+
+.otp-input.filled {
+  border-color: #22C55E;
+  background: #DCFCE7;
+}
+
+.change-number-btn {
+  display: inline-block;
+  background: transparent;
+  border: none;
+  color: #22C55E;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.change-number-btn:hover {
+  background: #F0FDF4;
+  color: #16A34A;
+}
+
+/* ═══════════════════════════════════════════
+   RESEND SECTION
+   ═══════════════════════════════════════════ */
+.resend-section {
+  text-align: center;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+}
+
+.timer-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  background: #F3F4F6;
+  border-radius: 2rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #6B7280;
+}
+
+.resend-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: 2px solid #22C55E;
+  border-radius: 2rem;
+  color: #22C55E;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.resend-btn:disabled {
+  border-color: #D1D5DB;
+  color: #9CA3AF;
+  cursor: not-allowed;
+}
+
+.resend-btn:hover:not(:disabled) {
+  background: #22C55E;
+  color: white;
+}
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════ */
+@media (max-width: 380px) {
+  .login-card {
+    padding: 2rem 1.25rem;
+  }
+  
+  .logo-circle {
+    width: 5rem;
+    height: 5rem;
+  }
+  
+  .app-title {
+    font-size: 1.75rem;
+  }
+  
+  .otp-input {
+    width: 3rem;
+    height: 3.5rem;
+    font-size: 1.5rem;
+  }
+  
+  .otp-inputs {
+    gap: 0.75rem;
+  }
+}

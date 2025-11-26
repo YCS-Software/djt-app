@@ -1,0 +1,499 @@
+/**
+ * Wallet Page Styles
+ * DJT HAIKA EV Charging App
+ */
+
+.wallet-page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #14532D 0%, #166534 12%, #F0FDF4 28%, #F0FDF4 100%);
+  padding-bottom: 6rem;
+}
+
+/* Loading State */
+.wallet-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 1rem;
+  color: #6B7280;
+}
+
+.wallet-loading .loading-spinner {
+  width: 3rem;
+  height: 3rem;
+  border: 3px solid #E5E7EB;
+  border-top-color: #16A34A;
+  border-radius: 50%;
+  animation: ev-spin 0.8s linear infinite;
+}
+
+.wallet-loading p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+/* ═══════════════════════════════════════════
+   HEADER
+   ═══════════════════════════════════════════ */
+.wallet-header {
+  padding: 2.5rem 1.5rem 3rem;
+  color: white;
+}
+
+.page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+/* ═══════════════════════════════════════════
+   MAIN CONTENT
+   ═══════════════════════════════════════════ */
+.wallet-content {
+  padding: 0 1rem;
+  margin-top: -1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ═══════════════════════════════════════════
+   BALANCE CARD
+   ═══════════════════════════════════════════ */
+.balance-card {
+  background: linear-gradient(135deg, #16A34A 0%, #14532D 100%);
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 10px 30px rgba(20, 83, 45, 0.3);
+  animation: ev-slide-up 0.4s ease-out;
+}
+
+.balance-icon-wrap {
+  width: 3rem;
+  height: 3rem;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  margin-bottom: 1rem;
+}
+
+.balance-info {
+  margin-bottom: 1.25rem;
+}
+
+.balance-label {
+  display: block;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.balance-amount {
+  display: flex;
+  align-items: baseline;
+  color: white;
+}
+
+.balance-amount .currency {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-right: 0.25rem;
+}
+
+.balance-amount .amount {
+  font-size: 2.75rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.add-money-main-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: white;
+  border: none;
+  border-radius: 1rem;
+  color: var(--ev-primary-dark);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.add-money-main-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+/* ═══════════════════════════════════════════
+   PAYMENT METHODS
+   ═══════════════════════════════════════════ */
+.payment-methods {
+  animation: ev-slide-up 0.5s ease-out;
+  animation-delay: 0.1s;
+  animation-fill-mode: backwards;
+}
+
+.section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ev-text-primary);
+  margin-bottom: 0.875rem;
+}
+
+.methods-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.method-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: white;
+  border: 1px solid var(--ev-border-light);
+  border-radius: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(20, 83, 45, 0.05);
+}
+
+.method-card:hover {
+  border-color: var(--ev-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(20, 83, 45, 0.1);
+}
+
+.method-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.method-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ev-text-primary);
+}
+
+/* ═══════════════════════════════════════════
+   TRANSACTIONS
+   ═══════════════════════════════════════════ */
+.transactions-section {
+  animation: ev-slide-up 0.6s ease-out;
+  animation-delay: 0.2s;
+  animation-fill-mode: backwards;
+}
+
+.transactions-list {
+  background: white;
+  border-radius: 1rem;
+  border: 1px solid var(--ev-border-light);
+  overflow: hidden;
+}
+
+.empty-transactions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  color: var(--ev-text-muted);
+  gap: 0.75rem;
+}
+
+.empty-transactions svg {
+  opacity: 0.5;
+}
+
+.empty-transactions p {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.transaction-item {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--ev-border-light);
+  transition: background 0.2s ease;
+}
+
+.transaction-item:last-child {
+  border-bottom: none;
+}
+
+.transaction-item:hover {
+  background: var(--ev-bg-app);
+}
+
+.transaction-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.transaction-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.transaction-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--ev-text-primary);
+}
+
+.transaction-location {
+  font-size: 0.8rem;
+  color: var(--ev-text-muted);
+}
+
+.transaction-date {
+  font-size: 0.75rem;
+  color: var(--ev-text-muted);
+}
+
+.transaction-amount {
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.transaction-amount.debit {
+  color: var(--ev-error);
+}
+
+.transaction-amount.credit {
+  color: var(--ev-success);
+}
+
+/* ═══════════════════════════════════════════
+   MODAL
+   ═══════════════════════════════════════════ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 83, 45, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: ev-fade-in 0.2s ease-out;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 1.5rem 1.5rem 0 0;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 28rem;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: ev-slide-up 0.3s ease-out;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--ev-text-primary);
+  margin: 0;
+}
+
+.modal-close {
+  width: 2.25rem;
+  height: 2.25rem;
+  background: var(--ev-bg-app);
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ev-text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+  background: var(--ev-error-soft);
+  color: var(--ev-error);
+}
+
+/* Amount Input */
+.amount-input-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 1rem;
+  background: var(--ev-bg-app);
+  border-radius: 1rem;
+  margin-bottom: 1rem;
+}
+
+.amount-currency {
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--ev-text-muted);
+}
+
+.amount-input {
+  width: 100%;
+  max-width: 10rem;
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--ev-text-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+  text-align: center;
+}
+
+.amount-input::placeholder {
+  color: var(--ev-border);
+}
+
+/* Quick Amounts */
+.quick-amounts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.quick-amount-btn {
+  padding: 0.75rem;
+  background: white;
+  border: 2px solid var(--ev-border);
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ev-text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quick-amount-btn:hover {
+  border-color: var(--ev-primary);
+  color: var(--ev-primary);
+}
+
+.quick-amount-btn.selected {
+  background: var(--ev-primary-soft);
+  border-color: var(--ev-primary);
+  color: var(--ev-primary);
+}
+
+/* Modal Methods */
+.modal-methods {
+  margin-bottom: 1.5rem;
+}
+
+.modal-methods-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ev-text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.modal-methods-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.modal-method-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  background: white;
+  border: 2px solid var(--ev-border-light);
+  border-radius: 0.875rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--ev-text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.modal-method-btn:hover {
+  border-color: var(--ev-border);
+}
+
+.modal-method-btn.selected {
+  background: var(--ev-primary-soft);
+  border-color: var(--ev-primary);
+}
+
+.modal-method-btn .check-icon {
+  margin-left: auto;
+  color: var(--ev-primary);
+}
+
+/* Add Button */
+.modal-add-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
+  border: none;
+  border-radius: 1rem;
+  color: white;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+.modal-add-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(34, 197, 94, 0.4);
+}
+
+.modal-add-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.loading-spinner-small {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: ev-spin 0.8s linear infinite;
+}
