@@ -1,0 +1,179 @@
+/* Wallet Page - EV Theme */
+
+.ev-wallet-page {
+  background: linear-gradient(180deg, #F8F9FA 0%, #FFFFFF 100%);
+}
+
+/* Balance Card - Green Gradient */
+.ev-balance-card {
+  background: linear-gradient(135deg, #76B82A 0%, #52A01E 100%);
+  border: none;
+  color: white;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 15px 40px rgba(118, 184, 42, 0.3);
+}
+
+.ev-balance-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+  animation: balanceGlow 8s linear infinite;
+}
+
+.ev-balance-card .text-blue-100 {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Quick Actions */
+.ev-wallet-action {
+  background: white;
+  border: 2px solid #E6F9E6;
+  transition: all 0.3s ease;
+}
+
+.ev-wallet-action:hover {
+  border-color: #76B82A;
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(118, 184, 42, 0.2);
+}
+
+.ev-wallet-icon {
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, rgba(118, 184, 42, 0.1) 0%, rgba(82, 160, 30, 0.1) 100%);
+  border: 2px solid rgba(118, 184, 42, 0.2);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 0.75rem;
+  transition: all 0.3s ease;
+}
+
+.ev-wallet-action:hover .ev-wallet-icon {
+  background: linear-gradient(135deg, #76B82A 0%, #52A01E 100%);
+  border-color: #76B82A;
+  transform: scale(1.1);
+}
+
+.ev-wallet-action:hover .ev-wallet-icon svg,
+.ev-wallet-action:hover .ev-wallet-icon i {
+  color: white !important;
+}
+
+/* Transaction Card */
+.ev-transaction-item {
+  background: white;
+  border: 2px solid #F8F9FA;
+  border-radius: 16px;
+  padding: 1rem;
+  transition: all 0.3s ease;
+}
+
+.ev-transaction-item:hover {
+  border-color: #E6F9E6;
+  box-shadow: 0 4px 15px rgba(118, 184, 42, 0.1);
+  transform: translateX(4px);
+}
+
+.ev-transaction-icon-charge {
+  background: linear-gradient(135deg, rgba(231, 76, 60, 0.1) 0%, rgba(192, 57, 43, 0.1) 100%);
+  border: 2px solid rgba(231, 76, 60, 0.2);
+}
+
+.ev-transaction-icon-topup {
+  background: linear-gradient(135deg, rgba(118, 184, 42, 0.1) 0%, rgba(82, 160, 30, 0.1) 100%);
+  border: 2px solid rgba(118, 184, 42, 0.2);
+}
+
+.ev-transaction-icon-refund {
+  background: linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(41, 128, 185, 0.1) 100%);
+  border: 2px solid rgba(52, 152, 219, 0.2);
+}
+
+/* Modal Enhancements */
+.ev-modal-overlay {
+  background: rgba(45, 52, 54, 0.8);
+  backdrop-filter: blur(8px);
+}
+
+.ev-modal-content {
+  border-radius: 24px;
+  border: 2px solid #E6F9E6;
+  box-shadow: 0 20px 60px rgba(118, 184, 42, 0.2);
+}
+
+.ev-amount-input {
+  border: 2px solid #E6F9E6;
+  border-radius: 16px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #2D3436;
+  transition: all 0.3s ease;
+}
+
+.ev-amount-input:focus {
+  border-color: #76B82A;
+  box-shadow: 0 0 0 4px rgba(118, 184, 42, 0.15);
+  outline: none;
+}
+
+.ev-quick-amount-btn {
+  border: 2px solid #E6F9E6;
+  border-radius: 12px;
+  padding: 0.75rem;
+  font-weight: 700;
+  color: #76B82A;
+  background: white;
+  transition: all 0.3s ease;
+}
+
+.ev-quick-amount-btn:hover {
+  background: #76B82A;
+  border-color: #76B82A;
+  color: white;
+  transform: scale(1.05);
+}
+
+.ev-payment-method {
+  border: 2px solid #E6F9E6;
+  border-radius: 16px;
+  transition: all 0.3s ease;
+}
+
+.ev-payment-method.active {
+  border-color: #76B82A;
+  background: rgba(118, 184, 42, 0.05);
+}
+
+.ev-payment-method:hover {
+  border-color: #76B82A;
+  transform: translateX(4px);
+}
+
+/* Animations */
+@keyframes balanceGlow {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.1);
+  }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .ev-balance-card {
+    padding: 1.5rem 1rem;
+  }
+
+  .ev-wallet-icon {
+    width: 48px;
+    height: 48px;
+  }
+}

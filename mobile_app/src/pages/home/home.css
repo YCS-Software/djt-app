@@ -1,0 +1,184 @@
+/* Home Page - EV Theme */
+
+.ev-home-page {
+  background: linear-gradient(180deg, #F8F9FA 0%, #FFFFFF 100%);
+}
+
+/* Dashboard Stats */
+.ev-stat-card-home {
+  background: white;
+  border: 2px solid #E6F9E6;
+  border-radius: 16px;
+  padding: 1.25rem;
+  text-align: center;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.ev-stat-card-home::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #76B82A, #52A01E);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.ev-stat-card-home:hover::before {
+  transform: scaleX(1);
+}
+
+.ev-stat-card-home:hover {
+  border-color: #76B82A;
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(118, 184, 42, 0.2);
+}
+
+.ev-stat-icon-home {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 0.75rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.ev-stat-value-home {
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin: 0.5rem 0 0.25rem;
+  background: linear-gradient(135deg, #76B82A 0%, #52A01E 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ev-stat-label-home {
+  font-size: 0.875rem;
+  color: #636e72;
+  font-weight: 600;
+}
+
+/* Wallet Card */
+.ev-wallet-card-home {
+  background: linear-gradient(135deg, #76B82A 0%, #52A01E 100%);
+  border: none;
+  color: white;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 15px 40px rgba(118, 184, 42, 0.3);
+}
+
+.ev-wallet-card-home::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+  animation: walletGlow 8s linear infinite;
+}
+
+/* QR Scanner */
+.ev-qr-card {
+  background: white;
+  border: 2px dashed #76B82A;
+  border-radius: 16px;
+  padding: 1.5rem;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.ev-qr-card:hover {
+  border-style: solid;
+  box-shadow: 0 8px 20px rgba(118, 184, 42, 0.2);
+  transform: scale(1.02);
+}
+
+.ev-qr-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 1rem;
+  background: linear-gradient(135deg, rgba(118, 184, 42, 0.1) 0%, rgba(82, 160, 30, 0.1) 100%);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: #76B82A;
+}
+
+/* Charging Sessions */
+.ev-session-card {
+  background: white;
+  border: 2px solid #E6F9E6;
+  border-radius: 16px;
+  padding: 1rem;
+  transition: all 0.3s ease;
+}
+
+.ev-session-card:hover {
+  border-color: #76B82A;
+  box-shadow: 0 4px 15px rgba(118, 184, 42, 0.15);
+  transform: translateX(4px);
+}
+
+.ev-session-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ev-session-completed {
+  background: linear-gradient(135deg, rgba(118, 184, 42, 0.1) 0%, rgba(82, 160, 30, 0.1) 100%);
+  border: 2px solid rgba(118, 184, 42, 0.2);
+  color: #52A01E;
+}
+
+.ev-session-active {
+  background: linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(41, 128, 185, 0.1) 100%);
+  border: 2px solid rgba(52, 152, 219, 0.2);
+  color: #3498db;
+}
+
+.ev-session-pending {
+  background: linear-gradient(135deg, rgba(243, 156, 18, 0.1) 0%, rgba(211, 84, 0, 0.1) 100%);
+  border: 2px solid rgba(243, 156, 18, 0.2);
+  color: #f39c12;
+}
+
+/* Animations */
+@keyframes walletGlow {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(180deg);
+  }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .ev-stat-card-home {
+    padding: 1rem 0.75rem;
+  }
+
+  .ev-stat-icon-home {
+    width: 40px;
+    height: 40px;
+  }
+
+  .ev-stat-value-home {
+    font-size: 1.5rem;
+  }
+}

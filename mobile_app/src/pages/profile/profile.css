@@ -1,0 +1,195 @@
+/* Profile Page - EV Theme */
+
+.ev-profile-card {
+  background: white;
+  border: 2px solid #E6F9E6;
+  transition: all 0.3s ease;
+}
+
+.ev-profile-card:hover {
+  border-color: #76B82A;
+  box-shadow: 0 4px 15px rgba(118, 184, 42, 0.15);
+}
+
+.ev-profile-avatar {
+  width: 70px;
+  height: 70px;
+  background: linear-gradient(135deg, #76B82A 0%, #52A01E 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 1rem;
+  color: white;
+  box-shadow: 0 8px 20px rgba(118, 184, 42, 0.3);
+}
+
+.ev-edit-btn {
+  width: 40px;
+  height: 40px;
+  background: rgba(118, 184, 42, 0.1);
+  border: 2px solid rgba(118, 184, 42, 0.3);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #76B82A;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.ev-edit-btn:hover {
+  background: #76B82A;
+  color: white;
+  transform: scale(1.05);
+}
+
+/* Stats Cards */
+.ev-stat-card {
+  text-align: center;
+  padding: 1.25rem 0.75rem;
+  background: white;
+  border: 2px solid #E6F9E6;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.ev-stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #76B82A, #52A01E);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.ev-stat-card:hover::before {
+  transform: scaleX(1);
+}
+
+.ev-stat-card:hover {
+  border-color: #76B82A;
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(118, 184, 42, 0.2);
+}
+
+.ev-stat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 0.75rem;
+  font-size: 1.25rem;
+}
+
+.ev-stat-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #2D3436;
+  margin: 0.5rem 0 0.25rem;
+  background: linear-gradient(135deg, #76B82A 0%, #52A01E 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ev-stat-label {
+  font-size: 0.75rem;
+  color: #636e72;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Menu Card */
+.ev-menu-card {
+  background: white;
+  border: 2px solid #E6F9E6;
+}
+
+.ev-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0.875rem;
+  border-radius: 12px;
+  background: transparent;
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.ev-menu-item:hover {
+  background: rgba(118, 184, 42, 0.05);
+  border-color: rgba(118, 184, 42, 0.2);
+  transform: translateX(4px);
+}
+
+.ev-menu-icon {
+  width: 44px;
+  height: 44px;
+  background: #F8F9FA;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 0.875rem;
+  font-size: 1.25rem;
+  transition: all 0.3s ease;
+}
+
+/* Logout Button */
+.ev-logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: white;
+  border: 2px solid #ffebee;
+  border-radius: 16px;
+  color: #e74c3c;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.ev-logout-btn:hover {
+  background: #e74c3c;
+  color: white;
+  border-color: #e74c3c;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(231, 76, 60, 0.3);
+}
+
+.ev-logout-btn i {
+  font-size: 1.25rem;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .ev-profile-avatar {
+    width: 60px;
+    height: 60px;
+  }
+
+  .ev-stat-card {
+    padding: 1rem 0.5rem;
+  }
+
+  .ev-stat-value {
+    font-size: 1.5rem;
+  }
+
+  .ev-stat-label {
+    font-size: 0.7rem;
+  }
+}
