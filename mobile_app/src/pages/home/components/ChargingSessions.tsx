@@ -65,7 +65,7 @@ export default function ChargingSessions() {
         {sessions.length > 0 ? (
           sessions.map((session) => (
             <div key={session.session_id} className="ev-session-card">
-              <div className="flex items-center">
+              <div className="flex items-center">sssssssssssssss
                 <div className="ev-session-icon ev-session-completed">
                   <i className="ri-flashlight-fill"></i>
                 </div>

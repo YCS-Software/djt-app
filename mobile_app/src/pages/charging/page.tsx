@@ -15,7 +15,9 @@ import {
   Camera,
   Star,
   History,
-  ArrowLeft
+  ArrowLeft,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { stationService } from '../../services/api/stationService';
 import { sessionService } from '../../services/api/sessionService';
@@ -63,6 +65,9 @@ export default function Charging() {
   const [showMap, setShowMap] = useState(false);
   const [selectedStation, setSelectedStation] = useState<ChargingStation | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  
+  // Expanded session state
+  const [expandedSessionId, setExpandedSessionId] = useState<number | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('x-access-token');
@@ -486,30 +491,127 @@ export default function Charging() {
               </div>
             ) : sessions.length > 0 ? (
               <div className="sessions-list">
-                {sessions.map((session) => (
-                  <div key={session.session_id} className="session-card">
-                    <div className="session-icon">
-                      <Zap size={24} />
-                    </div>
-                    <div className="session-info">
-                      <h3 className="session-station">{session.station_name}</h3>
-                      <div className="session-meta">
-                        <span className="session-date">{formatDate(session.start_time)}</span>
-                        {session.duration_minutes && (
-                          <span className="session-duration">
-                            <Clock size={12} />
-                            {session.duration_minutes} min
-                          </span>
-                        )}
-                        <span className="session-energy">{session.energy_consumed?.toFixed(1) || 0} kWh</span>
+                {sessions.map((session) => {
+                  const isExpanded = expandedSessionId === session.session_id;
+                  return (
+                    <div key={session.session_id} className={`session-card ${isExpanded ? 'expanded' : ''}`}>
+                      <div className="session-card-header" onClick={() => setExpandedSessionId(isExpanded ? null : session.session_id)}>
+                        <div className="session-icon">
+                          <Zap size={24} />
+                        </div>
+                        <div className="session-info">
+                          <h3 className="session-station">{session.station_name}</h3>
+                          <div className="session-meta">
+                            <span className="session-date">{formatDate(session.start_time)}</span>
+                            {session.duration_minutes && (
+                              <span className="session-duration">
+                                <Clock size={12} />
+                                {session.duration_minutes} min
+                              </span>
+                            )}
+                            <span className="session-energy">{session.energy_consumed?.toFixed(1) || 0} kWh</span>
+                          </div>
+                        </div>
+                        <div className="session-cost">
+                          <span className="cost-value">₹{session.cost?.toFixed(0) || 0}</span>
+                          <span className={`status-badge ${session.status}`}>{session.status}</span>
+                        </div>
+                        <button 
+                          className="expand-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedSessionId(isExpanded ? null : session.session_id);
+                          }}
+                        >
+                          {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                        </button>
                       </div>
+                      
+                      {isExpanded && (
+                        <div className="session-details-expanded">
+                          <div className="detail-row">
+                            <span className="detail-label">Session ID:</span>
+                            <span className="detail-value">{session.session_id}</span>
+                          </div>
+                          <div className="detail-row">
+                            <span className="detail-label">Station:</span>
+                            <span className="detail-value">{session.station_name}</span>
+                          </div>
+                          <div className="detail-row">
+                            <span className="detail-label">Date:</span>
+                            <span className="detail-value">{session.date || formatDate(session.start_time)}</span>
+                          </div>
+                          <div className="detail-row">
+                            <span className="detail-label">Start Time:</span>
+                            <span className="detail-value">
+                              {session.start_time ? new Date(session.start_time).toLocaleString('en-IN', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              }) : 'N/A'}
+                            </span>
+                          </div>
+                          {session.end_time && (
+                            <div className="detail-row">
+                              <span className="detail-label">End Time:</span>
+                              <span className="detail-value">
+                                {new Date(session.end_time).toLocaleString('en-IN', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                            </div>
+                          )}
+                          <div className="detail-row">
+                            <span className="detail-label">Duration:</span>
+                            <span className="detail-value">{session.duration_minutes || 0} minutes</span>
+                          </div>
+                          <div className="detail-row">
+                            <span className="detail-label">Energy Consumed:</span>
+                            <span className="detail-value">{session.energy_consumed?.toFixed(2) || 0} kWh</span>
+                          </div>
+                          {session.price_per_kwh && (
+                            <div className="detail-row">
+                              <span className="detail-label">Price per kWh:</span>
+                              <span className="detail-value">₹{session.price_per_kwh.toFixed(2)}</span>
+                            </div>
+                          )}
+                          <div className="detail-row">
+                            <span className="detail-label">Total Cost:</span>
+                            <span className="detail-value">₹{session.cost?.toFixed(2) || session.total_cost?.toFixed(2) || 0}</span>
+                          </div>
+                          {session.connector_type && (
+                            <div className="detail-row">
+                              <span className="detail-label">Connector Type:</span>
+                              <span className="detail-value">{session.connector_type}</span>
+                            </div>
+                          )}
+                          <div className="detail-row">
+                            <span className="detail-label">Status:</span>
+                            <span className={`detail-value status-text ${session.status}`}>{session.status}</span>
+                          </div>
+                          {session.payment_status && (
+                            <div className="detail-row">
+                              <span className="detail-label">Payment Status:</span>
+                              <span className={`detail-value status-text ${session.payment_status}`}>{session.payment_status}</span>
+                            </div>
+                          )}
+                          {session.session_code && (
+                            <div className="detail-row">
+                              <span className="detail-label">Session Code:</span>
+                              <span className="detail-value">{session.session_code}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <div className="session-cost">
-                      <span className="cost-value">₹{session.total_cost?.toFixed(0) || session.current_cost?.toFixed(0) || 0}</span>
-                      <span className={`status-badge ${session.status}`}>{session.status}</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="empty-state">

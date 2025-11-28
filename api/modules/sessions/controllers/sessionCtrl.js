@@ -523,13 +523,21 @@ exports.getSessionHistory = function(req, res) {
             const formattedSessions = sessions ? sessions.map(function(s) {
                 return {
                     session_id: s.sssn_id,
+                    session_code: s.sssn_cd,
                     station_name: s.sttn_nm_tx,
+                    station_id: s.sttn_id,
+                    address: s.addr_tx,
+                    connector_type: s.cnntr_typ_cd,
                     date: s.i_ts ? new Date(s.i_ts).toISOString().split('T')[0] : null,
                     start_time: s.strt_ts,
+                    end_time: s.end_ts,
                     duration_minutes: s.durn_mnts_nbr,
                     energy_consumed: parseFloat(s.enrgy_cnsmd_kwh) || 0,
+                    price_per_kwh: parseFloat(s.prce_per_kwh_amt) || 0,
                     cost: parseFloat(s.ttl_cst_amt) || 0,
-                    status: s.sttus_cd
+                    total_cost: parseFloat(s.ttl_cst_amt) || 0,
+                    status: s.sttus_cd,
+                    payment_status: s.pymnt_sttus_cd
                 };
             }) : [];
 
