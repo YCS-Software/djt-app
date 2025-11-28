@@ -6,16 +6,16 @@
 const { ChargingStation, StationConnector, UserFavoriteStation } = require('../../../../models');
 const std = require(appRoot + '/utils/standardMessages');
 
-// Dummy stations data for when database is empty
+// Dummy stations data for when database is empty - Rajahmundry, Andhra Pradesh, India
 const DUMMY_STATIONS = [
     {
         station_id: 1,
-        name: 'DJT HAIKA PowerHub Mall Road',
+        name: 'DJT HAIKA PowerHub Main Road',
         code: 'DJT001',
-        address: 'Mall Road, Sector 18',
-        city: 'Gurugram',
-        latitude: 28.4595,
-        longitude: 77.0266,
+        address: 'Main Road, Near RTC Bus Stand',
+        city: 'Rajahmundry',
+        latitude: 17.0000,
+        longitude: 81.7833,
         distance: '0.5',
         price_per_kwh: 10.00,
         total_chargers: 4,
@@ -27,12 +27,12 @@ const DUMMY_STATIONS = [
     },
     {
         station_id: 2,
-        name: 'DJT HAIKA EcoCharge Central',
+        name: 'DJT HAIKA EcoCharge Godavari',
         code: 'DJT002',
-        address: 'Central Park, MG Road',
-        city: 'Gurugram',
-        latitude: 28.4601,
-        longitude: 77.0280,
+        address: 'Godavari Bund Road, Near Pushkar Ghat',
+        city: 'Rajahmundry',
+        latitude: 17.0080,
+        longitude: 81.7900,
         distance: '1.2',
         price_per_kwh: 8.00,
         total_chargers: 6,
@@ -46,10 +46,10 @@ const DUMMY_STATIONS = [
         station_id: 3,
         name: 'DJT HAIKA QuickCharge Express',
         code: 'DJT003',
-        address: 'Tech Park, Cyber City',
-        city: 'Gurugram',
-        latitude: 28.4940,
-        longitude: 77.0826,
+        address: 'NH-16, Near Katheru Junction',
+        city: 'Rajahmundry',
+        latitude: 16.9920,
+        longitude: 81.7750,
         distance: '2.1',
         price_per_kwh: 12.00,
         total_chargers: 3,
@@ -150,8 +150,8 @@ exports.getAllStations = async (req, res) => {
                     code: station.sttn_cd,
                     address: station.addr_tx,
                     city: station.cty_tx,
-                    latitude: parseFloat(station.ltde_nbr) || 28.4595,
-                    longitude: parseFloat(station.lngtde_nbr) || 77.0266,
+                    latitude: parseFloat(station.ltde_nbr) || 17.0000,
+                    longitude: parseFloat(station.lngtde_nbr) || 81.7833,
                     price_per_kwh: parseFloat(station.prce_per_kwh_amt),
                     total_chargers: station.ttl_chrgrs_nbr,
                     available_chargers: station.avlbl_chrgrs_nbr,
@@ -185,7 +185,7 @@ exports.getStationDetails = async (req, res) => {
     try {
         const { stationId } = req.params;
 
-        const station = await ChargingStation.findById(stationId);
+        const station = await ChargingStation.findById(stationId, 'sttn_id');
         if (!station) {
             return res.status(std.message["NOT_FOUND"].code).json({
                 status: std.message["NOT_FOUND"].code,
@@ -240,7 +240,7 @@ exports.searchStations = async (req, res) => {
     try {
         const { q } = req.query;
 
-        if (!q) {
+        if (!q || q.trim() === '') {
             return res.status(std.message["BAD_REQUEST"].code).json({
                 status: std.message["BAD_REQUEST"].code,
                 message: 'Search query is required',
@@ -248,7 +248,16 @@ exports.searchStations = async (req, res) => {
             });
         }
 
-        const stations = await ChargingStation.searchStations(q);
+        const stations = await ChargingStation.searchStations(q.trim());
+
+        // Handle case where stations is null or undefined
+        if (!stations || !Array.isArray(stations)) {
+            return res.status(std.message["SUCCESS"].code).json({
+                status: std.message["SUCCESS"].code,
+                message: std.message["SUCCESS"].message,
+                data: { stations: [] }
+            });
+        }
 
         const formattedStations = stations.map(station => ({
             station_id: station.sttn_id,
@@ -256,9 +265,14 @@ exports.searchStations = async (req, res) => {
             code: station.sttn_cd,
             address: station.addr_tx,
             city: station.cty_tx,
-            price_per_kwh: parseFloat(station.prce_per_kwh_amt),
-            available_chargers: station.avlbl_chrgrs_nbr,
-            rating: parseFloat(station.rtng_nbr)
+            latitude: parseFloat(station.ltde_nbr) || 0,
+            longitude: parseFloat(station.lngtde_nbr) || 0,
+            price_per_kwh: parseFloat(station.prce_per_kwh_amt) || 0,
+            total_chargers: station.ttl_chrgrs_nbr || 0,
+            available_chargers: station.avlbl_chrgrs_nbr || 0,
+            rating: parseFloat(station.rtng_nbr) || 0,
+            is_fast_charging: station.is_fst_chrgng_in === 1,
+            power: station.pwr_tx || null
         }));
 
         res.status(std.message["SUCCESS"].code).json({

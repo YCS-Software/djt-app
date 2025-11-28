@@ -367,52 +367,74 @@ function RoutingControl({
     };
   }, [map, userPos, stationPos, onRouteFound, isNavigating, onRouteCoordinates]);
 
-  // Real-time navigation tracking
+  // Real-time navigation tracking - FIXED: Prevent multiple watchers and excessive API calls
   useEffect(() => {
-    if (!isNavigating || !map || !onRouteUpdate) return;
+    if (!isNavigating || !map || !onRouteUpdate) {
+      // Clean up watcher when not navigating
+      if (watchIdRef.current !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      return;
+    }
+
+    // Prevent multiple watchers - clear existing one first
+    if (watchIdRef.current !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
 
     let lastUpdateTime = 0;
     let lastPosition: L.LatLng | null = null;
     let initialZoomSet = false;
-    const throttleDelay = 1000; // Update map view at most once per second
-    const minDistanceForUpdate = 0.0001; // Minimum distance change to trigger update (about 10 meters)
+    const throttleDelay = 3000; // Increased to 3 seconds to reduce API calls
+    const minDistanceForUpdate = 0.0005; // Increased to ~50 meters to reduce updates
+    let updateTimeout: NodeJS.Timeout | null = null;
 
     const updateRoute = () => {
-      if (navigator.geolocation) {
-        watchIdRef.current = navigator.geolocation.watchPosition(
-          (position) => {
-            const currentPos = L.latLng(position.coords.latitude, position.coords.longitude);
-            const stationLatLng = Array.isArray(stationPos)
-              ? L.latLng(stationPos[0], stationPos[1])
-              : L.latLng((stationPos as any).lat, (stationPos as any).lng);
-            
-            // Calculate remaining distance
-            const R = 6371; // Earth radius in km
-            const dLat = (stationLatLng.lat - currentPos.lat) * Math.PI / 180;
-            const dLon = (stationLatLng.lng - currentPos.lng) * Math.PI / 180;
-            const a = 
-              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(currentPos.lat * Math.PI / 180) * Math.cos(stationLatLng.lat * Math.PI / 180) *
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            const distance = (R * c).toFixed(1);
-            
-            // Estimate time based on average speed (assuming 40 km/h in city)
-            const time = Math.round((R * c / 40) * 60);
-            const timeStr = time < 60 ? `${time} min` : `${Math.floor(time / 60)}h ${time % 60}m`;
-            
-            onRouteUpdate(`${distance} km`, timeStr);
-            
-            // Throttle map view updates to prevent blinking
-            const now = Date.now();
-            const timeSinceLastUpdate = now - lastUpdateTime;
-            
-            // Check if position has changed significantly
-            const positionChanged = !lastPosition || 
-              currentPos.distanceTo(lastPosition) > minDistanceForUpdate;
-            
-            if (positionChanged && timeSinceLastUpdate >= throttleDelay) {
-              lastUpdateTime = now;
+      if (!navigator.geolocation || watchIdRef.current !== null) return; // Prevent duplicate watchers
+
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        (position) => {
+          const currentPos = L.latLng(position.coords.latitude, position.coords.longitude);
+          const stationLatLng = Array.isArray(stationPos)
+            ? L.latLng(stationPos[0], stationPos[1])
+            : L.latLng((stationPos as any).lat, (stationPos as any).lng);
+          
+          // Calculate remaining distance (no API call, just calculation)
+          const R = 6371; // Earth radius in km
+          const dLat = (stationLatLng.lat - currentPos.lat) * Math.PI / 180;
+          const dLon = (stationLatLng.lng - currentPos.lng) * Math.PI / 180;
+          const a = 
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(currentPos.lat * Math.PI / 180) * Math.cos(stationLatLng.lat * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          const distance = (R * c).toFixed(1);
+          
+          // Estimate time based on average speed (assuming 40 km/h in city)
+          const time = Math.round((R * c / 40) * 60);
+          const timeStr = time < 60 ? `${time} min` : `${Math.floor(time / 60)}h ${time % 60}m`;
+          
+          onRouteUpdate(`${distance} km`, timeStr);
+          
+          // Throttle map view updates to prevent blinking - use timeout debounce
+          const now = Date.now();
+          const timeSinceLastUpdate = now - lastUpdateTime;
+          
+          // Check if position has changed significantly
+          const positionChanged = !lastPosition || 
+            currentPos.distanceTo(lastPosition) > minDistanceForUpdate;
+          
+          // Clear existing timeout
+          if (updateTimeout) {
+            clearTimeout(updateTimeout);
+          }
+          
+          // Debounce map updates
+          if (positionChanged && timeSinceLastUpdate >= throttleDelay) {
+            updateTimeout = setTimeout(() => {
+              lastUpdateTime = Date.now();
               lastPosition = currentPos;
               
               // Set initial zoom only once when navigation starts
@@ -421,7 +443,7 @@ function RoutingControl({
                 const targetZoom = currentZoom < 15 ? 15 : currentZoom;
                 map.setView(currentPos, targetZoom, { 
                   animate: true, 
-                  duration: 0.8,
+                  duration: 1.0,
                   easeLinearity: 0.25
                 });
                 initialZoomSet = true;
@@ -429,27 +451,34 @@ function RoutingControl({
                 // Use panTo for smoother updates without zoom changes
                 map.panTo(currentPos, {
                   animate: true,
-                  duration: 0.5,
+                  duration: 0.8,
                   easeLinearity: 0.25
                 });
               }
-            }
-          },
-          (error) => {
-            console.error('Error tracking position:', error);
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 5000,
-            maximumAge: 2000 // Allow slightly older positions to reduce updates
+            }, 500); // Additional 500ms debounce
           }
-        );
-      }
+        },
+        (error) => {
+          console.error('Error tracking position:', error);
+        },
+        {
+          enableHighAccuracy: false, // Changed to false to reduce battery usage
+          timeout: 10000, // Increased timeout
+          maximumAge: 5000 // Allow older positions to reduce updates
+        }
+      );
     };
 
-    updateRoute();
+    // Small delay before starting watcher to prevent immediate multiple calls
+    const startTimeout = setTimeout(() => {
+      updateRoute();
+    }, 500);
 
     return () => {
+      clearTimeout(startTimeout);
+      if (updateTimeout) {
+        clearTimeout(updateTimeout);
+      }
       if (watchIdRef.current !== null && navigator.geolocation) {
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;
@@ -502,8 +531,8 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
   const [routeLoading, setRouteLoading] = useState<boolean>(true);
   const [routeCoordinates, setRouteCoordinates] = useState<[number, number][] | null>(null);
 
-  // Default user location (Gurugram, India)
-  const defaultUserLocation: LatLngExpression = [28.4595, 77.0266];
+  // Default user location (Rajahmundry, Andhra Pradesh, India)
+  const defaultUserLocation: LatLngExpression = [17.0000, 81.7833];
   const currentUserLocation: LatLngExpression = currentLocation || (userLocation 
     ? [userLocation.latitude, userLocation.longitude]
     : defaultUserLocation);
@@ -575,7 +604,10 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
     }
   }, [isNavigating, routeInstructions, currentLocation, processInstruction]);
 
-  const startNavigation = () => {
+  const startNavigation = useCallback(() => {
+    // Prevent multiple clicks - disable button during transition
+    if (isNavigating) return;
+    
     if (!estimatedDistance || estimatedDistance === 'Calculating...') {
       alert('Please wait for the route to be calculated');
       return;
@@ -585,7 +617,7 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
     setRemainingDistance(estimatedDistance);
     setRemainingTime(estimatedTime);
     
-    // Get current location for navigation
+    // Get current location for navigation (only once)
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -599,19 +631,19 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
             setCurrentLocation([userLocation.latitude, userLocation.longitude]);
           }
         },
-        { enableHighAccuracy: true }
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 5000 }
       );
     } else if (userLocation) {
       setCurrentLocation([userLocation.latitude, userLocation.longitude]);
     }
-  };
+  }, [isNavigating, estimatedDistance, estimatedTime, userLocation]);
 
-  const stopNavigation = () => {
+  const stopNavigation = useCallback(() => {
     setIsNavigating(false);
     setRemainingDistance('');
     setRemainingTime('');
     setCurrentInstruction('');
-  };
+  }, []);
 
   return (
     <div className="station-map-overlay">
@@ -691,56 +723,56 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
           </MapContainer>
         </div>
 
-        {/* Route Info Card */}
-        <div className="route-info-card">
-          <div className="route-info-item">
-            <div className="route-icon">
-              <Route size={20} />
+        {/* Route Info Card - Google Maps Style */}
+        {!isNavigating ? (
+          <div className="route-info-card">
+            <div className="route-info-item">
+              <div className="route-icon">
+                <Route size={20} />
+              </div>
+              <div className="route-details">
+                <span className="route-label">Distance</span>
+                <span className="route-value">{estimatedDistance}</span>
+              </div>
             </div>
-            <div className="route-details">
-              <span className="route-label">{isNavigating ? 'Remaining' : 'Distance'}</span>
-              <span className="route-value">{isNavigating && remainingDistance ? remainingDistance : estimatedDistance}</span>
+            <div className="route-info-item">
+              <div className="route-icon">
+                <Clock size={20} />
+              </div>
+              <div className="route-details">
+                <span className="route-label">Est. Time</span>
+                <span className="route-value">{estimatedTime}</span>
+              </div>
             </div>
-          </div>
-          <div className="route-info-item">
-            <div className="route-icon">
-              <Clock size={20} />
-            </div>
-            <div className="route-details">
-              <span className="route-label">{isNavigating ? 'ETA' : 'Est. Time'}</span>
-              <span className="route-value">{isNavigating && remainingTime ? remainingTime : estimatedTime}</span>
-            </div>
-          </div>
-          {!isNavigating ? (
-            <button className="navigate-btn" onClick={startNavigation}>
+            <button 
+              className="navigate-btn" 
+              onClick={startNavigation}
+              disabled={routeLoading || estimatedDistance === 'Calculating...'}
+            >
               <Navigation2 size={18} />
-              <span>Start Navigation</span>
+              <span>Start</span>
             </button>
-          ) : (
-            <button className="navigate-btn stop-nav" onClick={stopNavigation}>
-              <Square size={18} />
-              <span>Stop</span>
-            </button>
-          )}
-        </div>
-
-        {/* Navigation Status (when active) */}
-        {isNavigating && (
-          <div className="navigation-status">
-            <div className="nav-status-content">
-              <div className="nav-status-icon">
-                <Navigation2 size={24} />
+          </div>
+        ) : (
+          <div className="navigation-card">
+            <div className="nav-card-header">
+              <div className="nav-card-info">
+                <div className="nav-card-distance">{remainingDistance || estimatedDistance}</div>
+                <div className="nav-card-time">{remainingTime || estimatedTime}</div>
               </div>
-              <div className="nav-status-text">
-                <span className="nav-status-label">Navigating to</span>
-                <span className="nav-status-destination">{station.name}</span>
-                {currentInstruction && (
-                  <span className="nav-instruction">
-                    <ArrowRight size={14} style={{ display: 'inline-block', marginRight: '0.25rem' }} />
-                    {currentInstruction}
-                  </span>
-                )}
+              <button className="nav-stop-btn" onClick={stopNavigation}>
+                <Square size={18} />
+              </button>
+            </div>
+            {currentInstruction && (
+              <div className="nav-card-instruction">
+                <ArrowRight size={16} />
+                <span>{currentInstruction}</span>
               </div>
+            )}
+            <div className="nav-card-destination">
+              <MapPin size={14} />
+              <span>{station.name}</span>
             </div>
           </div>
         )}

@@ -188,7 +188,7 @@
   margin: 0;
 }
 
-/* Route Info Card */
+/* Route Info Card - Google Maps Style */
 .route-info-card {
   background: white;
   padding: 1rem 1.5rem;
@@ -197,6 +197,8 @@
   align-items: center;
   gap: 1rem;
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+  position: relative;
+  z-index: 1000;
 }
 
 .route-info-item {
@@ -263,96 +265,134 @@
   transform: translateY(0);
 }
 
-.navigate-btn.stop-nav {
-  background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+.navigate-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
-.navigate-btn.stop-nav:hover {
-  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+.navigate-btn:disabled:hover {
+  transform: none;
 }
 
-/* Navigation Status Bar */
-.navigation-status {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(135deg, #14532D 0%, #16A34A 100%);
-  padding: 1rem 1.5rem;
-  color: white;
+/* Google Maps Style Navigation Card */
+.navigation-card {
+  background: white;
+  padding: 1.25rem 1.5rem;
+  border-top: 1px solid #E5E7EB;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+  position: relative;
   z-index: 1000;
   animation: slideUpNav 0.3s ease-out;
-  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
 }
 
 @keyframes slideUpNav {
   from {
     transform: translateY(100%);
+    opacity: 0;
   }
   to {
     transform: translateY(0);
+    opacity: 1;
   }
 }
 
-.nav-status-content {
+.nav-card-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 1rem;
+  margin-bottom: 0.75rem;
 }
 
-.nav-status-icon {
+.nav-card-info {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5rem;
+  flex: 1;
+}
+
+.nav-card-distance {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #14532D;
+  line-height: 1.2;
+}
+
+.nav-card-time {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #6B7280;
+  line-height: 1.2;
+}
+
+.nav-stop-btn {
   width: 3rem;
   height: 3rem;
-  background: rgba(255, 255, 255, 0.2);
   border-radius: 50%;
+  background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+  border: none;
+  color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: pulse 2s ease-in-out infinite;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  flex-shrink: 0;
 }
 
-@keyframes pulse {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 0.8;
-  }
+.nav-stop-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
 }
 
-.nav-status-text {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+.nav-stop-btn:active {
+  transform: scale(0.95);
 }
 
-.nav-status-label {
-  font-size: 0.75rem;
-  opacity: 0.9;
-  margin-bottom: 0.125rem;
-}
-
-.nav-status-destination {
-  font-size: 1rem;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 0.25rem;
-}
-
-.nav-instruction {
-  font-size: 0.875rem;
-  opacity: 0.95;
+.nav-card-instruction {
   display: flex;
   align-items: center;
-  margin-top: 0.375rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: #F0FDF4;
+  border-radius: 0.5rem;
+  margin-bottom: 0.75rem;
+  border-left: 3px solid #16A34A;
+}
+
+.nav-card-instruction svg {
+  color: #16A34A;
+  flex-shrink: 0;
+}
+
+.nav-card-instruction span {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #14532D;
   line-height: 1.4;
+}
+
+.nav-card-destination {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #E5E7EB;
+  font-size: 0.875rem;
+  color: #6B7280;
+}
+
+.nav-card-destination svg {
+  color: #16A34A;
+  flex-shrink: 0;
+}
+
+.nav-card-destination span {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Leaflet Routing Machine Styles - Hide instructions panel */

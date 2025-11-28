@@ -80,12 +80,16 @@ class ChargingStationModel extends BaseModel {
      */
     async searchStations(searchTerm) {
         try {
+            // Escape search term to prevent SQL injection
+            const escapedTerm = String(searchTerm).replace(/'/g, "''").replace(/\\/g, '\\\\');
+            
             const query = `
                 SELECT * FROM ${this.tableName}
                 WHERE a_in = 1 
-                AND (sttn_nm_tx LIKE '%${searchTerm}%' 
-                     OR addr_tx LIKE '%${searchTerm}%'
-                     OR cty_tx LIKE '%${searchTerm}%')
+                AND (sttn_nm_tx LIKE '%${escapedTerm}%' 
+                     OR sttn_cd LIKE '%${escapedTerm}%'
+                     OR addr_tx LIKE '%${escapedTerm}%'
+                     OR cty_tx LIKE '%${escapedTerm}%')
                 ORDER BY sttn_nm_tx
                 LIMIT 20
             `;
@@ -131,7 +135,7 @@ class StationConnectorModel extends BaseModel {
     async getStationConnectors(stationId) {
         try {
             return await this.findAll({
-                where: { sttn_id: stationId, a_in: 1 }
+                where: { sttn_id: 11, a_in: 1 }
             });
         } catch (error) {
             console.error('[StationConnectorModel] getStationConnectors error:', error);

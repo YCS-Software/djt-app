@@ -22,42 +22,48 @@ exports.getBalance = function(req, res) {
     walletMdl.getUserWalletMdl({ userId: userId })
         .then(function(walletResults) {
             if (!walletResults || walletResults.length === 0) {
-                // Create wallet if doesn't exist
-                return walletMdl.createWalletMdl({ userId: userId })
+                // Create wallet if doesn't exist (with balance 0.00)
+                return walletMdl.createWalletMdl({ userId: userId, initialAmount: 0.00 })
                     .then(function(createResults) {
-                        // Return dummy balance for new wallet
-                        return df.formatSucessRes(req, res, {
-                            wallet_id: createResults.insertId,
-                            balance: 520.00,
-                            last_updated: new Date().toISOString()
-                        }, cntxtDtls, fnm, {});
+                        // Verify wallet was created successfully
+                        if (!createResults || !createResults.insertId) {
+                            throw new Error('Failed to create wallet');
+                        }
+                        
+                        // Fetch the newly created wallet from database to get real data
+                        return walletMdl.getUserWalletMdl({ userId: userId });
                     })
-                    .catch(function(createError) {
-                        // Return dummy balance if creation fails
+                    .then(function(newWalletResults) {
+                        // Verify wallet exists after creation
+                        if (!newWalletResults || newWalletResults.length === 0) {
+                            throw new Error('Wallet not found after creation');
+                        }
+                        
+                        // Return real data from database
+                        const wallet = newWalletResults[0];
+                        const balance = parseFloat(wallet.blnce_amt) || 0;
+                        
                         return df.formatSucessRes(req, res, {
-                            wallet_id: 0,
-                            balance: 520.00,
-                            last_updated: new Date().toISOString()
+                            wallet_id: wallet.wllt_id,
+                            balance: balance,
+                            last_updated: wallet.lst_updtd_ts ? new Date(wallet.lst_updtd_ts).toISOString() : new Date().toISOString()
                         }, cntxtDtls, fnm, {});
                     });
             }
             
+            // Wallet exists - return real data from database
             const wallet = walletResults[0];
-            const balance = parseFloat(wallet.blnce_amt) || 520.00;
+            const balance = parseFloat(wallet.blnce_amt) || 0;
+            
             return df.formatSucessRes(req, res, {
                 wallet_id: wallet.wllt_id,
                 balance: balance,
-                last_updated: wallet.lst_updtd_ts || new Date().toISOString()
+                last_updated: wallet.lst_updtd_ts ? new Date(wallet.lst_updtd_ts).toISOString() : new Date().toISOString()
             }, cntxtDtls, fnm, {});
         })
         .catch(function(error) {
             console.error('[getBalance] Error:', error);
-            // Return dummy balance on error
-            return df.formatSucessRes(req, res, {
-                wallet_id: 0,
-                balance: 520.00,
-                last_updated: new Date().toISOString()
-            }, cntxtDtls, fnm, {});
+            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
         });
 };
 
@@ -73,7 +79,8 @@ exports.addMoney = function(req, res) {
     const userId = req.user.userId;
     const { amount, payment_method, payment_details } = data;
     
-    if (!amount || amount <= 0) {
+    // Validate amount
+    if (!amount || amount <= 0 || isNaN(amount)) {
         return res.status(std.message["BAD_REQUEST"].code).json({
             status: std.message["BAD_REQUEST"].code,
             message: 'Invalid amount',
@@ -86,39 +93,72 @@ exports.addMoney = function(req, res) {
             let wallet;
             
             if (!walletResults || walletResults.length === 0) {
-                // Create wallet if doesn't exist
-                return walletMdl.createWalletMdl({ userId: userId })
+                // Create wallet with initial balance = amount
+                return walletMdl.createWalletMdl({ userId: userId, initialAmount: amount })
                     .then(function(createResults) {
+                        // Verify wallet was created successfully
+                        if (!createResults || !createResults.insertId) {
+                            throw new Error('Failed to create wallet');
+                        }
                         return walletMdl.getUserWalletMdl({ userId: userId });
                     })
                     .then(function(newWalletResults) {
+                        // Verify wallet exists
+                        if (!newWalletResults || newWalletResults.length === 0) {
+                            throw new Error('Wallet not found after creation');
+                        }
                         wallet = newWalletResults[0];
-                        return processAddMoney(wallet, userId, amount, payment_method, payment_details, req, res, fnm);
+                        // Verify balance is set correctly
+                        const walletBalance = parseFloat(wallet.blnce_amt) || 0;
+                        if (Math.abs(walletBalance - parseFloat(amount)) > 0.01) {
+                            throw new Error('Wallet balance mismatch after creation');
+                        }
+                        // For new wallet, balance is already set to amount, so balanceBefore = 0, balanceAfter = amount
+                        return processAddMoneyForNewWallet(wallet, userId, amount, payment_method, payment_details, req, res, fnm);
                     });
             }
             
+            // Wallet exists - add amount to existing balance
             wallet = walletResults[0];
-            return processAddMoney(wallet, userId, amount, payment_method, payment_details, req, res, fnm);
+            const currentBalance = parseFloat(wallet.blnce_amt) || 0;
+            return processAddMoney(wallet, userId, amount, currentBalance, payment_method, payment_details, req, res, fnm);
         })
         .catch(function(error) {
             console.error('[addMoney] Error:', error);
-            // Return success with dummy data on error (for testing)
-            return df.formatSucessRes(req, res, {
-                transaction_id: Date.now(),
-                amount: parseFloat(amount),
-                new_balance: 520.00 + parseFloat(amount)
-            }, cntxtDtls, fnm, { message: 'Money added successfully (mock mode)' });
+            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
         });
 };
 
-// Helper function for adding money (called after payment verification)
-function processAddMoney(wallet, userId, amount, payment_method, payment_details, req, res, fnm) {
-    const balanceBefore = parseFloat(wallet.blnce_amt) || 0;
+// Helper function for adding money to existing wallet (called after payment verification)
+function processAddMoney(wallet, userId, amount, currentBalance, payment_method, payment_details, req, res, fnm) {
+    const balanceBefore = currentBalance;
     const balanceAfter = balanceBefore + parseFloat(amount);
+    let transactionInsertId = null;
     
     return walletMdl.addMoneyMdl({ walletId: wallet.wllt_id, amount: amount, userId: userId })
-        .then(function() {
-            // Create transaction record
+        .then(function(updateResults) {
+            // Verify wallet was updated successfully
+            if (!updateResults || updateResults.affectedRows !== 1) {
+                throw new Error('Failed to update wallet balance');
+            }
+            
+            // Verify updated balance by fetching wallet again
+            return walletMdl.getUserWalletMdl({ userId: userId });
+        })
+        .then(function(updatedWalletResults) {
+            if (!updatedWalletResults || updatedWalletResults.length === 0) {
+                throw new Error('Wallet not found after update');
+            }
+            
+            const updatedWallet = updatedWalletResults[0];
+            const actualBalance = parseFloat(updatedWallet.blnce_amt) || 0;
+            
+            // Verify balance matches expected value
+            if (Math.abs(actualBalance - balanceAfter) > 0.01) {
+                throw new Error(`Balance mismatch: expected ${balanceAfter}, got ${actualBalance}`);
+            }
+            
+            // Create transaction record in wallet_transactions_t
             return walletMdl.createTransactionMdl({
                 walletId: wallet.wllt_id,
                 userId: userId,
@@ -136,77 +176,136 @@ function processAddMoney(wallet, userId, amount, payment_method, payment_details
             });
         })
         .then(function(transactionResults) {
+            // Verify transaction was created successfully
+            if (!transactionResults || !transactionResults.insertId) {
+                throw new Error('Failed to create transaction record');
+            }
+            
+            transactionInsertId = transactionResults.insertId;
+            
+            // Verify transaction exists in database
+            return walletMdl.getUserTransactionsMdl({ userId: userId, limit: 1, offset: 0 });
+        })
+        .then(function(transactionVerification) {
+            // Verify transaction was actually inserted
+            if (!transactionVerification || transactionVerification.length === 0) {
+                throw new Error('Transaction not found after creation');
+            }
+            
+            const createdTransaction = transactionVerification[0];
+            
+            // Verify transaction ID matches
+            if (parseInt(createdTransaction.trxn_id) !== parseInt(transactionInsertId)) {
+                throw new Error(`Transaction ID mismatch: expected ${transactionInsertId}, got ${createdTransaction.trxn_id}`);
+            }
+            
+            // Verify transaction amount matches
+            if (Math.abs(parseFloat(createdTransaction.amt) - parseFloat(amount)) > 0.01) {
+                throw new Error(`Transaction amount mismatch: expected ${amount}, got ${createdTransaction.amt}`);
+            }
+            
+            // Verify final wallet balance
+            return walletMdl.getUserWalletMdl({ userId: userId });
+        })
+        .then(function(finalWalletVerification) {
+            if (!finalWalletVerification || finalWalletVerification.length === 0) {
+                throw new Error('Wallet not found after transaction creation');
+            }
+            
+            const finalWallet = finalWalletVerification[0];
+            const finalBalance = parseFloat(finalWallet.blnce_amt) || 0;
+            
+            // Verify final wallet balance matches expected balance
+            if (Math.abs(finalBalance - balanceAfter) > 0.01) {
+                throw new Error(`Final wallet balance mismatch: expected ${balanceAfter}, got ${finalBalance}`);
+            }
+            
+            // Return success only after all operations are verified
             return df.formatSucessRes(req, res, {
-                transaction_id: transactionResults.insertId,
+                transaction_id: transactionInsertId,
                 amount: parseFloat(amount),
                 new_balance: balanceAfter
             }, cntxtDtls, fnm, { message: 'Money added successfully' });
         });
 }
 
-// Dummy transactions data
-const DUMMY_TRANSACTIONS = [
-    {
-        trxn_id: 1001,
-        type: 'debit',
-        category: 'charging',
-        amount: 285.00,
-        balance_before: 805.00,
-        balance_after: 520.00,
-        description: 'Charging Session - PowerHub Mall Road',
-        payment_method: null,
-        status: 'completed',
-        created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() // 2 hours ago
-    },
-    {
-        trxn_id: 1002,
+// Helper function for new wallet (balance already set to amount during creation)
+function processAddMoneyForNewWallet(wallet, userId, amount, payment_method, payment_details, req, res, fnm) {
+    const balanceBefore = 0;
+    const balanceAfter = parseFloat(amount);
+    let transactionInsertId = null;
+    
+    // Create transaction record in wallet_transactions_t (wallet balance already set during creation)
+    return walletMdl.createTransactionMdl({
+        walletId: wallet.wllt_id,
+        userId: userId,
         type: 'credit',
         category: 'topup',
-        amount: 1000.00,
-        balance_before: 805.00,
-        balance_after: 1805.00,
-        description: 'Wallet Top-up via UPI',
-        payment_method: 'upi',
+        amount: amount,
+        balanceBefore: balanceBefore,
+        balanceAfter: balanceAfter,
+        description: `Wallet Top-up via ${payment_method || 'payment gateway'}`,
+        paymentMethod: payment_method,
+        paymentDetails: payment_details,
         status: 'completed',
-        created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString() // 5 hours ago
-    },
-    {
-        trxn_id: 1003,
-        type: 'debit',
-        category: 'charging',
-        amount: 221.00,
-        balance_before: 1026.00,
-        balance_after: 805.00,
-        description: 'Charging Session - EcoCharge Central',
-        payment_method: null,
-        status: 'completed',
-        created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() // 1 day ago
-    },
-    {
-        trxn_id: 1004,
-        type: 'credit',
-        category: 'refund',
-        amount: 45.00,
-        balance_before: 981.00,
-        balance_after: 1026.00,
-        description: 'Session Refund - QuickCharge Express',
-        payment_method: null,
-        status: 'completed',
-        created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() // 3 days ago
-    },
-    {
-        trxn_id: 1005,
-        type: 'credit',
-        category: 'topup',
-        amount: 500.00,
-        balance_before: 481.00,
-        balance_after: 981.00,
-        description: 'Wallet Top-up via Card',
-        payment_method: 'card',
-        status: 'completed',
-        created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days ago
-    }
-];
+        referenceId: payment_details?.payment_id || payment_details?.order_id,
+        referenceType: 'payment'
+    })
+    .then(function(transactionResults) {
+        // Verify transaction was created successfully
+        if (!transactionResults || !transactionResults.insertId) {
+            throw new Error('Failed to create transaction record');
+        }
+        
+        transactionInsertId = transactionResults.insertId;
+        
+        // Verify transaction exists in database
+        return walletMdl.getUserTransactionsMdl({ userId: userId, limit: 1, offset: 0 });
+    })
+    .then(function(transactionVerification) {
+        // Verify transaction was actually inserted
+        if (!transactionVerification || transactionVerification.length === 0) {
+            throw new Error('Transaction not found after creation');
+        }
+        
+        const createdTransaction = transactionVerification[0];
+        
+        // Verify transaction ID matches
+        if (parseInt(createdTransaction.trxn_id) !== parseInt(transactionInsertId)) {
+            throw new Error(`Transaction ID mismatch: expected ${transactionInsertId}, got ${createdTransaction.trxn_id}`);
+        }
+        
+        // Verify transaction amount matches
+        if (Math.abs(parseFloat(createdTransaction.amt) - parseFloat(amount)) > 0.01) {
+            throw new Error(`Transaction amount mismatch: expected ${amount}, got ${createdTransaction.amt}`);
+        }
+        
+        // Verify wallet balance matches
+        return walletMdl.getUserWalletMdl({ userId: userId });
+    })
+    .then(function(walletVerification) {
+        if (!walletVerification || walletVerification.length === 0) {
+            throw new Error('Wallet not found after transaction creation');
+        }
+        
+        const verifiedWallet = walletVerification[0];
+        const actualWalletBalance = parseFloat(verifiedWallet.blnce_amt) || 0;
+        
+        // Verify wallet balance matches expected balance
+        if (Math.abs(actualWalletBalance - balanceAfter) > 0.01) {
+            throw new Error(`Wallet balance mismatch: expected ${balanceAfter}, got ${actualWalletBalance}`);
+        }
+        
+        // Return success only after all operations are verified
+        return df.formatSucessRes(req, res, {
+            transaction_id: transactionInsertId,
+            amount: parseFloat(amount),
+            new_balance: balanceAfter
+        }, cntxtDtls, fnm, { message: 'Money added successfully' });
+    });
+}
+
+// Removed DUMMY_TRANSACTIONS - all data comes from database only
 
 /*****************************************************************************
 * Function      : getTransactions
@@ -241,11 +340,6 @@ exports.getTransactions = function(req, res) {
                 });
             }
             
-            // Return dummy data if no transactions found
-            if (!formattedTransactions || formattedTransactions.length === 0) {
-                formattedTransactions = DUMMY_TRANSACTIONS;
-            }
-            
             return df.formatSucessRes(req, res, {
                 transactions: formattedTransactions,
                 total: formattedTransactions.length,
@@ -255,13 +349,7 @@ exports.getTransactions = function(req, res) {
         })
         .catch(function(error) {
             console.error('[getTransactions] Error:', error);
-            // Return dummy data on error
-            return df.formatSucessRes(req, res, {
-                transactions: DUMMY_TRANSACTIONS,
-                total: DUMMY_TRANSACTIONS.length,
-                limit: limit,
-                offset: offset
-            }, cntxtDtls, fnm, {});
+            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
         });
 };
 

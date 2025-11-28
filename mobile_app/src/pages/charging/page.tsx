@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { stationService } from '../../services/api/stationService';
 import { sessionService } from '../../services/api/sessionService';
+import { walletService } from '../../services/api/walletService';
 import type { ChargingStation } from '../../services/api/stationService';
 import type { ChargingSession } from '../../services/api/sessionService';
 import StationMap from '../../components/StationMap';
@@ -27,8 +28,10 @@ import './charging.css';
 type ChargingState = 'idle' | 'scanning' | 'station-details' | 'charging' | 'completed';
 
 interface StationInfo {
+  station_id: number;
   name: string;
   chargerId: string;
+  connector_id: number;
   pricePerUnit: number;
   address: string;
   power: string;
@@ -42,7 +45,8 @@ export default function Charging() {
   const [state, setState] = useState<ChargingState>('idle');
   const [stationInfo, setStationInfo] = useState<StationInfo | null>(null);
   const [selectedUnits, setSelectedUnits] = useState(10);
-  const [walletBalance] = useState(520.00);
+  const [walletBalance, setWalletBalance] = useState(0.00);
+  const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
   
   // Charging state
   const [unitsPurchased, setUnitsPurchased] = useState(0);
@@ -70,6 +74,9 @@ export default function Charging() {
     // Get user location
     getUserLocation();
 
+    // Fetch wallet balance
+    fetchWalletBalance();
+
     // Fetch data based on view
     if (view === 'stations') {
       fetchStations();
@@ -77,6 +84,16 @@ export default function Charging() {
       fetchHistory();
     }
   }, [navigate, view]);
+
+  const fetchWalletBalance = async () => {
+    try {
+      const balanceData = await walletService.getBalance();
+      setWalletBalance(balanceData.balance || 0);
+    } catch (error) {
+      console.error('Error fetching wallet balance:', error);
+      setWalletBalance(0);
+    }
+  };
 
   const getUserLocation = () => {
     if (navigator.geolocation) {
@@ -89,18 +106,18 @@ export default function Charging() {
         },
         (error) => {
           console.log('Error getting location:', error);
-          // Use default location (Gurugram)
+          // Use default location (Rajahmundry, Andhra Pradesh)
           setUserLocation({
-            latitude: 28.4595,
-            longitude: 77.0266
+            latitude: 17.0000,
+            longitude: 81.7833
           });
         }
       );
     } else {
-      // Use default location
+      // Use default location (Rajahmundry, Andhra Pradesh)
       setUserLocation({
-        latitude: 28.4595,
-        longitude: 77.0266
+        latitude: 17.0000,
+        longitude: 81.7833
       });
     }
   };
@@ -108,11 +125,16 @@ export default function Charging() {
   const fetchStations = async () => {
     try {
       setLoading(true);
-      // Try to get user location or use default
-      const defaultLat = 28.4595;
-      const defaultLng = 77.0266;
-      const data = await stationService.getNearbyStations(defaultLat, defaultLng, 50);
-      setStations(data);
+      // Use user location or default (Rajahmundry, Andhra Pradesh)
+      const lat = userLocation?.latitude || 17.0000;
+      const lng = userLocation?.longitude || 81.7833;
+      const data = await stationService.getNearbyStations(lat, lng, 50);
+      // Only set stations if we have real data from API
+      if (data && Array.isArray(data) && data.length > 0) {
+        setStations(data);
+      } else {
+        setStations([]);
+      }
     } catch (error) {
       console.error('Error fetching stations:', error);
       setStations([]);
@@ -165,20 +187,92 @@ export default function Charging() {
     return () => clearInterval(interval);
   }, [isCharging, unitsConsumed, unitsPurchased]);
 
-  const handleScanQR = () => {
+  const handleScanQR = async () => {
     setState('scanning');
     
-    // Simulate QR scanning
-    setTimeout(() => {
+    try {
+      // Simulate QR scanning - In real app, this would use camera API
+      // QR code would contain station_id and connector_id
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // For testing: Check if scanned code is DJT001
+      // In real app, this would come from QR scanner
+      const scannedCode = 'DJT001'; // Test code - replace with actual QR scanner result
+      
+      // Fetch nearby stations if not already loaded
+      if (stations.length === 0) {
+        const lat = userLocation?.latitude || 17.0000;
+        const lng = userLocation?.longitude || 81.7833;
+        const nearbyStations = await stationService.getNearbyStations(lat, lng, 50);
+        setStations(nearbyStations);
+      }
+      
+      let targetStation: ChargingStation | null = null;
+      
+      // If scanned code is DJT001 (for testing), find that station
+      if (scannedCode === 'DJT001') {
+        // Search for station with code DJT001
+        targetStation = stations.find(s => s.code === 'DJT001') || null;
+        
+        // If not found in nearby stations, try searching
+        if (!targetStation) {
+          try {
+            const searchResults = await stationService.searchStations('DJT001');
+            targetStation = searchResults.find((s: ChargingStation) => s.code === 'DJT001') || null;
+          } catch (searchError) {
+            console.log('Search failed, trying nearby stations');
+          }
+        }
+        
+        // If still not found, use first station from nearby
+        if (!targetStation && stations.length > 0) {
+          targetStation = stations[0];
+        }
+      } else {
+        // For other codes or normal flow, use first available station
+        targetStation = stations.length > 0 ? stations[0] : null;
+      }
+      
+      if (!targetStation || !targetStation.station_id) {
+        alert('Station not found. Please ensure the QR code is valid or try again.');
+        setState('idle');
+        return;
+      }
+      
+      // Fetch station details with connectors from API
+      const stationDetails = await stationService.getStationDetails(targetStation.station_id);
+      
+      if (!stationDetails || !stationDetails.connectors || stationDetails.connectors.length === 0) {
+        alert('No available connectors at this station. Please try another station.');
+        setState('idle');
+        return;
+      }
+      
+      // Get first available connector
+      const availableConnector = stationDetails.connectors.find((c: any) => c.is_available) || stationDetails.connectors[0];
+      
+      if (!availableConnector || !availableConnector.connector_id) {
+        alert('No available connectors. Please try another station.');
+        setState('idle');
+        return;
+      }
+      
+      // Set station info with real data from API
       setStationInfo({
-        name: 'DJT HAIKA PowerHub',
-        chargerId: 'CHG-23456',
-        pricePerUnit: 7.50,
-        address: 'Mall Road, Sector 18',
-        power: '150kW'
+        station_id: stationDetails.station_id,
+        name: stationDetails.name,
+        chargerId: stationDetails.code || `CHG-${stationDetails.station_id}`,
+        connector_id: availableConnector.connector_id,
+        pricePerUnit: stationDetails.price_per_kwh,
+        address: stationDetails.address,
+        power: stationDetails.power || availableConnector.power || '150kW'
       });
       setState('station-details');
-    }, 2000);
+    } catch (error: any) {
+      console.error('Error scanning QR:', error);
+      alert(error.message || 'Failed to scan QR code. Please try again.');
+      setState('idle');
+    }
   };
 
   const getTotalPrice = () => {
@@ -187,31 +281,95 @@ export default function Charging() {
   };
 
   const canPay = () => {
-    return getTotalPrice() <= walletBalance;
+    const totalPrice = getTotalPrice();
+    return totalPrice > 0 && totalPrice <= walletBalance;
   };
 
-  const handlePayAndStart = () => {
-    if (!canPay()) return;
-    
-    setUnitsPurchased(selectedUnits);
-    setUnitsConsumed(0);
-    setChargingTime(0);
-    setIsCharging(true);
-    setState('charging');
+  const handlePayAndStart = async () => {
+    if (!canPay() || !stationInfo) {
+      alert('Insufficient wallet balance. Please add money to your wallet.');
+      return;
+    }
+
+    if (!stationInfo.station_id || !stationInfo.connector_id) {
+      alert('Invalid station or connector information. Please scan QR code again.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Start charging session via API with real station and connector IDs
+      const sessionData = await sessionService.startSession({
+        station_id: stationInfo.station_id,
+        connector_id: stationInfo.connector_id,
+        qr_code: stationInfo.chargerId
+      });
+
+      if (sessionData && sessionData.session_id) {
+        setCurrentSessionId(sessionData.session_id);
+        setUnitsPurchased(selectedUnits);
+        setUnitsConsumed(0);
+        setChargingTime(0);
+        setIsCharging(true);
+        setState('charging');
+      } else {
+        throw new Error('Failed to start session');
+      }
+    } catch (error: any) {
+      console.error('Error starting charging session:', error);
+      alert(error.message || 'Failed to start charging session. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleStopCharging = () => {
-    setIsCharging(false);
-    setState('completed');
+  const handleStopCharging = async () => {
+    if (!currentSessionId) {
+      setIsCharging(false);
+      setState('completed');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Stop session via API (this will deduct from wallet based on actual energy consumed)
+      const stoppedSession = await sessionService.stopSession({
+        session_id: currentSessionId
+      });
+
+      if (stoppedSession) {
+        setIsCharging(false);
+        setState('completed');
+        
+        // Refresh wallet balance after payment
+        await fetchWalletBalance();
+      } else {
+        throw new Error('Failed to stop session');
+      }
+    } catch (error: any) {
+      console.error('Error stopping charging session:', error);
+      alert(error.message || 'Failed to stop charging session. Please try again.');
+      // Still update UI even if API fails
+      setIsCharging(false);
+      setState('completed');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDone = () => {
+  const handleDone = async () => {
     setState('idle');
     setStationInfo(null);
     setSelectedUnits(10);
     setUnitsPurchased(0);
     setUnitsConsumed(0);
     setChargingTime(0);
+    setCurrentSessionId(null);
+    
+    // Refresh wallet balance
+    await fetchWalletBalance();
   };
 
   const formatTime = (seconds: number) => {

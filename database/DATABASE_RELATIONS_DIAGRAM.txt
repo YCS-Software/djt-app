@@ -1,0 +1,161 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║              EV CHARGING STATION - DATABASE RELATIONS DIAGRAM                ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              CENTRAL HUB                                    │
+│                          ┌──────────────┐                                   │
+│                          │   users_t     │                                   │
+│                          │  (usr_id)     │                                   │
+│                          └───────┬───────┘                                   │
+└──────────────────────────────────┼──────────────────────────────────────────┘
+                                   │
+        ┌──────────────────────────┼──────────────────────────┐
+        │                          │                          │
+        │                          │                          │
+┌───────▼────────┐        ┌────────▼────────┐      ┌─────────▼─────────┐
+│   wallet_t     │        │user_statistics_t│      │user_preferences_t │
+│  (wllt_id)     │        │    (stt_id)      │      │     (prf_id)      │
+│  [1:1]         │        │     [1:1]        │      │      [1:1]        │
+└───────┬────────┘        └──────────────────┘      └───────────────────┘
+        │
+        │ [1:N]
+        │
+┌───────▼──────────────────────────────────────────────────────────────────┐
+│                    wallet_transactions_t (trxn_id)                        │
+│                    [1:N from wallet_t]                                    │
+│                    [1:N from users_t]                                     │
+└──────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        CHARGING INFRASTRUCTURE                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────┐
+│  charging_stations_t     │
+│      (sttn_id)           │
+└───────────┬───────────────┘
+            │
+    ┌───────┼───────┐
+    │       │       │
+    │ [1:N] │ [1:N] │ [1:N]
+    │       │       │
+┌───▼───┐ ┌─▼────┐ ┌▼──────────┐ ┌▼──────────┐ ┌▼──────────────┐
+│connectors│ │sessions│ │bookings│ │reviews│ │favorites│
+│(cnntr_id)│ │(sssn_id)│ │(bkng_id)│ │(rvw_id)│ │(fvrt_id)│
+└───┬───┘ └─┬────┘ └──────────┘ └──────────┘ └──────────────┘
+    │       │
+    │       │ [1:N]
+    │       │
+    │   ┌───▼──────────────────┐
+    │   │charging_session_logs_t│
+    │   │      (log_id)         │
+    │   └───────────────────────┘
+    │
+    └───► Used in sessions and bookings
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          USER ACTIVITIES                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+users_t (usr_id)
+    │
+    ├──► [1:N] user_tokens_t (tkn_id)
+    │
+    ├──► [1:N] charging_sessions_t (sssn_id)
+    │         │
+    │         ├──► charging_stations_t (sttn_id)
+    │         ├──► station_connectors_t (cnntr_id)
+    │         ├──► wallet_transactions_t (wllt_trxn_id)
+    │         └──► charging_session_logs_t (sssn_id)
+    │
+    ├──► [1:N] station_bookings_t (bkng_id)
+    │         │
+    │         ├──► charging_stations_t (sttn_id)
+    │         └──► station_connectors_t (cnntr_id)
+    │
+    ├──► [1:N] user_vehicles_t (vhcl_id)
+    │
+    ├──► [1:N] notifications_t (ntfctn_id)
+    │
+    ├──► [1:N] station_reviews_t (rvw_id)
+    │         │
+    │         ├──► charging_stations_t (sttn_id)
+    │         └──► charging_sessions_t (sssn_id)
+    │
+    ├──► [M:N] user_favorite_stations_t (fvrt_id)
+    │         │
+    │         └──► charging_stations_t (sttn_id)
+    │
+    └──► [1:N] user_offer_usage_t (usg_id)
+            │
+            ├──► offers_t (offr_id)
+            └──► charging_sessions_t (sssn_id)
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          OFFERS & REWARDS                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+offers_t (offr_id)
+    │
+    └──► [1:N] user_offer_usage_t (usg_id)
+            │
+            ├──► users_t (usr_id)
+            └──► charging_sessions_t (sssn_id)
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          STANDALONE TABLES                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+auth_otp_t (otp_id)
+    └──► Linked to users_t by phn_nmbr_tx (no FK)
+
+audit_logs_t (log_id)
+    └──► usr_id nullable (no FK constraint)
+
+app_settings_t (sttng_id)
+    └──► No relationships
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                          RELATIONSHIP LEGEND                                ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  [1:1]  = One-to-One relationship                                            ║
+║  [1:N]  = One-to-Many relationship                                           ║
+║  [M:N]  = Many-to-Many relationship (via junction table)                     ║
+║  (PK)   = Primary Key                                                         ║
+║  (FK)   = Foreign Key                                                         ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                          KEY DATA FLOWS                                      ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  1. USER REGISTRATION FLOW:                                                 ║
+║     users_t → wallet_t → user_preferences_t → user_statistics_t             ║
+║                                                                              ║
+║  2. CHARGING SESSION FLOW:                                                   ║
+║     users_t → charging_sessions_t → station_connectors_t                    ║
+║     → charging_session_logs_t → wallet_transactions_t → wallet_t            ║
+║                                                                              ║
+║  3. BOOKING FLOW:                                                            ║
+║     users_t → station_bookings_t → charging_stations_t                      ║
+║     → station_connectors_t → charging_sessions_t                            ║
+║                                                                              ║
+║  4. PAYMENT FLOW:                                                            ║
+║     charging_sessions_t → wallet_transactions_t → wallet_t                  ║
+║                                                                              ║
+║  5. REVIEW FLOW:                                                             ║
+║     charging_sessions_t → station_reviews_t → charging_stations_t            ║
+║     (updates station rating)                                                 ║
+║                                                                              ║
+║  6. OFFER APPLICATION:                                                       ║
+║     offers_t → user_offer_usage_t → charging_sessions_t                     ║
+║     → wallet_transactions_t (with discount)                                 ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Total Tables: 20
+Total Relationships: 25+
+Primary Entity: users_t (connects to 12+ tables)
+
+

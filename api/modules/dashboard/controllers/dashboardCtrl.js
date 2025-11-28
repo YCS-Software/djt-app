@@ -8,75 +8,6 @@ const df = require(appRoot + '/utils/dateFormatUtil');
 const dashboardMdl = require('../models/dashboardMdl');
 const cntxtDtls = "dashboardCtrl";
 
-// Dummy data for home page
-const DUMMY_STATIONS = [
-    {
-        station_id: 1,
-        name: 'DJT HAIKA PowerHub Mall Road',
-        address: 'Mall Road, Sector 18',
-        distance: '0.5 km',
-        available_chargers: 3,
-        total_chargers: 4,
-        price_per_kwh: 10.00,
-        rating: 4.5,
-        is_fast_charging: true,
-        power: '150kW'
-    },
-    {
-        station_id: 2,
-        name: 'DJT HAIKA EcoCharge Central',
-        address: 'Central Park, MG Road',
-        distance: '1.2 km',
-        available_chargers: 4,
-        total_chargers: 6,
-        price_per_kwh: 8.00,
-        rating: 4.2,
-        is_fast_charging: false,
-        power: '22kW'
-    },
-    {
-        station_id: 3,
-        name: 'DJT HAIKA QuickCharge Express',
-        address: 'Tech Park, Cyber City',
-        distance: '2.1 km',
-        available_chargers: 2,
-        total_chargers: 3,
-        price_per_kwh: 12.00,
-        rating: 4.7,
-        is_fast_charging: true,
-        power: '350kW'
-    }
-];
-
-const DUMMY_SESSIONS = [
-    {
-        session_id: 1001,
-        station_name: 'DJT HAIKA PowerHub Mall Road',
-        date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        energy_consumed: 15.5,
-        cost: 155.00,
-        duration_minutes: 45,
-        status: 'completed'
-    },
-    {
-        session_id: 1002,
-        station_name: 'DJT HAIKA EcoCharge Central',
-        date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        energy_consumed: 22.3,
-        cost: 178.40,
-        duration_minutes: 60,
-        status: 'completed'
-    },
-    {
-        session_id: 1003,
-        station_name: 'DJT HAIKA QuickCharge Express',
-        date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        energy_consumed: 18.0,
-        cost: 216.00,
-        duration_minutes: 30,
-        status: 'completed'
-    }
-];
 
 /*****************************************************************************
 * Function      : getHomeData
@@ -87,28 +18,25 @@ exports.getHomeData = function(req, res) {
     var fnm = "getHomeData";
     const userId = req.user.userId;
     
-    // Get all data for home page
+    // Get all data for home page - only query data, no dummy data
     Promise.all([
-        dashboardMdl.getWalletBalanceMdl({ userId: userId }).catch(() => null),
-        dashboardMdl.getNearbyStationsMdl({ userId: userId, limit: 3 }).catch(() => []),
-        dashboardMdl.getRecentSessionsMdl({ userId: userId, limit: 3 }).catch(() => []),
-        dashboardMdl.getUserStatsMdl({ userId: userId }).catch(() => null)
+        dashboardMdl.getWalletBalanceMdl({ userId: userId }),
+        dashboardMdl.getNearbyStationsMdl({ userId: userId, limit: 3 }),
+        dashboardMdl.getRecentSessionsMdl({ userId: userId, limit: 3 }),
+        dashboardMdl.getUserStatsMdl({ userId: userId })
     ])
     .then(function([walletResult, stations, sessions, statsResult]) {
-        // Format wallet data
-        let wallet = {
-            balance: 520.00,
-            last_updated: new Date().toISOString()
-        };
+        // Format wallet data - only from query
+        let wallet = null;
         if (walletResult && walletResult.length > 0) {
             wallet = {
-                balance: parseFloat(walletResult[0].blnce_amt) || 520.00,
-                last_updated: walletResult[0].lst_updtd_ts || new Date().toISOString()
+                balance: parseFloat(walletResult[0].blnce_amt) || 0,
+                last_updated: walletResult[0].lst_updtd_ts ? new Date(walletResult[0].lst_updtd_ts).toISOString() : null
             };
         }
         
-        // Format stations - use dummy if empty
-        let nearbyStations = DUMMY_STATIONS;
+        // Format stations - only from query
+        let nearbyStations = [];
         if (stations && stations.length > 0) {
             nearbyStations = stations.map(function(s) {
                 return {
@@ -116,18 +44,18 @@ exports.getHomeData = function(req, res) {
                     name: s.sttn_nm_tx,
                     address: s.addr_tx,
                     distance: (parseFloat(s.distance) || 0).toFixed(1) + ' km',
-                    available_chargers: s.avlbl_chrgrs_nbr,
-                    total_chargers: s.ttl_chrgrs_nbr,
-                    price_per_kwh: parseFloat(s.prce_per_kwh_amt),
-                    rating: parseFloat(s.rtng_nbr),
+                    available_chargers: s.avlbl_chrgrs_nbr || 0,
+                    total_chargers: s.ttl_chrgrs_nbr || 0,
+                    price_per_kwh: parseFloat(s.prce_per_kwh_amt) || 0,
+                    rating: parseFloat(s.rtng_nbr) || 0,
                     is_fast_charging: s.is_fst_chrgng_in === 1,
-                    power: s.pwr_tx
+                    power: s.pwr_tx || null
                 };
             });
         }
         
-        // Format sessions - use dummy if empty
-        let recentSessions = DUMMY_SESSIONS;
+        // Format sessions - only from query
+        let recentSessions = [];
         if (sessions && sessions.length > 0) {
             recentSessions = sessions.map(function(s) {
                 return {
@@ -137,25 +65,25 @@ exports.getHomeData = function(req, res) {
                     energy_consumed: parseFloat(s.enrgy_cnsmd_kwh) || 0,
                     cost: parseFloat(s.ttl_cst_amt) || 0,
                     duration_minutes: s.durn_mnts_nbr || 0,
-                    status: s.sttus_cd
+                    status: s.sttus_cd || null
                 };
             });
         }
         
-        // Format stats
+        // Format stats - only from query
         let stats = {
-            total_sessions: 47,
-            total_energy_kwh: 1245,
-            total_spent: 12450,
-            co2_saved_kg: 1020.9
+            total_sessions: 0,
+            total_energy_kwh: 0,
+            total_spent: 0,
+            co2_saved_kg: 0
         };
         if (statsResult && statsResult.length > 0) {
             const s = statsResult[0];
             stats = {
-                total_sessions: s.ttl_sssns_nbr || 47,
-                total_energy_kwh: parseFloat(s.ttl_enrgy_kwh) || 1245,
-                total_spent: parseFloat(s.ttl_spnt_amt) || 12450,
-                co2_saved_kg: parseFloat(s.co2_svd_kg) || 1020.9
+                total_sessions: s.ttl_sssns_nbr || 0,
+                total_energy_kwh: parseFloat(s.ttl_enrgy_kwh) || 0,
+                total_spent: parseFloat(s.ttl_spnt_amt) || 0,
+                co2_saved_kg: parseFloat(s.co2_svd_kg) || 0
             };
         }
         
@@ -168,13 +96,8 @@ exports.getHomeData = function(req, res) {
     })
     .catch(function(error) {
         console.error('[getHomeData] Error:', error);
-        // Return dummy data on error
-        return df.formatSucessRes(req, res, {
-            wallet: { balance: 520.00, last_updated: new Date().toISOString() },
-            nearby_stations: DUMMY_STATIONS,
-            recent_sessions: DUMMY_SESSIONS,
-            stats: { total_sessions: 47, total_energy_kwh: 1245, total_spent: 12450, co2_saved_kg: 1020.9 }
-        }, cntxtDtls, fnm, {});
+        // Return empty data on error - no dummy data
+        return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
     });
 };
 

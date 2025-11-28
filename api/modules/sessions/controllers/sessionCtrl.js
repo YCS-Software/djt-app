@@ -3,8 +3,11 @@
  * Handles charging session operations
  */
 
-const { ChargingSession, ChargingStation, StationConnector, Wallet, WalletTransaction } = require('../../../../models');
+const { ChargingSession, ChargingStation, StationConnector } = require('../../../../models');
+const walletMdl = require('../../wallet/models/walletMdl');
 const std = require(appRoot + '/utils/standardMessages');
+const df = require(appRoot + '/utils/dateFormatUtil');
+const cntxtDtls = "sessionCtrl";
 
 /**
  * Generate unique session code
@@ -33,7 +36,7 @@ exports.startSession = async (req, res) => {
         }
 
         // Get station details
-        const station = await ChargingStation.findById(station_id);
+        const station = await ChargingStation.findById(station_id, 'sttn_id');
         if (!station) {
             return res.status(std.message["NOT_FOUND"].code).json({
                 status: std.message["NOT_FOUND"].code,
@@ -48,6 +51,29 @@ exports.startSession = async (req, res) => {
             return res.status(std.message["BAD_REQUEST"].code).json({
                 status: std.message["BAD_REQUEST"].code,
                 message: 'You already have an active charging session',
+                data: null
+            });
+        }
+
+        // Check wallet balance - ensure user has minimum balance
+        // Note: Actual payment happens when session stops, but we check balance here as pre-authorization
+        const walletResults = await walletMdl.getUserWalletMdl({ userId: userId });
+        if (!walletResults || walletResults.length === 0) {
+            return res.status(std.message["BAD_REQUEST"].code).json({
+                status: std.message["BAD_REQUEST"].code,
+                message: 'Wallet not found. Please contact support.',
+                data: null
+            });
+        }
+
+        const wallet = walletResults[0];
+        const walletBalance = parseFloat(wallet.blnce_amt) || 0;
+        const minRequiredBalance = parseFloat(station.prce_per_kwh_amt) * 1; // At least 1 kWh worth
+        
+        if (walletBalance < minRequiredBalance) {
+            return res.status(std.message["BAD_REQUEST"].code).json({
+                status: std.message["BAD_REQUEST"].code,
+                message: `Insufficient wallet balance. Minimum required: ₹${minRequiredBalance.toFixed(2)}`,
                 data: null
             });
         }
@@ -67,7 +93,7 @@ exports.startSession = async (req, res) => {
         await ChargingSession.startSession(session.sssn_id);
 
         // Get connector details
-        const connector = await StationConnector.findById(connector_id);
+        const connector = await StationConnector.findById(connector_id, 'cnntr_id');
 
         res.status(std.message["SUCCESS"].code).json({
             status: std.message["SUCCESS"].code,
@@ -109,7 +135,7 @@ exports.stopSession = async (req, res) => {
         }
 
         // Get session
-        const session = await ChargingSession.findById(session_id);
+        const session = await ChargingSession.findById(session_id, 'sssn_id');
         if (!session || session.usr_id !== userId) {
             return res.status(std.message["NOT_FOUND"].code).json({
                 status: std.message["NOT_FOUND"].code,
@@ -126,38 +152,92 @@ exports.stopSession = async (req, res) => {
             });
         }
 
-        // Calculate energy and cost (simplified calculation)
+        // Calculate energy and cost based on actual consumption
         const energyConsumed = parseFloat(session.enrgy_cnsmd_kwh) || 0;
         const totalCost = energyConsumed * parseFloat(session.prce_per_kwh_amt);
+
+        // Get wallet to check balance
+        const walletResults = await walletMdl.getUserWalletMdl({ userId: userId });
+        if (!walletResults || walletResults.length === 0) {
+            return res.status(std.message["BAD_REQUEST"].code).json({
+                status: std.message["BAD_REQUEST"].code,
+                message: 'Wallet not found. Cannot process payment.',
+                data: null
+            });
+        }
+
+        const wallet = walletResults[0];
+        const walletBalance = parseFloat(wallet.blnce_amt) || 0;
+
+        // Verify wallet has sufficient balance
+        if (walletBalance < totalCost) {
+            // Stop session but mark payment as failed
+            await ChargingSession.stopSession(session_id, energyConsumed, totalCost);
+            await ChargingSession.updatePaymentStatus(session_id, 'pending', null);
+            
+            return res.status(std.message["BAD_REQUEST"].code).json({
+                status: std.message["BAD_REQUEST"].code,
+                message: `Insufficient wallet balance. Required: ₹${totalCost.toFixed(2)}, Available: ₹${walletBalance.toFixed(2)}`,
+                data: {
+                    session_id,
+                    energy_consumed: energyConsumed,
+                    total_cost: totalCost,
+                    wallet_balance: walletBalance,
+                    status: 'completed',
+                    payment_status: 'pending'
+                }
+            });
+        }
 
         // Stop session
         await ChargingSession.stopSession(session_id, energyConsumed, totalCost);
 
         // Deduct from wallet
-        const wallet = await Wallet.getUserWallet(userId);
-        if (wallet && parseFloat(wallet.blnce_amt) >= totalCost) {
-            const balanceBefore = parseFloat(wallet.blnce_amt);
-            const balanceAfter = balanceBefore - totalCost;
+        const balanceBefore = walletBalance;
+        const balanceAfter = balanceBefore - totalCost;
 
-            await Wallet.deductMoney(wallet.wllt_id, totalCost);
+        await walletMdl.deductMoneyMdl({ 
+            walletId: wallet.wllt_id, 
+            amount: totalCost, 
+            userId: userId 
+        });
 
-            // Create transaction
-            const transaction = await WalletTransaction.createTransaction({
-                walletId: wallet.wllt_id,
-                userId,
-                type: 'debit',
-                category: 'charging',
-                amount: totalCost,
-                balanceBefore,
-                balanceAfter,
-                description: 'Charging session payment',
-                referenceId: session_id,
-                referenceType: 'session',
-                status: 'completed'
-            });
-
-            await ChargingSession.updatePaymentStatus(session_id, 'paid', transaction.trxn_id);
+        // Verify wallet was updated
+        const updatedWalletResults = await walletMdl.getUserWalletMdl({ userId: userId });
+        if (!updatedWalletResults || updatedWalletResults.length === 0) {
+            throw new Error('Failed to verify wallet update');
         }
+
+        const updatedWallet = updatedWalletResults[0];
+        const actualBalance = parseFloat(updatedWallet.blnce_amt) || 0;
+
+        // Verify balance matches expected value
+        if (Math.abs(actualBalance - balanceAfter) > 0.01) {
+            throw new Error(`Wallet balance mismatch: expected ${balanceAfter}, got ${actualBalance}`);
+        }
+
+        // Create transaction record in wallet_transactions_t
+        const transactionResults = await walletMdl.createTransactionMdl({
+            walletId: wallet.wllt_id,
+            userId: userId,
+            type: 'debit',
+            category: 'charging',
+            amount: totalCost,
+            balanceBefore: balanceBefore,
+            balanceAfter: balanceAfter,
+            description: `Charging session payment - ${session.sssn_cd || 'Session ' + session_id}`,
+            status: 'completed',
+            referenceId: session_id.toString(),
+            referenceType: 'session'
+        });
+
+        // Verify transaction was created
+        if (!transactionResults || !transactionResults.insertId) {
+            throw new Error('Failed to create wallet transaction');
+        }
+
+        // Update session payment status
+        await ChargingSession.updatePaymentStatus(session_id, 'paid', transactionResults.insertId);
 
         res.status(std.message["SUCCESS"].code).json({
             status: std.message["SUCCESS"].code,

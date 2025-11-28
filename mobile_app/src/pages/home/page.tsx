@@ -67,13 +67,8 @@ export default function Home() {
     } catch (error) {
       console.error('Error fetching home data:', error);
       // Set default values on error
-      setWalletBalance(520.00);
-      setStats({
-        total_sessions: 47,
-        total_energy_kwh: 1245,
-        total_spent: 12450,
-        co2_saved_kg: 1020.9
-      });
+      setWalletBalance(0.00);
+      setStats(null as UserStats | null);
     } finally {
       setLoading(false);
     }

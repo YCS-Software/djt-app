@@ -486,19 +486,63 @@ CREATE INDEX idx_station_location_active ON charging_stations_t(ltde_nbr, lngtde
 -- SAMPLE DATA INSERTS (Optional)
 -- ============================================
 
--- Sample charging station
+-- Sample charging stations - Rajahmundry, Andhra Pradesh, India
 INSERT INTO charging_stations_t (
     sttn_nm_tx, sttn_cd, addr_tx, cty_tx, stte_tx,
     ltde_nbr, lngtde_nbr, prce_per_kwh_amt,
     ttl_chrgrs_nbr, avlbl_chrgrs_nbr, rtng_nbr,
     is_fst_chrgng_in, pwr_tx, oprtr_nm_tx
 ) VALUES 
-('DJT HAIKA PowerHub Mall Road', 'DJT001', 'Mall Road, Sector 18', 'Gurugram', 'Haryana',
- 28.4595, 77.0266, 10.00, 4, 3, 4.5, 1, '150kW', 'DJT HAIKA'),
-('DJT HAIKA EcoCharge Central', 'DJT002', 'Central Park, MG Road', 'Gurugram', 'Haryana',
- 28.4601, 77.0280, 8.00, 6, 4, 4.2, 0, '22kW', 'DJT HAIKA'),
-('DJT HAIKA QuickCharge Express', 'DJT003', 'Tech Park, Cyber City', 'Gurugram', 'Haryana',
- 28.4940, 77.0826, 12.00, 3, 2, 4.7, 1, '350kW', 'DJT HAIKA');
+('DJT HAIKA PowerHub Main Road', 'DJT001', 'Main Road, Near RTC Bus Stand', 'Rajahmundry', 'Andhra Pradesh',
+ 17.0000, 81.7833, 10.00, 4, 3, 4.5, 1, '150kW', 'DJT HAIKA'),
+('DJT HAIKA EcoCharge Godavari', 'DJT002', 'Godavari Bund Road, Near Pushkar Ghat', 'Rajahmundry', 'Andhra Pradesh',
+ 17.0080, 81.7900, 8.00, 6, 4, 4.2, 0, '22kW', 'DJT HAIKA'),
+('DJT HAIKA QuickCharge Express', 'DJT003', 'NH-16, Near Katheru Junction', 'Rajahmundry', 'Andhra Pradesh',
+ 16.9920, 81.7750, 12.00, 3, 2, 4.7, 1, '350kW', 'DJT HAIKA');
+
+-- Sample station connectors (assuming stations 1, 2, 3 exist)
+INSERT INTO station_connectors_t (sttn_id, cnntr_typ_cd, cnntr_nm_tx, pwr_tx, is_avlbl_in) VALUES
+(1, 'CCS2', 'CCS2 Connector 1', '150kW', 1),
+(1, 'CHAdeMO', 'CHAdeMO Connector 1', '150kW', 1),
+(2, 'Type2', 'Type 2 Connector 1', '22kW', 1),
+(2, 'CCS2', 'CCS2 Connector 1', '22kW', 1),
+(3, 'CCS2', 'CCS2 Connector 1', '350kW', 1),
+(3, 'CHAdeMO', 'CHAdeMO Connector 1', '350kW', 1);
+
+-- Sample charging sessions (from dashboardCtrl.js)
+-- Note: Assumes user_id = 1 exists, stations 1, 2, 3 exist, and connectors 1, 2, 3 exist
+INSERT INTO charging_sessions_t (
+    sssn_cd, usr_id, sttn_id, cnntr_id,
+    strt_ts, end_ts, durn_mnts_nbr,
+    enrgy_cnsmd_kwh, prce_per_kwh_amt, ttl_cst_amt,
+    prgrss_pct, sttus_cd, pymnt_sttus_cd
+) VALUES
+-- Session 1: DJT HAIKA PowerHub Main Road (Station 1)
+-- Date: 1 day ago, Duration: 45 minutes, Energy: 15.5 kWh, Cost: 155.00
+('SSN001', 1, 1, 1,
+ DATE_SUB(NOW(), INTERVAL 1 DAY) + INTERVAL 10 HOUR,
+ DATE_SUB(NOW(), INTERVAL 1 DAY) + INTERVAL 10 HOUR + INTERVAL 45 MINUTE,
+ 45,
+ 15.500, 10.00, 155.00,
+ 100, 'completed', 'paid'),
+
+-- Session 2: DJT HAIKA EcoCharge Godavari (Station 2)
+-- Date: 3 days ago, Duration: 60 minutes, Energy: 22.3 kWh, Cost: 178.40
+('SSN002', 1, 2, 3,
+ DATE_SUB(NOW(), INTERVAL 3 DAY) + INTERVAL 14 HOUR,
+ DATE_SUB(NOW(), INTERVAL 3 DAY) + INTERVAL 14 HOUR + INTERVAL 60 MINUTE,
+ 60,
+ 22.300, 8.00, 178.40,
+ 100, 'completed', 'paid'),
+
+-- Session 3: DJT HAIKA QuickCharge Express (Station 3)
+-- Date: 7 days ago, Duration: 30 minutes, Energy: 18.0 kWh, Cost: 216.00
+('SSN003', 1, 3, 5,
+ DATE_SUB(NOW(), INTERVAL 7 DAY) + INTERVAL 9 HOUR,
+ DATE_SUB(NOW(), INTERVAL 7 DAY) + INTERVAL 9 HOUR + INTERVAL 30 MINUTE,
+ 30,
+ 18.000, 12.00, 216.00,
+ 100, 'completed', 'paid');
 
 -- Sample app settings
 INSERT INTO app_settings_t (sttng_ky_tx, sttng_vl_tx, dscrptn_tx) VALUES

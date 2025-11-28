@@ -24,7 +24,7 @@ interface UserData {
 const Home = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<UserData | null>(null);
-  const [walletBalance, setWalletBalance] = useState(520.00);
+  const [walletBalance, setWalletBalance] = useState(0.00);
   const [greeting, setGreeting] = useState('Hello');
 
   useEffect(() => {
