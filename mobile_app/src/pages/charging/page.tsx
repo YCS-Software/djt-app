@@ -177,16 +177,24 @@ export default function Charging() {
     try {
       setLoading(true);
       
-      // Stop session via API (this will deduct from wallet based on actual energy consumed)
+      // Calculate actual charged cost based on units consumed
+      const chargedCost = unitsConsumed * (stationInfo?.pricePerUnit || 0);
+      const isFullyCompleted = unitsConsumed >= unitsPurchased;
+      
+      // Stop session via API with actual charged units and cost
+      // Backend will calculate refund (prepaid - charged) and add to wallet
       const stoppedSession = await sessionService.stopSession({
-        session_id: currentSessionId
+        session_id: currentSessionId,
+        charged_units: unitsConsumed,
+        charged_cost: chargedCost,
+        is_fully_completed: isFullyCompleted
       });
 
       if (stoppedSession) {
         setIsCharging(false);
         setState('completed');
         
-        // Refresh wallet balance after payment
+        // Refresh wallet balance after payment/refund
         await fetchWalletBalance();
       } else {
         throw new Error('Failed to stop session');
@@ -200,7 +208,7 @@ export default function Charging() {
     } finally {
       setLoading(false);
     }
-  }, [currentSessionId, fetchWalletBalance]);
+  }, [currentSessionId, unitsConsumed, unitsPurchased, stationInfo, fetchWalletBalance]);
 
   // Charging timer
   useEffect(() => {
