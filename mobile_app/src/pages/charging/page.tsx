@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   QrCode, 
@@ -167,6 +167,41 @@ export default function Charging() {
     return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
   };
 
+  const handleStopCharging = useCallback(async () => {
+    if (!currentSessionId) {
+      setIsCharging(false);
+      setState('completed');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Stop session via API (this will deduct from wallet based on actual energy consumed)
+      const stoppedSession = await sessionService.stopSession({
+        session_id: currentSessionId
+      });
+
+      if (stoppedSession) {
+        setIsCharging(false);
+        setState('completed');
+        
+        // Refresh wallet balance after payment
+        await fetchWalletBalance();
+      } else {
+        throw new Error('Failed to stop session');
+      }
+    } catch (error: any) {
+      console.error('Error stopping charging session:', error);
+      alert(error.message || 'Failed to stop charging session. Please try again.');
+      // Still update UI even if API fails
+      setIsCharging(false);
+      setState('completed');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentSessionId, fetchWalletBalance]);
+
   // Charging timer
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -176,8 +211,10 @@ export default function Charging() {
         setUnitsConsumed(prev => {
           const next = prev + 0.1;
           if (next >= unitsPurchased) {
+            // Charging reached 100% - automatically stop session
             setIsCharging(false);
-            setState('completed');
+            // Call stopSession API automatically when 100% complete
+            handleStopCharging();
             return unitsPurchased;
           }
           return next;
@@ -185,7 +222,7 @@ export default function Charging() {
       }, 500);
     }
     return () => clearInterval(interval);
-  }, [isCharging, unitsConsumed, unitsPurchased]);
+  }, [isCharging, unitsConsumed, unitsPurchased, handleStopCharging]);
 
   const handleScanQR = async () => {
     setState('scanning');
@@ -299,11 +336,17 @@ export default function Charging() {
     try {
       setLoading(true);
       
+      // Calculate total amount
+      const totalAmount = getTotalPrice();
+      
       // Start charging session via API with real station and connector IDs
+      // Send selected units and total amount for wallet deduction
       const sessionData = await sessionService.startSession({
         station_id: stationInfo.station_id,
         connector_id: stationInfo.connector_id,
-        qr_code: stationInfo.chargerId
+        qr_code: stationInfo.chargerId,
+        selected_units: selectedUnits,
+        total_amount: totalAmount
       });
 
       if (sessionData && sessionData.session_id) {
@@ -313,6 +356,9 @@ export default function Charging() {
         setChargingTime(0);
         setIsCharging(true);
         setState('charging');
+        
+        // Refresh wallet balance after payment deduction
+        await fetchWalletBalance();
       } else {
         throw new Error('Failed to start session');
       }
@@ -324,40 +370,6 @@ export default function Charging() {
     }
   };
 
-  const handleStopCharging = async () => {
-    if (!currentSessionId) {
-      setIsCharging(false);
-      setState('completed');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      
-      // Stop session via API (this will deduct from wallet based on actual energy consumed)
-      const stoppedSession = await sessionService.stopSession({
-        session_id: currentSessionId
-      });
-
-      if (stoppedSession) {
-        setIsCharging(false);
-        setState('completed');
-        
-        // Refresh wallet balance after payment
-        await fetchWalletBalance();
-      } else {
-        throw new Error('Failed to stop session');
-      }
-    } catch (error: any) {
-      console.error('Error stopping charging session:', error);
-      alert(error.message || 'Failed to stop charging session. Please try again.');
-      // Still update UI even if API fails
-      setIsCharging(false);
-      setState('completed');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleDone = async () => {
     setState('idle');

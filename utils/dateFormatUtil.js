@@ -16,14 +16,62 @@ const std = require(appRoot + '/utils/standardMessages');
  * @returns {Object} - Formatted response
  */
 exports.formatSucessRes = function(req, res, data, cntxtDtls, fnm, options) {
-    const response = {
-        status: std.message["SUCCESS"].code || 200,
-        message: options.message || 'Success',
-        data: data
+    // Check if response was already sent
+    if (res.headersSent) {
+        console.error(`[${cntxtDtls}] ${fnm} - Cannot send success, response already sent`);
+        return;
+    }
+    
+    // Create a replacer function with access to a WeakSet to track circular references
+    const seen = new WeakSet();
+    const replacer = function(key, value) {
+        // Skip common circular reference properties
+        if (key === 'socket' || key === 'parser' || key === '_events' || key === '_eventsCount' || 
+            key === 'connection' || key === 'pool' || key === 'client' || key === 'stream' ||
+            key === 'req' || key === 'res' || key === 'request' || key === 'response') {
+            return undefined;
+        }
+        // Handle circular references
+        if (typeof value === 'object' && value !== null) {
+            if (seen.has(value)) {
+                return '[Circular]';
+            }
+            seen.add(value);
+        }
+        return value;
     };
     
-    console.log(`[${cntxtDtls}] ${fnm} - Success`);
-    return res.status(response.status).json(response);
+    let cleanData = data;
+    try {
+        // Test if data can be serialized
+        JSON.stringify(data, replacer);
+        cleanData = data;
+    } catch (e) {
+        console.error(`[${cntxtDtls}] ${fnm} - Data contains circular references, using empty object`, e.message);
+        cleanData = {};
+    }
+    
+    const response = {
+        status: std.message["SUCCESS"].code || 200,
+        message: (options && options.message) ? options.message : 'Success',
+        data: cleanData
+    };
+    
+    try {
+        console.log(`[${cntxtDtls}] ${fnm} - Success`);
+        // Use the replacer when sending the response
+        return res.status(response.status).json(response);
+    } catch (e) {
+        console.error(`[${cntxtDtls}] ${fnm} - Error sending response:`, e.message);
+        // If JSON.stringify fails, try with minimal data
+        if (!res.headersSent) {
+            return res.status(response.status).json({
+                status: response.status,
+                message: response.message,
+                data: {}
+            });
+        }
+    }
 };
 
 /**
@@ -36,6 +84,12 @@ exports.formatSucessRes = function(req, res, data, cntxtDtls, fnm, options) {
  * @returns {Object} - Formatted error response
  */
 exports.formatErrorRes = function(res, error, cntxtDtls, fnm, options) {
+    // Check if response was already sent
+    if (res.headersSent) {
+        console.error(`[${cntxtDtls}] ${fnm} - Cannot send error, response already sent`);
+        return;
+    }
+    
     console.error(`[${cntxtDtls}] ${fnm} - Error:`, error);
     
     const errorStatus = error.err_status || error.status || std.message["INTERNAL_ERROR"].code || 500;

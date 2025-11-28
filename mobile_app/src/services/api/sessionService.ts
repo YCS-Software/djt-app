@@ -27,6 +27,8 @@ export interface StartSessionRequest {
   station_id: number;
   connector_id: number;
   qr_code?: string;
+  selected_units?: number;
+  total_amount?: number;
 }
 
 export interface StopSessionRequest {
