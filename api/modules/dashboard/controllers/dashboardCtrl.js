@@ -31,7 +31,7 @@ exports.getHomeData = function(req, res) {
         if (walletResult && walletResult.length > 0) {
             wallet = {
                 balance: parseFloat(walletResult[0].blnce_amt) || 0,
-                last_updated: walletResult[0].lst_updtd_ts ? new Date(walletResult[0].lst_updtd_ts).toISOString() : null
+                last_updated: df.formatDate(walletResult[0].lst_updtd_ts) || null
             };
         }
         

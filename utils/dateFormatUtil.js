@@ -15,16 +15,14 @@ const std = require(appRoot + '/utils/standardMessages');
  * @param {Object} options - Additional options
  * @returns {Object} - Formatted response
  */
-exports.formatSucessRes = function(req, res, data, cntxtDtls, fnm, options) {
-    // Check if response was already sent
-    if (res.headersSent) {
-        console.error(`[${cntxtDtls}] ${fnm} - Cannot send success, response already sent`);
-        return;
-    }
-    
-    // Create a replacer function with access to a WeakSet to track circular references
+/**
+ * Clean data to remove circular references
+ */
+function cleanDataForJSON(obj) {
     const seen = new WeakSet();
-    const replacer = function(key, value) {
+    const stack = [];
+    
+    function replacer(key, value) {
         // Skip common circular reference properties
         if (key === 'socket' || key === 'parser' || key === '_events' || key === '_eventsCount' || 
             key === 'connection' || key === 'pool' || key === 'client' || key === 'stream' ||
@@ -33,22 +31,46 @@ exports.formatSucessRes = function(req, res, data, cntxtDtls, fnm, options) {
         }
         // Handle circular references
         if (typeof value === 'object' && value !== null) {
-            if (seen.has(value)) {
-                return '[Circular]';
+            // Check if we've seen this object before
+            for (let i = 0; i < stack.length; i++) {
+                if (stack[i] === value) {
+                    return '[Circular]';
+                }
             }
-            seen.add(value);
+            stack.push(value);
         }
         return value;
-    };
+    }
     
+    try {
+        return JSON.parse(JSON.stringify(obj, replacer));
+    } catch (e) {
+        console.error('Error cleaning data:', e.message);
+        return {};
+    }
+}
+
+exports.formatSucessRes = function(req, res, data, cntxtDtls, fnm, options) {
+    // Check if response was already sent
+    if (res.headersSent) {
+        console.error(`[${cntxtDtls}] ${fnm} - Cannot send success, response already sent`);
+        return;
+    }
+    
+    // Ensure data is serializable (remove any circular references)
     let cleanData = data;
     try {
         // Test if data can be serialized
-        JSON.stringify(data, replacer);
+        JSON.stringify(data);
         cleanData = data;
     } catch (e) {
-        console.error(`[${cntxtDtls}] ${fnm} - Data contains circular references, using empty object`, e.message);
-        cleanData = {};
+        console.error(`[${cntxtDtls}] ${fnm} - Data contains circular references, cleaning...`, e.message);
+        try {
+            cleanData = cleanDataForJSON(data);
+        } catch (cleanError) {
+            console.error(`[${cntxtDtls}] ${fnm} - Failed to clean data, using empty object`);
+            cleanData = {};
+        }
     }
     
     const response = {
@@ -57,21 +79,8 @@ exports.formatSucessRes = function(req, res, data, cntxtDtls, fnm, options) {
         data: cleanData
     };
     
-    try {
-        console.log(`[${cntxtDtls}] ${fnm} - Success`);
-        // Use the replacer when sending the response
-        return res.status(response.status).json(response);
-    } catch (e) {
-        console.error(`[${cntxtDtls}] ${fnm} - Error sending response:`, e.message);
-        // If JSON.stringify fails, try with minimal data
-        if (!res.headersSent) {
-            return res.status(response.status).json({
-                status: response.status,
-                message: response.message,
-                data: {}
-            });
-        }
-    }
+    console.log(`[${cntxtDtls}] ${fnm} - Success`);
+    return res.status(response.status).json(response);
 };
 
 /**

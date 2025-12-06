@@ -39,73 +39,33 @@ exports.getNearbyStations = function(req, res) {
             stations.map(function(station) {
                 return stationMdl.getStationConnectorsMdl({ stationId: station.sttn_id })
                     .then(function(connectors) {
-                        // Create plain object with only the data we need
                         return {
                             station_id: station.sttn_id,
-                            name: station.sttn_nm_tx || '',
-                            code: station.sttn_cd || '',
-                            address: station.addr_tx || '',
-                            city: station.cty_tx || '',
-                            latitude: parseFloat(station.ltde_nbr) || 0,
-                            longitude: parseFloat(station.lngtde_nbr) || 0,
+                            name: station.sttn_nm_tx,
+                            code: station.sttn_cd,
+                            address: station.addr_tx,
+                            city: station.cty_tx,
+                            latitude: parseFloat(station.ltde_nbr),
+                            longitude: parseFloat(station.lngtde_nbr),
                             distance: parseFloat(station.distance || 0).toFixed(2),
-                            price_per_kwh: parseFloat(station.prce_per_kwh_amt) || 0,
-                            total_chargers: station.ttl_chrgrs_nbr || 0,
-                            available_chargers: station.avlbl_chrgrs_nbr || 0,
-                            rating: parseFloat(station.rtng_nbr) || 0,
+                            price_per_kwh: parseFloat(station.prce_per_kwh_amt),
+                            total_chargers: station.ttl_chrgrs_nbr,
+                            available_chargers: station.avlbl_chrgrs_nbr,
+                            rating: parseFloat(station.rtng_nbr),
                             is_fast_charging: station.is_fst_chrgng_in === 1,
-                            power: station.pwr_tx || '',
-                            connector_types: (connectors && Array.isArray(connectors)) ? connectors.map(function(c) { 
-                                return c && c.cnntr_typ_cd ? c.cnntr_typ_cd : null; 
-                            }).filter(function(c) { return c !== null; }) : []
-                        };
-                    })
-                    .catch(function(connectorError) {
-                        // If connector fetch fails, return station without connectors
-                        console.error('[StationCtrl] Error fetching connectors for station:', station.sttn_id, connectorError);
-                        return {
-                            station_id: station.sttn_id,
-                            name: station.sttn_nm_tx || '',
-                            code: station.sttn_cd || '',
-                            address: station.addr_tx || '',
-                            city: station.cty_tx || '',
-                            latitude: parseFloat(station.ltde_nbr) || 0,
-                            longitude: parseFloat(station.lngtde_nbr) || 0,
-                            distance: parseFloat(station.distance || 0).toFixed(2),
-                            price_per_kwh: parseFloat(station.prce_per_kwh_amt) || 0,
-                            total_chargers: station.ttl_chrgrs_nbr || 0,
-                            available_chargers: station.avlbl_chrgrs_nbr || 0,
-                            rating: parseFloat(station.rtng_nbr) || 0,
-                            is_fast_charging: station.is_fst_chrgng_in === 1,
-                            power: station.pwr_tx || '',
-                            connector_types: []
+                            power: station.pwr_tx,
+                            connector_types: connectors ? connectors.map(function(c) { return c.cnntr_typ_cd; }) : []
                         };
                     });
             })
         );
     })
     .then(function(stationsWithConnectors) {
-        // Ensure we have a clean array of plain objects
-        const cleanStations = (stationsWithConnectors && Array.isArray(stationsWithConnectors)) 
-            ? stationsWithConnectors.filter(function(s) { return s !== null && s !== undefined; })
-            : [];
-        
-        // Check if response was already sent before trying to send
-        if (res.headersSent) {
-            console.error('[StationCtrl] getNearbyStations - Response already sent');
-            return;
-        }
-        
-        return df.formatSucessRes(req, res, { stations: cleanStations }, cntxtDtls, fnm, {});
+        return df.formatSucessRes(req, res, { stations: stationsWithConnectors || [] }, cntxtDtls, fnm, {});
     })
     .catch(function(error) {
         console.error('[StationCtrl] getNearbyStations error:', error);
-        // Check if response was already sent
-        if (!res.headersSent) {
-            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
-        } else {
-            console.error('[StationCtrl] getNearbyStations - Cannot send error, response already sent');
-        }
+        return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
     });
 };
 

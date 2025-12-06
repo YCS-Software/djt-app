@@ -211,7 +211,7 @@ exports.startSession = function(req, res) {
 exports.stopSession = function(req, res) {
     var fnm = "stopSession";
     const userId = req.user.userId;
-    const { session_id, charged_units, charged_cost, is_fully_completed } = req.body;
+    const { session_id } = req.body;
 
     if (!session_id) {
         return res.status(std.message["BAD_REQUEST"].code).json({
@@ -251,13 +251,8 @@ exports.stopSession = function(req, res) {
             }
 
             // Calculate energy and cost based on actual consumption
-            // Use charged_units/charged_cost from frontend if provided, otherwise calculate from session
-            const energyConsumed = (charged_units && charged_units > 0) 
-                ? parseFloat(charged_units) 
-                : (parseFloat(session.enrgy_cnsmd_kwh) || 0);
-            const actualChargedCost = (charged_cost && charged_cost > 0) 
-                ? parseFloat(charged_cost) 
-                : (energyConsumed * parseFloat(session.prce_per_kwh_amt));
+            const energyConsumed = parseFloat(session.enrgy_cnsmd_kwh) || 0;
+            const actualTotalCost = energyConsumed * parseFloat(session.prce_per_kwh_amt);
             const prepaidAmount = parseFloat(session.ttl_cst_amt) || 0;
             const paymentAlreadyMade = session.pymnt_sttus_cd === 'paid';
 
@@ -275,20 +270,20 @@ exports.stopSession = function(req, res) {
                     const wallet = walletResults[0];
                     const walletBalance = parseFloat(wallet.blnce_amt) || 0;
 
-                    // If payment was already made upfront, calculate refund
+                    // If payment was already made upfront, calculate difference
                     if (paymentAlreadyMade && prepaidAmount > 0) {
-                        // Calculate refund amount: prepaid - actual charged
-                        const refundAmount = prepaidAmount - actualChargedCost;
+                        const costDifference = actualTotalCost - prepaidAmount;
                         
-                        // Stop session with actual charged cost
+                        // Stop session with actual cost
                         return sessionMdl.stopSessionMdl({ 
                             sessionId: session_id, 
                             energyConsumed: energyConsumed, 
-                            totalCost: actualChargedCost 
+                            totalCost: actualTotalCost 
                         })
                         .then(function() {
-                            // If there's a refund (stopped in middle), add it back to wallet
-                            if (refundAmount > 0 && !is_fully_completed) {
+                            // If actual cost is less than prepaid, refund the difference
+                            if (costDifference < 0) {
+                                const refundAmount = Math.abs(costDifference);
                                 const balanceBefore = walletBalance;
                                 const balanceAfter = balanceBefore + refundAmount;
 
@@ -323,7 +318,7 @@ exports.stopSession = function(req, res) {
                                         amount: refundAmount,
                                         balanceBefore: balanceBefore,
                                         balanceAfter: balanceAfter,
-                                        description: `Charging session refund - ${session.sssn_cd || 'Session ' + session_id} (Prepaid: ₹${prepaidAmount.toFixed(2)}, Charged: ₹${actualChargedCost.toFixed(2)})`,
+                                        description: `Charging session refund - ${session.sssn_cd || 'Session ' + session_id} (Prepaid: ₹${prepaidAmount.toFixed(2)}, Actual: ₹${actualTotalCost.toFixed(2)})`,
                                         status: 'completed',
                                         referenceId: session_id.toString(),
                                         referenceType: 'session'
@@ -335,25 +330,103 @@ exports.stopSession = function(req, res) {
                                         duration_minutes: session.durn_mnts_nbr || 0,
                                         energy_consumed: energyConsumed,
                                         prepaid_amount: prepaidAmount,
-                                        charged_cost: actualChargedCost,
-                                        refund_amount: refundAmount,
-                                        total_cost: actualChargedCost,
+                                        actual_cost: actualTotalCost,
+                                        refund_amount: Math.abs(costDifference),
+                                        total_cost: actualTotalCost,
+                                        status: 'completed',
+                                        end_time: new Date().toISOString()
+                                    }, cntxtDtls, fnm, { message: 'Charging session stopped' });
+                                });
+                            } 
+                            // If actual cost is more than prepaid, deduct additional amount
+                            else if (costDifference > 0) {
+                                if (walletBalance < costDifference) {
+                                    // Cannot pay additional amount, mark as pending
+                                    return sessionMdl.updatePaymentStatusMdl({ 
+                                        sessionId: session_id, 
+                                        status: 'pending', 
+                                        transactionId: null 
+                                    })
+                                    .then(function() {
+                                        return res.status(std.message["BAD_REQUEST"].code).json({
+                                            status: std.message["BAD_REQUEST"].code,
+                                            message: `Additional payment required. Required: ₹${costDifference.toFixed(2)}, Available: ₹${walletBalance.toFixed(2)}`,
+                                            data: {
+                                                session_id: session_id,
+                                                energy_consumed: energyConsumed,
+                                                prepaid_amount: prepaidAmount,
+                                                actual_cost: actualTotalCost,
+                                                additional_required: costDifference,
+                                                status: 'completed',
+                                                payment_status: 'pending'
+                                            }
+                                        });
+                                    });
+                                }
+
+                                const balanceBefore = walletBalance;
+                                const balanceAfter = balanceBefore - costDifference;
+
+                                return walletMdl.deductMoneyMdl({ 
+                                    walletId: wallet.wllt_id, 
+                                    amount: costDifference, 
+                                    userId: userId 
+                                })
+                                .then(function() {
+                                    // Verify wallet was updated
+                                    return walletMdl.getUserWalletMdl({ userId: userId });
+                                })
+                                .then(function(updatedWalletResults) {
+                                    if (!updatedWalletResults || updatedWalletResults.length === 0) {
+                                        throw new Error('Failed to verify wallet update');
+                                    }
+
+                                    const updatedWallet = updatedWalletResults[0];
+                                    const actualBalance = parseFloat(updatedWallet.blnce_amt) || 0;
+
+                                    // Verify balance matches expected value
+                                    if (Math.abs(actualBalance - balanceAfter) > 0.01) {
+                                        throw new Error(`Wallet balance mismatch: expected ${balanceAfter}, got ${actualBalance}`);
+                                    }
+
+                                    // Create additional payment transaction record
+                                    return walletMdl.createTransactionMdl({
+                                        walletId: wallet.wllt_id,
+                                        userId: userId,
+                                        type: 'debit',
+                                        category: 'charging',
+                                        amount: costDifference,
+                                        balanceBefore: balanceBefore,
+                                        balanceAfter: balanceAfter,
+                                        description: `Charging session additional payment - ${session.sssn_cd || 'Session ' + session_id} (Prepaid: ₹${prepaidAmount.toFixed(2)}, Actual: ₹${actualTotalCost.toFixed(2)})`,
+                                        status: 'completed',
+                                        referenceId: session_id.toString(),
+                                        referenceType: 'session'
+                                    });
+                                })
+                                .then(function() {
+                                    return df.formatSucessRes(req, res, {
+                                        session_id: session_id,
+                                        duration_minutes: session.durn_mnts_nbr || 0,
+                                        energy_consumed: energyConsumed,
+                                        prepaid_amount: prepaidAmount,
+                                        actual_cost: actualTotalCost,
+                                        additional_paid: costDifference,
+                                        total_cost: actualTotalCost,
                                         status: 'completed',
                                         end_time: new Date().toISOString()
                                     }, cntxtDtls, fnm, { message: 'Charging session stopped' });
                                 });
                             }
-                            // If fully completed (no refund needed) or charged cost equals prepaid
+                            // If actual cost equals prepaid, no additional transaction needed
                             else {
-                                // Fully completed - no refund needed, prepaid amount covers all
                                 return df.formatSucessRes(req, res, {
                                     session_id: session_id,
                                     duration_minutes: session.durn_mnts_nbr || 0,
                                     energy_consumed: energyConsumed,
                                     prepaid_amount: prepaidAmount,
-                                    charged_cost: actualChargedCost,
-                                    refund_amount: 0,
-                                    total_cost: actualChargedCost,
+                                    actual_cost: actualTotalCost,
+                                    total_cost: actualTotalCost,
                                     status: 'completed',
                                     end_time: new Date().toISOString()
                                 }, cntxtDtls, fnm, { message: 'Charging session stopped' });
@@ -363,12 +436,12 @@ exports.stopSession = function(req, res) {
                     // If payment was not made upfront, deduct now (old flow for backward compatibility)
                     else {
                         // Verify wallet has sufficient balance
-                        if (walletBalance < actualChargedCost) {
+                        if (walletBalance < actualTotalCost) {
                             // Stop session but mark payment as failed
                             return sessionMdl.stopSessionMdl({ 
                                 sessionId: session_id, 
                                 energyConsumed: energyConsumed, 
-                                totalCost: actualChargedCost 
+                                totalCost: actualTotalCost 
                             })
                             .then(function() {
                                 return sessionMdl.updatePaymentStatusMdl({ 
@@ -380,11 +453,11 @@ exports.stopSession = function(req, res) {
                             .then(function() {
                                 return res.status(std.message["BAD_REQUEST"].code).json({
                                     status: std.message["BAD_REQUEST"].code,
-                                    message: `Insufficient wallet balance. Required: ₹${actualChargedCost.toFixed(2)}, Available: ₹${walletBalance.toFixed(2)}`,
+                                    message: `Insufficient wallet balance. Required: ₹${actualTotalCost.toFixed(2)}, Available: ₹${walletBalance.toFixed(2)}`,
                                     data: {
                                         session_id: session_id,
                                         energy_consumed: energyConsumed,
-                                        total_cost: actualChargedCost,
+                                        total_cost: actualTotalCost,
                                         wallet_balance: walletBalance,
                                         status: 'completed',
                                         payment_status: 'pending'
@@ -397,16 +470,16 @@ exports.stopSession = function(req, res) {
                         return sessionMdl.stopSessionMdl({ 
                             sessionId: session_id, 
                             energyConsumed: energyConsumed, 
-                            totalCost: actualChargedCost 
+                            totalCost: actualTotalCost 
                         })
                         .then(function() {
                             // Deduct from wallet
                             const balanceBefore = walletBalance;
-                            const balanceAfter = balanceBefore - actualChargedCost;
+                            const balanceAfter = balanceBefore - actualTotalCost;
 
                             return walletMdl.deductMoneyMdl({ 
                                 walletId: wallet.wllt_id, 
-                                amount: actualChargedCost, 
+                                amount: actualTotalCost, 
                                 userId: userId 
                             })
                             .then(function() {
@@ -432,7 +505,7 @@ exports.stopSession = function(req, res) {
                                     userId: userId,
                                     type: 'debit',
                                     category: 'charging',
-                                    amount: actualChargedCost,
+                                    amount: actualTotalCost,
                                     balanceBefore: balanceBefore,
                                     balanceAfter: balanceAfter,
                                     description: `Charging session payment - ${session.sssn_cd || 'Session ' + session_id}`,
@@ -458,7 +531,7 @@ exports.stopSession = function(req, res) {
                                         session_id: session_id,
                                         duration_minutes: session.durn_mnts_nbr || 0,
                                         energy_consumed: energyConsumed,
-                                        total_cost: actualChargedCost,
+                                        total_cost: actualTotalCost,
                                         status: 'completed',
                                         end_time: new Date().toISOString()
                                     }, cntxtDtls, fnm, { message: 'Charging session stopped' });
@@ -523,21 +596,13 @@ exports.getSessionHistory = function(req, res) {
             const formattedSessions = sessions ? sessions.map(function(s) {
                 return {
                     session_id: s.sssn_id,
-                    session_code: s.sssn_cd,
                     station_name: s.sttn_nm_tx,
-                    station_id: s.sttn_id,
-                    address: s.addr_tx,
-                    connector_type: s.cnntr_typ_cd,
                     date: s.i_ts ? new Date(s.i_ts).toISOString().split('T')[0] : null,
                     start_time: s.strt_ts,
-                    end_time: s.end_ts,
                     duration_minutes: s.durn_mnts_nbr,
                     energy_consumed: parseFloat(s.enrgy_cnsmd_kwh) || 0,
-                    price_per_kwh: parseFloat(s.prce_per_kwh_amt) || 0,
                     cost: parseFloat(s.ttl_cst_amt) || 0,
-                    total_cost: parseFloat(s.ttl_cst_amt) || 0,
-                    status: s.sttus_cd,
-                    payment_status: s.pymnt_sttus_cd
+                    status: s.sttus_cd
                 };
             }) : [];
 

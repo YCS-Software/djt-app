@@ -6,22 +6,37 @@ import { Capacitor } from '@capacitor/core';
 
 // Detect platform and set appropriate API URL
 function getApiBaseUrl(): string {
-  // Check for environment variable first
+  // Priority 1: Check for environment variable (set during build)
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
 
-  // If running in Capacitor (mobile app)
+  // Priority 2: Check for Capacitor config (for runtime override)
   if (Capacitor.isNativePlatform()) {
-    // For Android emulator: use 10.0.2.2
-    // For physical device: use your computer's local IP (e.g., 192.168.1.XXX)
-    // For production: use your production API URL
-    // TODO: Replace with your actual server IP or production URL
-    return 'http://192.168.1.100:5000/api'; // Change this to your computer's IP
+    // You can also set this in capacitor.config.ts
+    const capacitorConfig = (window as any).Capacitor?.getPlatform()?.config;
+    if (capacitorConfig?.server?.url) {
+      return capacitorConfig.server.url;
+    }
+  }
+
+  // Priority 3: Fallback to default
+  // For Android emulator: use 10.0.2.2 instead of localhost
+  // For physical device: use your computer's local IP (e.g., 192.168.1.XXX)
+  // For production: use your production API URL
+  const defaultUrl = 'http://13.202.34.243:5001/api';
+  
+  if (Capacitor.isNativePlatform()) {
+    // Check if running on Android emulator
+    const platform = Capacitor.getPlatform();
+    if (platform === 'android') {
+      // You can detect emulator vs physical device here if needed
+      return defaultUrl;
+    }
   }
 
   // For web development
-  return 'http://localhost:5000/api';
+  return defaultUrl;
 }
 
 const API_BASE_URL = getApiBaseUrl();

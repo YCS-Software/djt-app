@@ -1,181 +1,348 @@
-# Android APK Build Guide - DJT HAIKA
+# Android APK Build Guide - API URL Configuration
 
-This guide will help you build the Android APK for **DJT HAIKA** EV Charging App using Android Studio.
+This guide explains how to build Android APK with different API URLs for different environments.
 
-## Prerequisites
+## 📋 Table of Contents
+1. [Quick Start](#quick-start)
+2. [Environment Variables](#environment-variables)
+3. [Build Variants](#build-variants)
+4. [Building APK](#building-apk)
+5. [Changing API URL](#changing-api-url)
 
-1. **Android Studio** (latest version recommended)
-   - Download from: https://developer.android.com/studio
-   - Install Android SDK (API 33 or higher)
-   - Install JDK 17 or higher
+---
 
-2. **Node.js and npm** (already installed)
-   - Verify: `node --version` and `npm --version`
+## 🚀 Quick Start
 
-3. **Capacitor CLI** (already installed)
-   - Verify: `npx cap --version`
+### Build APK with Default URL
+```bash
+# Build for production
+npm run build
+npx cap sync android
+cd android
+./gradlew assembleProductionRelease
+```
 
-## App Configuration
+### Build APK with Custom URL
+1. Edit `.env.production` file
+2. Set `VITE_API_URL=your-api-url`
+3. Build APK
 
-✅ **App Name**: DJT HAIKA  
-✅ **Package ID**: com.djthaika.ev  
-✅ **Build Output**: `out/` directory  
-✅ **Capacitor Config**: Updated with app name and package ID
+---
 
-## Build Steps
+## 🔧 Environment Variables
 
-### Step 1: Build React App
+### Available Environment Files
 
-The React app has already been built. If you need to rebuild:
+1. **`.env.development`** - For development builds
+2. **`.env.staging`** - For staging builds  
+3. **`.env.production`** - For production builds
 
+### Setting API URL
+
+Edit the corresponding `.env` file:
+
+```bash
+# .env.production
+VITE_API_URL=http://your-production-api.com/api
+
+# .env.staging
+VITE_API_URL=http://your-staging-api.com/api
+
+# .env.development
+VITE_API_URL=http://your-dev-api.com/api
+```
+
+---
+
+## 🏗️ Build Variants
+
+The Android app supports three build variants:
+
+### 1. Development
+- **Application ID**: `com.djthaika.ev.dev`
+- **Version**: `1.0-dev`
+- **API URL**: Set in `.env.development` or `build.gradle`
+
+### 2. Staging
+- **Application ID**: `com.djthaika.ev.staging`
+- **Version**: `1.0-staging`
+- **API URL**: Set in `.env.staging` or `build.gradle`
+
+### 3. Production
+- **Application ID**: `com.djthaika.ev`
+- **Version**: `1.0`
+- **API URL**: Set in `.env.production` or `build.gradle`
+
+---
+
+## 📦 Building APK
+
+### Method 1: Using Environment Variables (Recommended)
+
+#### Step 1: Set Environment Variable
+```bash
+# For production
+export VITE_API_URL=http://your-api-url.com/api
+
+# Or create/edit .env.production file
+echo "VITE_API_URL=http://your-api-url.com/api" > .env.production
+```
+
+#### Step 2: Build Web Assets
 ```bash
 npm run build
 ```
 
-This creates the production build in the `out/` directory.
-
-### Step 2: Sync with Capacitor
-
-Sync the web assets with Android:
-
-```bash
-npm run android:sync
-```
-
-Or manually:
+#### Step 3: Sync with Capacitor
 ```bash
 npx cap sync android
 ```
 
-### Step 3: Open in Android Studio
-
-Open the Android project in Android Studio:
-
+#### Step 4: Build APK
 ```bash
-npm run android:open
+cd android
+./gradlew assembleProductionRelease
 ```
 
-Or manually:
-```bash
-npx cap open android
+The APK will be generated at:
+```
+android/app/build/outputs/apk/production/release/app-production-release.apk
 ```
 
-This will open Android Studio with the project.
+### Method 2: Using Build Variants
 
-### Step 4: Build APK in Android Studio
-
-1. **Wait for Gradle Sync**
-   - Android Studio will automatically sync Gradle dependencies
-   - Wait for the sync to complete (check bottom status bar)
-
-2. **Select Build Variant**
-   - Click on `Build` → `Select Build Variant`
-   - Choose `release` for production APK or `debug` for testing
-
-3. **Build APK**
-   - Click `Build` → `Build Bundle(s) / APK(s)` → `Build APK(s)`
-   - Wait for the build to complete
-   - You'll see a notification when done: "APK(s) generated successfully"
-
-4. **Locate APK**
-   - Click "locate" in the notification, or
-   - Navigate to: `android/app/build/outputs/apk/release/`
-   - The APK file will be named: `app-release.apk`
-
-### Step 5: Generate Signed APK (For Production)
-
-For production release, you need to sign the APK:
-
-1. **Create Keystore** (if you don't have one)
-   ```bash
-   keytool -genkey -v -keystore djthaika-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias djthaika
-   ```
-   - Store the keystore file securely
-   - Remember the password and alias
-
-2. **Configure Signing in Android Studio**
-   - Go to `File` → `Project Structure` → `Modules` → `app` → `Signing Configs`
-   - Click `+` to add a new config
-   - Fill in:
-     - Name: `release`
-     - Key store file: Select your `.jks` file
-     - Key store password: Your keystore password
-     - Key alias: `djthaika`
-     - Key password: Your key password
-
-3. **Update build.gradle** (if needed)
-   - The signing config should be automatically added
-   - Check `android/app/build.gradle` for signing configuration
-
-4. **Build Signed APK**
-   - `Build` → `Generate Signed Bundle / APK`
-   - Select `APK`
-   - Select your signing config
-   - Choose `release` build variant
-   - Click `Finish`
-
-## Quick Build Commands
-
+#### Build Development APK
 ```bash
-# Build React app
 npm run build
-
-# Sync with Capacitor
-npm run android:sync
-
-# Open in Android Studio
-npm run android:open
-
-# Or do all at once
-npm run android:build
+npx cap sync android
+cd android
+./gradlew assembleDevelopmentDebug
 ```
 
-## Troubleshooting
+#### Build Staging APK
+```bash
+npm run build
+npx cap sync android
+cd android
+./gradlew assembleStagingRelease
+```
 
-### Issue: Gradle Sync Failed
-- **Solution**: Check internet connection, invalidate caches (`File` → `Invalidate Caches / Restart`)
-- Update Gradle wrapper if needed
-
-### Issue: Build Errors
-- **Solution**: Clean project (`Build` → `Clean Project`) then rebuild
-- Check Android SDK versions in `android/build.gradle`
-
-### Issue: Package Name Conflicts
-- **Solution**: The package name has been updated to `com.djthaika.ev`
-- If you see old package references, clean and rebuild
-
-### Issue: App Name Not Showing
-- **Solution**: Check `android/app/src/main/res/values/strings.xml`
-- Should show: `<string name="app_name">DJT HAIKA</string>`
-
-## File Locations
-
-- **React Build**: `out/`
-- **Android Project**: `android/`
-- **APK Output**: `android/app/build/outputs/apk/release/app-release.apk`
-- **Capacitor Config**: `capacitor.config.ts`
-- **Android Strings**: `android/app/src/main/res/values/strings.xml`
-- **MainActivity**: `android/app/src/main/java/com/djthaika/ev/MainActivity.java`
-
-## App Information
-
-- **App Name**: DJT HAIKA
-- **Package ID**: com.djthaika.ev
-- **Version**: 1.0
-- **Min SDK**: 22 (Android 5.1)
-- **Target SDK**: 34 (Android 14)
-
-## Next Steps
-
-1. ✅ App name configured: **DJT HAIKA**
-2. ✅ Package ID updated: **com.djthaika.ev**
-3. ✅ React app built
-4. ✅ Capacitor synced
-5. ⏭️ Open Android Studio and build APK
-6. ⏭️ Test on device/emulator
-7. ⏭️ Generate signed APK for production
+#### Build Production APK
+```bash
+npm run build
+npx cap sync android
+cd android
+./gradlew assembleProductionRelease
+```
 
 ---
 
-**Ready to build!** Open Android Studio and follow Step 4 above to generate your APK.
+## 🔄 Changing API URL
 
+### Option 1: Edit Environment File (Recommended)
+
+1. **For Production Build:**
+   ```bash
+   # Edit .env.production
+   VITE_API_URL=http://your-new-api-url.com/api
+   ```
+
+2. **Build:**
+   ```bash
+   npm run build
+   npx cap sync android
+   cd android
+   ./gradlew assembleProductionRelease
+   ```
+
+### Option 2: Edit build.gradle
+
+1. **Open:** `android/app/build.gradle`
+
+2. **Find the production flavor:**
+   ```gradle
+   production {
+       dimension "environment"
+       buildConfigField "String", "API_BASE_URL", '"http://your-api-url.com/api"'
+       resValue "string", "api_base_url", "http://your-api-url.com/api"
+   }
+   ```
+
+3. **Change the URL:**
+   ```gradle
+   production {
+       dimension "environment"
+       buildConfigField "String", "API_BASE_URL", '"http://new-api-url.com/api"'
+       resValue "string", "api_base_url", "http://new-api-url.com/api"
+   }
+   ```
+
+4. **Build:**
+   ```bash
+   cd android
+   ./gradlew assembleProductionRelease
+   ```
+
+### Option 3: Command Line (One-time Build)
+
+```bash
+# Set environment variable and build
+VITE_API_URL=http://your-api-url.com/api npm run build
+npx cap sync android
+cd android
+./gradlew assembleProductionRelease
+```
+
+---
+
+## 📝 Build Scripts
+
+Add these scripts to `package.json` for easier building:
+
+```json
+{
+  "scripts": {
+    "build:dev": "vite build --mode development",
+    "build:staging": "vite build --mode staging",
+    "build:prod": "vite build --mode production",
+    "android:build:dev": "npm run build:dev && npx cap sync android && cd android && ./gradlew assembleDevelopmentDebug",
+    "android:build:staging": "npm run build:staging && npx cap sync android && cd android && ./gradlew assembleStagingRelease",
+    "android:build:prod": "npm run build:prod && npx cap sync android && cd android && ./gradlew assembleProductionRelease"
+  }
+}
+```
+
+Then use:
+```bash
+npm run android:build:prod
+```
+
+---
+
+## 🔍 Verify API URL in APK
+
+### Method 1: Check Build Output
+The API URL is embedded during build. Check the build logs for:
+```
+VITE_API_URL=http://your-api-url.com/api
+```
+
+### Method 2: Check in App
+Add a debug screen in your app to display the current API URL:
+```typescript
+console.log('API URL:', import.meta.env.VITE_API_URL);
+```
+
+---
+
+## ⚠️ Important Notes
+
+1. **Always rebuild** after changing API URL
+2. **Clear build cache** if URL doesn't update:
+   ```bash
+   cd android
+   ./gradlew clean
+   ```
+
+3. **For production**, use HTTPS URLs:
+   ```
+   VITE_API_URL=https://api.yourdomain.com/api
+   ```
+
+4. **For local testing** on physical device:
+   - Use your computer's local IP (e.g., `192.168.1.100`)
+   - Not `localhost` or `127.0.0.1`
+
+5. **For Android emulator**:
+   - Use `10.0.2.2` instead of `localhost`
+
+---
+
+## 🐛 Troubleshooting
+
+### API URL Not Changing
+
+1. **Clear build cache:**
+   ```bash
+   rm -rf android/app/build
+   cd android
+   ./gradlew clean
+   ```
+
+2. **Rebuild from scratch:**
+   ```bash
+   npm run build
+   npx cap sync android
+   cd android
+   ./gradlew clean
+   ./gradlew assembleProductionRelease
+   ```
+
+### Build Fails
+
+1. **Check Gradle version:**
+   ```bash
+   cd android
+   ./gradlew --version
+   ```
+
+2. **Sync project:**
+   ```bash
+   npx cap sync android
+   ```
+
+---
+
+## 📱 Example Build Commands
+
+### Production Build with Custom URL
+```bash
+# 1. Set API URL
+echo "VITE_API_URL=https://api.production.com/api" > .env.production
+
+# 2. Build
+npm run build
+npx cap sync android
+
+# 3. Generate APK
+cd android
+./gradlew assembleProductionRelease
+```
+
+### Development Build
+```bash
+# 1. Set API URL
+echo "VITE_API_URL=http://192.168.1.100:5001/api" > .env.development
+
+# 2. Build
+npm run build --mode development
+npx cap sync android
+
+# 3. Generate APK
+cd android
+./gradlew assembleDevelopmentDebug
+```
+
+---
+
+## 📚 Additional Resources
+
+- [Vite Environment Variables](https://vitejs.dev/guide/env-and-mode.html)
+- [Capacitor Android Guide](https://capacitorjs.com/docs/android)
+- [Gradle Build Variants](https://developer.android.com/studio/build/build-variants)
+
+---
+
+## ✅ Quick Reference
+
+| Environment | File | Build Command |
+|------------|------|---------------|
+| Development | `.env.development` | `npm run build:dev` |
+| Staging | `.env.staging` | `npm run build:staging` |
+| Production | `.env.production` | `npm run build:prod` |
+
+| Variant | APK Location |
+|---------|-------------|
+| Development | `android/app/build/outputs/apk/development/debug/` |
+| Staging | `android/app/build/outputs/apk/staging/release/` |
+| Production | `android/app/build/outputs/apk/production/release/` |

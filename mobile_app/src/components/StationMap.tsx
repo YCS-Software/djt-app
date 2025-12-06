@@ -1,10 +1,10 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
+import { useEffect, useState, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { Icon, LatLngExpression } from 'leaflet';
 import L from 'leaflet';
 import 'leaflet-routing-machine';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
-import { MapPin, Navigation, X, Clock, Route, Play, Square, ArrowRight, Navigation2 } from 'lucide-react';
+import { MapPin, Navigation, X, Clock, Route, Play, Square } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import './StationMap.css';
 
@@ -55,64 +55,18 @@ const stationIcon = new Icon({
   iconAnchor: [20, 40],
 });
 
-// Component to draw route polyline directly - This ensures route is ALWAYS visible
-function RoutePolyline({ 
-  userPos, 
-  stationPos,
-  routeCoordinates 
-}: { 
-  userPos: LatLngExpression; 
-  stationPos: LatLngExpression;
-  routeCoordinates?: [number, number][] | null;
-}) {
-  const userLatLng = Array.isArray(userPos) 
-    ? [userPos[0], userPos[1]]
-    : [(userPos as any).lat, (userPos as any).lng];
-  const stationLatLng = Array.isArray(stationPos)
-    ? [stationPos[0], stationPos[1]]
-    : [(stationPos as any).lat, (stationPos as any).lng];
-
-  // Use route coordinates if available and valid, otherwise use direct line
-  const positions = routeCoordinates && routeCoordinates.length > 1
-    ? routeCoordinates
-    : [userLatLng, stationLatLng];
-
-  // Always render the route line - this ensures it's visible
-  return (
-    <Polyline
-      positions={positions}
-      pathOptions={{
-        color: '#16A34A',
-        weight: 8,
-        opacity: 0.95,
-        lineCap: 'round',
-        lineJoin: 'round',
-        interactive: false,
-      }}
-    />
-  );
-}
-
 // Component to handle routing
 function RoutingControl({ 
   userPos, 
   stationPos, 
-  onRouteFound,
-  isNavigating = false,
-  onRouteUpdate,
-  onRouteCoordinates
+  onRouteFound 
 }: { 
   userPos: LatLngExpression; 
   stationPos: LatLngExpression;
-  onRouteFound: (distance: string, time: string, instructions?: any[]) => void;
-  isNavigating?: boolean;
-  onRouteUpdate?: (distance: string, time: string) => void;
-  onRouteCoordinates?: (coordinates: [number, number][]) => void;
+  onRouteFound: (distance: string, time: string) => void;
 }) {
   const map = useMap();
   const routingControlRef = useRef<any>(null);
-  const routeLayerRef = useRef<L.LayerGroup | null>(null);
-  const watchIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!map) return;
@@ -127,77 +81,9 @@ function RoutingControl({
     // Remove existing routing control
     if (routingControlRef.current) {
       map.removeControl(routingControlRef.current);
-      routingControlRef.current = null;
     }
 
-    // Remove existing route layer
-    if (routeLayerRef.current) {
-      map.removeLayer(routeLayerRef.current);
-      routeLayerRef.current = null;
-    }
-
-    // Create a layer group for the route
-    const routeLayer = L.layerGroup().addTo(map);
-    routeLayerRef.current = routeLayer;
-
-    // Set initial coordinates for React component (direct line as fallback)
-    // This ensures route is visible immediately
-    if (onRouteCoordinates) {
-      onRouteCoordinates([[userLatLng.lat, userLatLng.lng], [stationLatLng.lat, stationLatLng.lng]]);
-    }
-
-    // Timeout fallback - if route doesn't load in 10 seconds, use fallback
-    const timeoutId = setTimeout(() => {
-      const R = 6371;
-      const dLat = (stationLatLng.lat - userLatLng.lat) * Math.PI / 180;
-      const dLon = (stationLatLng.lng - userLatLng.lng) * Math.PI / 180;
-      const a = 
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(userLatLng.lat * Math.PI / 180) * Math.cos(stationLatLng.lat * Math.PI / 180) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      const distance = (R * c).toFixed(1);
-      const time = Math.round((R * c / 30) * 60);
-      const timeStr = time < 60 ? `${time} min` : `${Math.floor(time / 60)}h ${time % 60}m`;
-      onRouteFound(`${distance} km`, timeStr);
-    }, 10000);
-
-    // Fetch route geometry directly from OSRM API
-    const fetchRouteGeometry = async () => {
-      try {
-        const url = `https://router.projectosrm.org/route/v1/driving/${userLatLng.lng},${userLatLng.lat};${stationLatLng.lng},${stationLatLng.lat}?overview=full&geometries=geojson`;
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-          const route = data.routes[0];
-          const geometry = route.geometry;
-          
-          // Decode GeoJSON coordinates (they're in [lng, lat] format, need to convert to [lat, lng])
-          const coordinates: [number, number][] = geometry.coordinates.map((coord: number[]) => [coord[1], coord[0]]);
-          
-          if (coordinates.length > 0 && onRouteCoordinates) {
-            // Update the React component with actual route coordinates
-            onRouteCoordinates(coordinates);
-            
-            // Calculate distance and time
-            const distance = (route.distance / 1000).toFixed(1);
-            const time = Math.round(route.duration / 60);
-            const timeStr = time < 60 ? `${time} min` : `${Math.floor(time / 60)}h ${time % 60}m`;
-            
-            onRouteFound(`${distance} km`, timeStr, []);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching route geometry:', error);
-        // Keep the direct line as fallback
-      }
-    };
-
-    // Fetch route immediately
-    fetchRouteGeometry();
-
-    // Create routing control with OSRM (as backup)
+    // Create routing control with OSRM
     const routingControl = (L as any).Routing.control({
       waypoints: [userLatLng, stationLatLng],
       router: (L as any).Routing.osrmv1({
@@ -210,9 +96,8 @@ function RoutingControl({
         styles: [
           {
             color: '#16A34A',
-            weight: 7,
-            opacity: 0.95,
-            dashArray: isNavigating ? '10, 5' : undefined,
+            weight: 6,
+            opacity: 0.9,
           }
         ],
         extendToWaypoints: true,
@@ -239,7 +124,6 @@ function RoutingControl({
 
     // Listen for route found event
     routingControl.on('routesfound', function(e: any) {
-      clearTimeout(timeoutId); // Clear timeout if route is found
       const routes = e.routes;
       if (routes && routes.length > 0) {
         const route = routes[0];
@@ -255,78 +139,7 @@ function RoutingControl({
           timeStr = `${hours}h ${mins}m`;
         }
         
-        // Extract instructions if available
-        const instructions = route.instructions || [];
-        
-        // Extract route coordinates from geometry
-        let routeCoords: [number, number][] = [];
-        if (route.coordinates && route.coordinates.length > 0) {
-          routeCoords = route.coordinates.map((coord: any) => [coord.lat, coord.lng] as [number, number]);
-        } else if (route.coordinate) {
-          // Alternative format
-          routeCoords = route.coordinate.map((coord: any) => [coord.lat, coord.lng] as [number, number]);
-        } else if (route.geometry) {
-          // Decode polyline if needed
-          try {
-            const decoded = (L as any).Routing.decodePolyline(route.geometry);
-            routeCoords = decoded.map((coord: any) => [coord.lat, coord.lng] as [number, number]);
-          } catch (e) {
-            console.log('Could not decode geometry, using waypoints');
-            routeCoords = [[userLatLng.lat, userLatLng.lng], [stationLatLng.lat, stationLatLng.lng]];
-          }
-        }
-        
-          // If we have route coordinates, update the React component
-          if (routeCoords.length > 0 && onRouteCoordinates) {
-            onRouteCoordinates(routeCoords);
-          }
-        
-        onRouteFound(`${distance} km`, timeStr, instructions);
-        
-        // Ensure route is visible and styled properly - multiple attempts for reliability
-        const styleRoute = () => {
-          // Style the route line using multiple selectors
-          const selectors = [
-            '.leaflet-routing-line',
-            '.leaflet-routing-line path',
-            '.leaflet-routing-line polyline',
-            'path[stroke]',
-            '.leaflet-interactive'
-          ];
-          
-          selectors.forEach(selector => {
-            const elements = document.querySelectorAll(selector);
-            elements.forEach((element: any) => {
-              // Check if this is likely a route line (has stroke or is in routing container)
-              const parent = element.closest('.leaflet-routing-container, .leaflet-routing-alt');
-              if (parent || element.getAttribute('stroke') || element.style.stroke) {
-                if (element.style) {
-                  element.style.stroke = '#16A34A';
-                  element.style.strokeWidth = '7px';
-                  element.style.opacity = '0.95';
-                  element.style.fill = 'none';
-                  element.style.zIndex = '500';
-                  element.setAttribute('stroke', '#16A34A');
-                  element.setAttribute('stroke-width', '7');
-                }
-              }
-            });
-          });
-          
-          // Add animation class if navigating
-          if (isNavigating) {
-            const routeLines = document.querySelectorAll('.leaflet-routing-line');
-            routeLines.forEach((line: any) => {
-              line.classList.add('leaflet-routing-line-navigating');
-            });
-          }
-        };
-        
-        // Try styling immediately and with delays
-        styleRoute();
-        setTimeout(styleRoute, 200);
-        setTimeout(styleRoute, 500);
-        setTimeout(styleRoute, 1000);
+        onRouteFound(`${distance} km`, timeStr);
       }
     });
 
@@ -348,157 +161,25 @@ function RoutingControl({
       onRouteFound(`${distance} km`, timeStr);
     });
 
-    // Fit bounds to show both points (only if not navigating)
-    if (!isNavigating) {
-      const bounds = L.latLngBounds([userLatLng, stationLatLng]);
-      map.fitBounds(bounds, { padding: [80, 80] });
-    }
+    // Fit bounds to show both points
+    const bounds = L.latLngBounds([userLatLng, stationLatLng]);
+    map.fitBounds(bounds, { padding: [80, 80] });
 
     return () => {
-      clearTimeout(timeoutId);
       if (routingControlRef.current) {
         map.removeControl(routingControlRef.current);
-        routingControlRef.current = null;
-      }
-      if (routeLayerRef.current) {
-        map.removeLayer(routeLayerRef.current);
-        routeLayerRef.current = null;
       }
     };
-  }, [map, userPos, stationPos, onRouteFound, isNavigating, onRouteCoordinates]);
-
-  // Real-time navigation tracking - FIXED: Prevent multiple watchers and excessive API calls
-  useEffect(() => {
-    if (!isNavigating || !map || !onRouteUpdate) {
-      // Clean up watcher when not navigating
-      if (watchIdRef.current !== null && navigator.geolocation) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
-      return;
-    }
-
-    // Prevent multiple watchers - clear existing one first
-    if (watchIdRef.current !== null && navigator.geolocation) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
-
-    let lastUpdateTime = 0;
-    let lastPosition: L.LatLng | null = null;
-    let initialZoomSet = false;
-    const throttleDelay = 3000; // Increased to 3 seconds to reduce API calls
-    const minDistanceForUpdate = 0.0005; // Increased to ~50 meters to reduce updates
-    let updateTimeout: NodeJS.Timeout | null = null;
-
-    const updateRoute = () => {
-      if (!navigator.geolocation || watchIdRef.current !== null) return; // Prevent duplicate watchers
-
-      watchIdRef.current = navigator.geolocation.watchPosition(
-        (position) => {
-          const currentPos = L.latLng(position.coords.latitude, position.coords.longitude);
-          const stationLatLng = Array.isArray(stationPos)
-            ? L.latLng(stationPos[0], stationPos[1])
-            : L.latLng((stationPos as any).lat, (stationPos as any).lng);
-          
-          // Calculate remaining distance (no API call, just calculation)
-          const R = 6371; // Earth radius in km
-          const dLat = (stationLatLng.lat - currentPos.lat) * Math.PI / 180;
-          const dLon = (stationLatLng.lng - currentPos.lng) * Math.PI / 180;
-          const a = 
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(currentPos.lat * Math.PI / 180) * Math.cos(stationLatLng.lat * Math.PI / 180) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-          const distance = (R * c).toFixed(1);
-          
-          // Estimate time based on average speed (assuming 40 km/h in city)
-          const time = Math.round((R * c / 40) * 60);
-          const timeStr = time < 60 ? `${time} min` : `${Math.floor(time / 60)}h ${time % 60}m`;
-          
-          onRouteUpdate(`${distance} km`, timeStr);
-          
-          // Throttle map view updates to prevent blinking - use timeout debounce
-          const now = Date.now();
-          const timeSinceLastUpdate = now - lastUpdateTime;
-          
-          // Check if position has changed significantly
-          const positionChanged = !lastPosition || 
-            currentPos.distanceTo(lastPosition) > minDistanceForUpdate;
-          
-          // Clear existing timeout
-          if (updateTimeout) {
-            clearTimeout(updateTimeout);
-          }
-          
-          // Debounce map updates
-          if (positionChanged && timeSinceLastUpdate >= throttleDelay) {
-            updateTimeout = setTimeout(() => {
-              lastUpdateTime = Date.now();
-              lastPosition = currentPos;
-              
-              // Set initial zoom only once when navigation starts
-              if (!initialZoomSet) {
-                const currentZoom = map.getZoom();
-                const targetZoom = currentZoom < 15 ? 15 : currentZoom;
-                map.setView(currentPos, targetZoom, { 
-                  animate: true, 
-                  duration: 1.0,
-                  easeLinearity: 0.25
-                });
-                initialZoomSet = true;
-              } else {
-                // Use panTo for smoother updates without zoom changes
-                map.panTo(currentPos, {
-                  animate: true,
-                  duration: 0.8,
-                  easeLinearity: 0.25
-                });
-              }
-            }, 500); // Additional 500ms debounce
-          }
-        },
-        (error) => {
-          console.error('Error tracking position:', error);
-        },
-        {
-          enableHighAccuracy: false, // Changed to false to reduce battery usage
-          timeout: 10000, // Increased timeout
-          maximumAge: 5000 // Allow older positions to reduce updates
-        }
-      );
-    };
-
-    // Small delay before starting watcher to prevent immediate multiple calls
-    const startTimeout = setTimeout(() => {
-      updateRoute();
-    }, 500);
-
-    return () => {
-      clearTimeout(startTimeout);
-      if (updateTimeout) {
-        clearTimeout(updateTimeout);
-      }
-      if (watchIdRef.current !== null && navigator.geolocation) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
-      lastPosition = null;
-      initialZoomSet = false;
-    };
-  }, [isNavigating, map, stationPos, onRouteUpdate]);
+  }, [map, userPos, stationPos, onRouteFound]);
 
   return null;
 }
 
 // Component to fit map bounds
-function MapBounds({ userPos, stationPos, isNavigating }: { userPos: LatLngExpression; stationPos: LatLngExpression; isNavigating?: boolean }) {
+function MapBounds({ userPos, stationPos }: { userPos: LatLngExpression; stationPos: LatLngExpression }) {
   const map = useMap();
   
   useEffect(() => {
-    // Don't fit bounds when navigating - let navigation tracking handle the view
-    if (isNavigating) return;
-    
     if (userPos && stationPos) {
       try {
         const userLatLng = Array.isArray(userPos) 
@@ -514,7 +195,7 @@ function MapBounds({ userPos, stationPos, isNavigating }: { userPos: LatLngExpre
         console.error('Error fitting bounds:', error);
       }
     }
-  }, [map, userPos, stationPos, isNavigating]);
+  }, [map, userPos, stationPos]);
   
   return null;
 }
@@ -523,127 +204,30 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
   const [estimatedTime, setEstimatedTime] = useState<string>('Calculating...');
   const [estimatedDistance, setEstimatedDistance] = useState<string>('Calculating...');
   const [isNavigating, setIsNavigating] = useState(false);
-  const [routeInstructions, setRouteInstructions] = useState<any[]>([]);
-  const [currentInstruction, setCurrentInstruction] = useState<string>('');
-  const [currentLocation, setCurrentLocation] = useState<LatLngExpression | null>(null);
-  const [remainingDistance, setRemainingDistance] = useState<string>('');
-  const [remainingTime, setRemainingTime] = useState<string>('');
-  const [routeLoading, setRouteLoading] = useState<boolean>(true);
-  const [routeCoordinates, setRouteCoordinates] = useState<[number, number][] | null>(null);
+  const [routeInstructions, setRouteInstructions] = useState<string[]>([]);
 
-  // Default user location (Rajahmundry, Andhra Pradesh, India)
-  const defaultUserLocation: LatLngExpression = [17.0000, 81.7833];
-  const currentUserLocation: LatLngExpression = currentLocation || (userLocation 
+  // Default user location (Gurugram, India)
+  const defaultUserLocation: LatLngExpression = [28.4595, 77.0266];
+  const currentUserLocation: LatLngExpression = userLocation 
     ? [userLocation.latitude, userLocation.longitude]
-    : defaultUserLocation);
+    : defaultUserLocation;
   
   const stationPosition: LatLngExpression = [station.latitude, station.longitude];
 
-  const processInstruction = useCallback((instruction: any): string => {
-    if (!instruction) return 'Follow the route';
-    
-    // Clean up instruction text
-    let text = instruction.text || '';
-    
-    // Remove HTML tags if present
-    text = text.replace(/<[^>]*>/g, '');
-    
-    // Make instructions more meaningful
-    if (text.toLowerCase().includes('head') || text.toLowerCase().includes('go')) {
-      return text;
-    } else if (text.toLowerCase().includes('turn left')) {
-      return `Turn left${instruction.road ? ` onto ${instruction.road}` : ''}`;
-    } else if (text.toLowerCase().includes('turn right')) {
-      return `Turn right${instruction.road ? ` onto ${instruction.road}` : ''}`;
-    } else if (text.toLowerCase().includes('continue') || text.toLowerCase().includes('straight')) {
-      return `Continue straight${instruction.road ? ` on ${instruction.road}` : ''}`;
-    } else if (text.toLowerCase().includes('destination')) {
-      return `You have arrived at ${station.name}`;
-    }
-    
-    return text || 'Follow the route';
-  }, [station.name]);
-
-  const handleRouteFound = useCallback((distance: string, time: string, instructions?: any[]) => {
-    setRouteLoading(false);
+  const handleRouteFound = (distance: string, time: string) => {
     setEstimatedDistance(distance);
     setEstimatedTime(time);
-    if (instructions && instructions.length > 0) {
-      setRouteInstructions(instructions);
-      const firstInstruction = processInstruction(instructions[0]);
-      setCurrentInstruction(firstInstruction);
-    } else {
-      setCurrentInstruction(`Navigate to ${station.name}`);
-    }
-  }, [processInstruction, station.name]);
+  };
 
-  const handleRouteUpdate = useCallback((distance: string, time: string) => {
-    setRemainingDistance(distance);
-    setRemainingTime(time);
-  }, []);
-
-  const handleRouteCoordinates = useCallback((coordinates: [number, number][]) => {
-    setRouteCoordinates(coordinates);
-  }, []);
-
-  // Update instructions during navigation
-  useEffect(() => {
-    if (isNavigating && routeInstructions.length > 0 && currentLocation) {
-      // Find the closest instruction based on current location
-      // For now, show the first meaningful instruction
-      // In a real app, you'd calculate which instruction is closest
-      const activeInstruction = routeInstructions.find((inst, index) => {
-        // Simple logic: show first instruction, then progress through them
-        return index === 0 || (index < routeInstructions.length / 2);
-      });
-      
-      if (activeInstruction) {
-        const processed = processInstruction(activeInstruction);
-        setCurrentInstruction(processed);
-      }
-    }
-  }, [isNavigating, routeInstructions, currentLocation, processInstruction]);
-
-  const startNavigation = useCallback(() => {
-    // Prevent multiple clicks - disable button during transition
-    if (isNavigating) return;
-    
-    if (!estimatedDistance || estimatedDistance === 'Calculating...') {
-      alert('Please wait for the route to be calculated');
-      return;
-    }
-    
+  const startNavigation = () => {
     setIsNavigating(true);
-    setRemainingDistance(estimatedDistance);
-    setRemainingTime(estimatedTime);
-    
-    // Get current location for navigation (only once)
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const newLocation: LatLngExpression = [position.coords.latitude, position.coords.longitude];
-          setCurrentLocation(newLocation);
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          // Use existing user location
-          if (userLocation) {
-            setCurrentLocation([userLocation.latitude, userLocation.longitude]);
-          }
-        },
-        { enableHighAccuracy: false, timeout: 10000, maximumAge: 5000 }
-      );
-    } else if (userLocation) {
-      setCurrentLocation([userLocation.latitude, userLocation.longitude]);
-    }
-  }, [isNavigating, estimatedDistance, estimatedTime, userLocation]);
+    // In a real app, you would start turn-by-turn navigation here
+    // For now, we'll just show that navigation is active
+  };
 
-  const stopNavigation = useCallback(() => {
+  const stopNavigation = () => {
     setIsNavigating(false);
-    setRemainingDistance('');
-    setRemainingTime('');
-    setCurrentInstruction('');
-  }, []);
+  };
 
   return (
     <div className="station-map-overlay">
@@ -663,19 +247,12 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
 
         {/* Map */}
         <div className="map-wrapper">
-          {routeLoading && (
-            <div className="map-loading">
-              <div className="map-spinner"></div>
-              <p>Calculating route...</p>
-            </div>
-          )}
           <MapContainer
             center={stationPosition}
             zoom={13}
             style={{ height: '100%', width: '100%' }}
-            scrollWheelZoom={!isNavigating}
+            scrollWheelZoom={true}
             zoomControl={true}
-            dragging={true}
           >
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -706,73 +283,57 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
               userPos={currentUserLocation} 
               stationPos={stationPosition}
               onRouteFound={handleRouteFound}
-              isNavigating={isNavigating}
-              onRouteUpdate={handleRouteUpdate}
-              onRouteCoordinates={handleRouteCoordinates}
             />
 
-            {/* Direct Route Polyline - Fallback/Actual Route */}
-            <RoutePolyline 
-              userPos={currentUserLocation} 
-              stationPos={stationPosition}
-              routeCoordinates={routeCoordinates || undefined}
-            />
-
-            {/* Fit bounds - disabled during navigation */}
-            <MapBounds userPos={currentUserLocation} stationPos={stationPosition} isNavigating={isNavigating} />
+            {/* Fit bounds */}
+            <MapBounds userPos={currentUserLocation} stationPos={stationPosition} />
           </MapContainer>
         </div>
 
-        {/* Route Info Card - Google Maps Style */}
-        {!isNavigating ? (
-          <div className="route-info-card">
-            <div className="route-info-item">
-              <div className="route-icon">
-                <Route size={20} />
-              </div>
-              <div className="route-details">
-                <span className="route-label">Distance</span>
-                <span className="route-value">{estimatedDistance}</span>
-              </div>
+        {/* Route Info Card */}
+        <div className="route-info-card">
+          <div className="route-info-item">
+            <div className="route-icon">
+              <Route size={20} />
             </div>
-            <div className="route-info-item">
-              <div className="route-icon">
-                <Clock size={20} />
-              </div>
-              <div className="route-details">
-                <span className="route-label">Est. Time</span>
-                <span className="route-value">{estimatedTime}</span>
-              </div>
+            <div className="route-details">
+              <span className="route-label">Distance</span>
+              <span className="route-value">{estimatedDistance}</span>
             </div>
-            <button 
-              className="navigate-btn" 
-              onClick={startNavigation}
-              disabled={routeLoading || estimatedDistance === 'Calculating...'}
-            >
-              <Navigation2 size={18} />
-              <span>Start</span>
-            </button>
           </div>
-        ) : (
-          <div className="navigation-card">
-            <div className="nav-card-header">
-              <div className="nav-card-info">
-                <div className="nav-card-distance">{remainingDistance || estimatedDistance}</div>
-                <div className="nav-card-time">{remainingTime || estimatedTime}</div>
-              </div>
-              <button className="nav-stop-btn" onClick={stopNavigation}>
-                <Square size={18} />
-              </button>
+          <div className="route-info-item">
+            <div className="route-icon">
+              <Clock size={20} />
             </div>
-            {currentInstruction && (
-              <div className="nav-card-instruction">
-                <ArrowRight size={16} />
-                <span>{currentInstruction}</span>
+            <div className="route-details">
+              <span className="route-label">Est. Time</span>
+              <span className="route-value">{estimatedTime}</span>
+            </div>
+          </div>
+          {!isNavigating ? (
+            <button className="navigate-btn" onClick={startNavigation}>
+              <Play size={18} />
+              <span>Start Navigation</span>
+            </button>
+          ) : (
+            <button className="navigate-btn stop-nav" onClick={stopNavigation}>
+              <Square size={18} />
+              <span>Stop</span>
+            </button>
+          )}
+        </div>
+
+        {/* Navigation Status (when active) */}
+        {isNavigating && (
+          <div className="navigation-status">
+            <div className="nav-status-content">
+              <div className="nav-status-icon">
+                <Navigation size={24} />
               </div>
-            )}
-            <div className="nav-card-destination">
-              <MapPin size={14} />
-              <span>{station.name}</span>
+              <div className="nav-status-text">
+                <span className="nav-status-label">Navigating to</span>
+                <span className="nav-status-destination">{station.name}</span>
+              </div>
             </div>
           </div>
         )}

@@ -142,7 +142,7 @@ const Home = () => {
                 <History size={22} style={{ color: 'var(--ev-info)' }} />
               </div>
               <div className="shortcut-content">
-                <span className="shortcut-title">Charging History</span>
+                <span className="shortcut-title">Charging Historyyyyy</span>
                 <span className="shortcut-subtitle">View past sessions</span>
               </div>
               <ChevronRight size={20} className="shortcut-arrow" />

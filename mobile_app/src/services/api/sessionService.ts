@@ -6,38 +6,31 @@ import { apiClient } from './apiClient';
 
 export interface ChargingSession {
   session_id: number;
-  session_code?: string;
+  session_code: string;
   station_name: string;
   station_id?: number;
   address?: string;
-  connector_type?: string;
+  connector_type: string;
   start_time: string;
   end_time?: string;
   duration_minutes?: number;
   energy_consumed: number;
   current_cost?: number;
   total_cost?: number;
-  cost?: number;
-  price_per_kwh?: number;
-  progress?: number;
+  price_per_kwh: number;
+  progress: number;
   status: string;
   payment_status?: string;
-  date?: string;
 }
 
 export interface StartSessionRequest {
   station_id: number;
   connector_id: number;
   qr_code?: string;
-  selected_units?: number;
-  total_amount?: number;
 }
 
 export interface StopSessionRequest {
   session_id: number;
-  charged_units?: number;
-  charged_cost?: number;
-  is_fully_completed?: boolean;
 }
 
 export const sessionService = {

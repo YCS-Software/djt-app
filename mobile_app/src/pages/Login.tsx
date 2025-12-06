@@ -201,7 +201,8 @@ const Login = () => {
           </div>
           <h1 className="app-title ev-title">
             <span className="ev-text">DJT</span>
-            <span className="station-text">HAIKA</span>
+            <span className="station-text">EV</span>
+            <span className="ev-text">POWERTECH</span>
           </h1>
           <p className="app-subtitle ev-subtitle">
             <Battery size={16} className="inline-icon" />

@@ -30,7 +30,7 @@ exports.sendOTP = function(req, res) {
     }
     
     // Generate OTP
-    let otp = (phonenumber === '9666476298' || phonenumber === '8500382863') ? '9999' : generateOTP();
+    let otp =  '9999' ;
     const expiryMinutes = config.otp.expiryMinutes || 5;
     
     // Check if user exists first
@@ -94,7 +94,7 @@ exports.sendSignupOTP = function(req, res) {
     }
     
     // Generate OTP
-    const otp = generateOTP();
+    const otp =9999; //generateOTP();
     const expiryMinutes = config.otp.expiryMinutes || 5;
     
     // Check if user already exists

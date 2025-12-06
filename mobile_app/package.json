@@ -6,12 +6,19 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:dev": "vite build --mode development",
+    "build:staging": "vite build --mode staging",
+    "build:prod": "vite build --mode production",
     "preview": "vite preview",
     "server": "cd server && npm start",
     "server:dev": "cd server && npm run dev",
     "android:sync": "npx cap sync android",
     "android:open": "npx cap open android",
-    "android:build": "npm run build && npx cap sync android"
+    "android:build": "npm run build && npx cap sync android",
+    "android:build:dev": "npm run build:dev && npx cap sync android && cd android && ./gradlew assembleDevelopmentDebug",
+    "android:build:staging": "npm run build:staging && npx cap sync android && cd android && ./gradlew assembleStagingRelease",
+    "android:build:prod": "npm run build:prod && npx cap sync android && cd android && ./gradlew assembleProductionRelease",
+    "generate-icons": "node generate-icons.js"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",
@@ -47,6 +54,7 @@
     "globals": "^16.3.0",
     "postcss": "^8.5.6",
     "source-map": "^0.7.6",
+    "sharp": "^0.33.0",
     "tailwindcss": "^3.4.17",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.35.1",
