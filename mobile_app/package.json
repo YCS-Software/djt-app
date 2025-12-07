@@ -17,8 +17,7 @@
     "android:build": "npm run build && npx cap sync android",
     "android:build:dev": "npm run build:dev && npx cap sync android && cd android && ./gradlew assembleDevelopmentDebug",
     "android:build:staging": "npm run build:staging && npx cap sync android && cd android && ./gradlew assembleStagingRelease",
-    "android:build:prod": "npm run build:prod && npx cap sync android && cd android && ./gradlew assembleProductionRelease",
-    "generate-icons": "node generate-icons.js"
+    "android:build:prod": "npm run build:prod && npx cap sync android && cd android && ./gradlew assembleProductionRelease"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",
@@ -54,7 +53,6 @@
     "globals": "^16.3.0",
     "postcss": "^8.5.6",
     "source-map": "^0.7.6",
-    "sharp": "^0.33.0",
     "tailwindcss": "^3.4.17",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.35.1",

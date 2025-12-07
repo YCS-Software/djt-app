@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "134604098558",
+    "project_id": "sgss-7140b",
+    "storage_bucket": "sgss-7140b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:134604098558:android:0919098b4be97ef609ceaf",
+        "android_client_info": {
+          "package_name": "com.dreamstep.GST"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDmzjZq2fYNqr3gXDI9pdBaVDM97qtzmos"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

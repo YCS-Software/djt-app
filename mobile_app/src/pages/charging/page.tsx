@@ -55,6 +55,7 @@ export default function Charging() {
   const [unitsConsumed, setUnitsConsumed] = useState(0);
   const [chargingTime, setChargingTime] = useState(0);
   const [isCharging, setIsCharging] = useState(false);
+  const [prepaidAmount, setPrepaidAmount] = useState(0);
 
   // Stations & History data
   const [stations, setStations] = useState<ChargingStation[]>([]);
@@ -182,17 +183,17 @@ export default function Charging() {
     try {
       setLoading(true);
       
-      // Calculate actual charged cost based on units consumed
-      const chargedCost = unitsConsumed * (stationInfo?.pricePerUnit || 0);
-      const isFullyCompleted = unitsConsumed >= unitsPurchased;
+      // Calculate actual values from current state
+      const actualChargedUnits = unitsConsumed;
+      const actualChargedCost = stationInfo ? unitsConsumed * stationInfo.pricePerUnit : 0;
+      const actualIsFullyCompleted = unitsConsumed >= unitsPurchased;
       
-      // Stop session via API with actual charged units and cost
-      // Backend will calculate refund (prepaid - charged) and add to wallet
+      // Stop session via API - backend will calculate refund (prepaid - charged) and add to wallet
       const stoppedSession = await sessionService.stopSession({
         session_id: currentSessionId,
-        charged_units: unitsConsumed,
-        charged_cost: chargedCost,
-        is_fully_completed: isFullyCompleted
+        charged_units: actualChargedUnits,
+        charged_cost: actualChargedCost,
+        is_fully_completed: actualIsFullyCompleted
       });
 
       if (stoppedSession) {
@@ -369,6 +370,7 @@ export default function Charging() {
         setChargingTime(0);
         setIsCharging(true);
         setState('charging');
+        setPrepaidAmount(totalAmount); // Store prepaid amount
         
         // Refresh wallet balance after payment deduction
         await fetchWalletBalance();
@@ -392,6 +394,7 @@ export default function Charging() {
     setUnitsConsumed(0);
     setChargingTime(0);
     setCurrentSessionId(null);
+    setPrepaidAmount(0);
     
     // Refresh wallet balance
     await fetchWalletBalance();
@@ -672,29 +675,13 @@ export default function Charging() {
         {/* STATION DETAILS STATE */}
         {state === 'station-details' && stationInfo && (
           <div className="station-details-state">
-            <section className="station-card">
-              <div className="station-header">
-                <div className="station-icon-wrap">
-                  <Zap size={24} />
-                </div>
-                <div className="station-info">
-                  <h2 className="station-name">{stationInfo.name}</h2>
-                  <p className="station-id">Charger ID: {stationInfo.chargerId}</p>
-                </div>
-              </div>
+            <section className="station-info-card">
+              <h2 className="station-name">{stationInfo.name}</h2>
               <div className="station-meta">
                 <div className="meta-item">
                   <MapPin size={16} />
                   <span>{stationInfo.address}</span>
                 </div>
-                <div className="meta-item">
-                  <Zap size={16} />
-                  <span>{stationInfo.power}</span>
-                </div>
-              </div>
-              <div className="price-badge">
-                <IndianRupee size={16} />
-                <span>{stationInfo.pricePerUnit.toFixed(2)} per Unit</span>
               </div>
             </section>
 
@@ -845,8 +832,28 @@ export default function Charging() {
                   <span className="summary-value">{formatTime(chargingTime)}</span>
                 </div>
                 <div className="summary-divider"></div>
+                <div className="summary-row">
+                  <span className="summary-label">Prepaid Amount</span>
+                  <span className="summary-value">₹{prepaidAmount.toFixed(2)}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Charged Amount</span>
+                  <span className="summary-value">₹{(unitsConsumed * stationInfo.pricePerUnit).toFixed(2)}</span>
+                </div>
+                {prepaidAmount > (unitsConsumed * stationInfo.pricePerUnit) && (
+                  <div className="summary-row refund-row">
+                    <span className="summary-label">
+                      <Wallet size={16} style={{ display: 'inline-block', marginRight: '0.5rem', verticalAlign: 'middle' }} />
+                      Refund Amount
+                    </span>
+                    <span className="summary-value refund-value">
+                      ₹{(prepaidAmount - (unitsConsumed * stationInfo.pricePerUnit)).toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                <div className="summary-divider"></div>
                 <div className="summary-row total">
-                  <span className="summary-label">Total Paid</span>
+                  <span className="summary-label">Total Charged</span>
                   <span className="summary-value">₹{(unitsConsumed * stationInfo.pricePerUnit).toFixed(2)}</span>
                 </div>
               </div>

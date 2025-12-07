@@ -1,0 +1,24 @@
+{
+	"appId": "com.djthaika.ev",
+	"appName": "DJT HAIKA",
+	"webDir": "www",
+	"bundledWebRuntime": false,
+	"plugins": {
+		"SplashScreen": {
+		  "launchShowDuration": 3000,
+		  "launchAutoHide": true,
+		  "backgroundColor": "#ffffff",
+		  "androidSplashResourceName": "splash",
+		  "androidScaleType": "CENTER_CROP",
+		  "showSpinner": false,
+		  "splashFullScreen": true,
+		  "splashImmersive": true
+		},
+		"LiveUpdates": {
+      "appId": "d705072f",
+      "channel": "Production",
+      "autoUpdateMethod": "background",
+      "maxVersions": 2
+    }
+	}
+}
