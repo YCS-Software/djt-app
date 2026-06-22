@@ -31,9 +31,6 @@ export interface StartSessionRequest {
 
 export interface StopSessionRequest {
   session_id: number;
-  charged_units?: number;
-  charged_cost?: number;
-  is_fully_completed?: boolean;
 }
 
 export const sessionService = {

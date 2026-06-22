@@ -183,17 +183,12 @@ export default function Charging() {
     try {
       setLoading(true);
       
-      // Calculate actual values from current state
-      const actualChargedUnits = unitsConsumed;
-      const actualChargedCost = stationInfo ? unitsConsumed * stationInfo.pricePerUnit : 0;
-      const actualIsFullyCompleted = unitsConsumed >= unitsPurchased;
-      
       // Stop session via API - backend will calculate refund (prepaid - charged) and add to wallet
       const stoppedSession = await sessionService.stopSession({
         session_id: currentSessionId,
-        charged_units: actualChargedUnits,
-        charged_cost: actualChargedCost,
-        is_fully_completed: actualIsFullyCompleted
+        charged_units: chargedUnits,
+        charged_cost: chargedCost,
+        is_fully_completed: isFullyCompleted
       });
 
       if (stoppedSession) {

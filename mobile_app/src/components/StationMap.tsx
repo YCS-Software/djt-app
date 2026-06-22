@@ -1,12 +1,22 @@
-import { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import { Icon, LatLngExpression } from 'leaflet';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap, CircleMarker } from 'react-leaflet';
+import { Icon, DivIcon } from 'leaflet';
+import type { LatLngExpression } from 'leaflet';
 import L from 'leaflet';
-import 'leaflet-routing-machine';
-import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
-import { MapPin, Navigation, X, Clock, Route, Play, Square } from 'lucide-react';
+import { Navigation, X, Clock, Route, Play, Square, RotateCcw, AlertCircle, CheckCircle } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import './StationMap.css';
+import {
+  getRoute,
+  type RouteData,
+  type NavigationState,
+  calculateRemainingRoute,
+  isOnRoute,
+  formatDistance,
+  formatTime,
+  cacheRoute,
+  findNearestPointOnRoute,
+} from '../services/navigationService';
 
 interface StationMapProps {
   station: {
@@ -32,201 +42,369 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-// Custom icon for user location
-const userIcon = new Icon({
+// Red pin icon for start location (like Google Maps)
+const startIcon = new Icon({
   iconUrl: 'data:image/svg+xml;base64,' + btoa(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="#2563EB" stroke="white" stroke-width="2">
-      <circle cx="12" cy="12" r="10"/>
-      <circle cx="12" cy="12" r="4" fill="white"/>
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">
+      <path d="M16 0C7.163 0 0 7.163 0 16c0 10 16 24 16 24s16-14 16-24C32 7.163 24.837 0 16 0z" fill="#EA4335"/>
+      <circle cx="16" cy="16" r="8" fill="white"/>
+      <circle cx="16" cy="16" r="5" fill="#EA4335"/>
     </svg>
   `),
-  iconSize: [32, 32],
-  iconAnchor: [16, 32],
+  iconSize: [32, 40],
+  iconAnchor: [16, 40],
+  popupAnchor: [0, -40],
 });
 
-// Custom icon for station
-const stationIcon = new Icon({
-  iconUrl: 'data:image/svg+xml;base64,' + btoa(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="#16A34A" stroke="white" stroke-width="2">
-      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-    </svg>
-  `),
-  iconSize: [40, 40],
-  iconAnchor: [20, 40],
-});
+// Component to create route info bubble
+function RouteInfoBubble({ route, position }: { route: RouteData; position: [number, number] }) {
+  return (
+    <Marker
+      position={position}
+      icon={new DivIcon({
+        className: 'route-info-bubble',
+        html: `
+          <div class="route-bubble-content">
+            <div class="route-bubble-icon">🚴</div>
+            <div class="route-bubble-info">
+              <div class="route-bubble-time">${formatTime(route.duration)}</div>
+              <div class="route-bubble-distance">${formatDistance(route.distance)}</div>
+            </div>
+          </div>
+        `,
+        iconSize: [120, 50],
+        iconAnchor: [60, 50],
+      })}
+    >
+      <Popup>
+        <div style={{ padding: '0.5rem', fontFamily: 'system-ui' }}>
+          <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>Route Option</div>
+          <div style={{ fontSize: '0.875rem', color: '#6B7280' }}>
+            {formatTime(route.duration)} • {formatDistance(route.distance)}
+          </div>
+        </div>
+      </Popup>
+    </Marker>
+  );
+}
 
-// Component to handle routing
-function RoutingControl({ 
-  userPos, 
-  stationPos, 
-  onRouteFound 
-}: { 
-  userPos: LatLngExpression; 
+// Component to fit map bounds and update view
+function MapController({
+  userPos,
+  stationPos,
+  routePolylines,
+  isNavigating,
+  onMapReady,
+}: {
+  userPos: LatLngExpression;
   stationPos: LatLngExpression;
-  onRouteFound: (distance: string, time: string) => void;
+  routePolylines?: [number, number][][];
+  isNavigating: boolean;
+  onMapReady?: (map: L.Map) => void;
 }) {
   const map = useMap();
-  const routingControlRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!map) return;
+    if (onMapReady) {
+      onMapReady(map);
+    }
+  }, [map, onMapReady]);
 
   useEffect(() => {
     if (!map) return;
 
-    const userLatLng = Array.isArray(userPos) 
-      ? L.latLng(userPos[0], userPos[1])
-      : L.latLng((userPos as any).lat, (userPos as any).lng);
-    const stationLatLng = Array.isArray(stationPos)
-      ? L.latLng(stationPos[0], stationPos[1])
-      : L.latLng((stationPos as any).lat, (stationPos as any).lng);
+    try {
+      const userLatLng = Array.isArray(userPos)
+        ? L.latLng(userPos[0], userPos[1])
+        : L.latLng((userPos as any).lat, (userPos as any).lng);
+      const stationLatLng = Array.isArray(stationPos)
+        ? L.latLng(stationPos[0], stationPos[1])
+        : L.latLng((stationPos as any).lat, (stationPos as any).lng);
 
-    // Remove existing routing control
-    if (routingControlRef.current) {
-      map.removeControl(routingControlRef.current);
-    }
-
-    // Create routing control with OSRM
-    const routingControl = (L as any).Routing.control({
-      waypoints: [userLatLng, stationLatLng],
-      router: (L as any).Routing.osrmv1({
-        serviceUrl: 'https://router.projectosrm.org/route/v1',
-        profile: 'driving',
-      }),
-      routeWhileDragging: false,
-      showAlternatives: false,
-      lineOptions: {
-        styles: [
-          {
-            color: '#16A34A',
-            weight: 6,
-            opacity: 0.9,
-          }
-        ],
-        extendToWaypoints: true,
-        missingRouteTolerance: 0,
-      },
-      createMarker: function() {
-        return null; // Don't create default markers, we use custom ones
-      },
-      addWaypoints: false,
-      fitSelectedRoutes: 'smart',
-      show: false, // Hide the instructions panel
-      collapsible: false,
-    }).addTo(map);
-
-    // Hide the routing container after it's added
-    setTimeout(() => {
-      const routingContainer = document.querySelector('.leaflet-routing-container');
-      if (routingContainer) {
-        (routingContainer as HTMLElement).style.display = 'none';
-      }
-    }, 100);
-
-    routingControlRef.current = routingControl;
-
-    // Listen for route found event
-    routingControl.on('routesfound', function(e: any) {
-      const routes = e.routes;
-      if (routes && routes.length > 0) {
-        const route = routes[0];
-        const distance = (route.summary.totalDistance / 1000).toFixed(1); // Convert to km
-        const time = Math.round(route.summary.totalTime / 60); // Convert to minutes
-        
-        let timeStr = '';
-        if (time < 60) {
-          timeStr = `${time} min`;
-        } else {
-          const hours = Math.floor(time / 60);
-          const mins = time % 60;
-          timeStr = `${hours}h ${mins}m`;
-        }
-        
-        onRouteFound(`${distance} km`, timeStr);
-      }
-    });
-
-    // Handle routing errors
-    routingControl.on('routingerror', function(e: any) {
-      console.error('Routing error:', e);
-      // Calculate fallback distance using Haversine formula
-      const R = 6371; // Earth radius in km
-      const dLat = (stationLatLng.lat - userLatLng.lat) * Math.PI / 180;
-      const dLon = (stationLatLng.lng - userLatLng.lng) * Math.PI / 180;
-      const a = 
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(userLatLng.lat * Math.PI / 180) * Math.cos(stationLatLng.lat * Math.PI / 180) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      const distance = (R * c).toFixed(1);
-      const time = Math.round((R * c / 30) * 60); // Assuming 30 km/h average
-      const timeStr = time < 60 ? `${time} min` : `${Math.floor(time / 60)}h ${time % 60}m`;
-      onRouteFound(`${distance} km`, timeStr);
-    });
-
-    // Fit bounds to show both points
-    const bounds = L.latLngBounds([userLatLng, stationLatLng]);
-    map.fitBounds(bounds, { padding: [80, 80] });
-
-    return () => {
-      if (routingControlRef.current) {
-        map.removeControl(routingControlRef.current);
-      }
-    };
-  }, [map, userPos, stationPos, onRouteFound]);
-
-  return null;
-}
-
-// Component to fit map bounds
-function MapBounds({ userPos, stationPos }: { userPos: LatLngExpression; stationPos: LatLngExpression }) {
-  const map = useMap();
-  
-  useEffect(() => {
-    if (userPos && stationPos) {
-      try {
-        const userLatLng = Array.isArray(userPos) 
-          ? L.latLng(userPos[0], userPos[1])
-          : L.latLng((userPos as any).lat, (userPos as any).lng);
-        const stationLatLng = Array.isArray(stationPos)
-          ? L.latLng(stationPos[0], stationPos[1])
-          : L.latLng((stationPos as any).lat, (stationPos as any).lng);
-        
+      if (isNavigating && routePolylines && routePolylines.length > 0 && routePolylines[0]) {
+        // During navigation, center on user location with zoom
+        map.setView(userLatLng, 16, { animate: true, duration: 0.5 });
+      } else {
+        // Before navigation, fit both markers
         const bounds = L.latLngBounds([userLatLng, stationLatLng]);
-        map.fitBounds(bounds, { padding: [80, 80] });
-      } catch (error) {
-        console.error('Error fitting bounds:', error);
+        if (routePolylines && routePolylines.length > 0) {
+          // Include all routes in bounds
+          routePolylines.forEach((polyline) => {
+            polyline.forEach(([lat, lng]) => {
+              bounds.extend([lat, lng]);
+            });
+          });
+        }
+        map.fitBounds(bounds, { padding: [100, 100], animate: true, duration: 0.5 });
       }
+    } catch (error) {
+      console.error('Error updating map view:', error);
     }
-  }, [map, userPos, stationPos]);
-  
+  }, [map, userPos, stationPos, routePolylines, isNavigating]);
+
   return null;
 }
 
 export default function StationMap({ station, userLocation, onClose }: StationMapProps) {
-  const [estimatedTime, setEstimatedTime] = useState<string>('Calculating...');
-  const [estimatedDistance, setEstimatedDistance] = useState<string>('Calculating...');
+  // Routes state (supporting alternatives)
+  const [routes, setRoutes] = useState<RouteData[]>([]);
+  const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
+  const [isLoadingRoute, setIsLoadingRoute] = useState(true);
+  const [routeError, setRouteError] = useState<string | null>(null);
+
+  // Navigation state
   const [isNavigating, setIsNavigating] = useState(false);
-  const [routeInstructions, setRouteInstructions] = useState<string[]>([]);
+  const [navState, setNavState] = useState<NavigationState>({
+    currentStepIndex: 0,
+    remainingDistance: 0,
+    remainingTime: 0,
+    currentInstruction: 'Calculating route...',
+    isOnRoute: true,
+    offRouteDistance: 0,
+  });
 
-  // Default user location (Gurugram, India)
-  const defaultUserLocation: LatLngExpression = [28.4595, 77.0266];
-  const currentUserLocation: LatLngExpression = userLocation 
-    ? [userLocation.latitude, userLocation.longitude]
-    : defaultUserLocation;
+  // Location tracking
+  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(
+    userLocation || null
+  );
+  const locationWatchId = useRef<number | null>(null);
+  const routeCheckInterval = useRef<NodeJS.Timeout | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
   
+  const handleMapReady = useCallback((map: L.Map) => {
+    mapRef.current = map;
+  }, []);
+
+  // Default user location (Rajahmundry, Andhra Pradesh)
+  const defaultUserLocation = { latitude: 17.0000, longitude: 81.7833 };
+  const effectiveUserLocation = currentLocation || userLocation || defaultUserLocation;
+
   const stationPosition: LatLngExpression = [station.latitude, station.longitude];
+  const userPosition: LatLngExpression = [effectiveUserLocation.latitude, effectiveUserLocation.longitude];
+  const selectedRoute = routes[selectedRouteIndex] || null;
 
-  const handleRouteFound = (distance: string, time: string) => {
-    setEstimatedDistance(distance);
-    setEstimatedTime(time);
-  };
+  // Load routes on mount
+  useEffect(() => {
+    loadRoutes();
+    return () => {
+      stopLocationTracking();
+      if (routeCheckInterval.current) {
+        clearInterval(routeCheckInterval.current);
+      }
+    };
+  }, []);
 
-  const startNavigation = () => {
+  // Load routes with alternatives
+  const loadRoutes = useCallback(async () => {
+    setIsLoadingRoute(true);
+    setRouteError(null);
+
+    try {
+      const cacheKey = `${effectiveUserLocation.latitude},${effectiveUserLocation.longitude}_${station.latitude},${station.longitude}`;
+      
+      // Always fetch fresh routes to ensure we get proper road-based routing
+      // Cache can be unreliable for route geometry
+      console.log('Loading routes for:', {
+        from: { lat: effectiveUserLocation.latitude, lng: effectiveUserLocation.longitude },
+        to: { lat: station.latitude, lng: station.longitude },
+      });
+      
+      // Fetch new routes with alternatives
+      const fetchedRoutes = await getRoute(
+        effectiveUserLocation.latitude,
+        effectiveUserLocation.longitude,
+        station.latitude,
+        station.longitude,
+        { alternatives: 2 }
+      );
+      
+      console.log('Fetched routes:', fetchedRoutes.length);
+      
+      // Validate routes have proper polylines (more than 2 points = not straight line)
+      const validRoutes = fetchedRoutes.filter(route => {
+        const isValid = route.polyline && route.polyline.length > 2;
+        if (!isValid) {
+          console.warn('Route has invalid polyline (straight line):', route);
+        }
+        return isValid;
+      });
+      
+      if (validRoutes.length === 0) {
+        throw new Error('No valid routes found. Please check your locations.');
+      }
+      
+      // Cache the first valid route
+      if (validRoutes.length > 0) {
+        cacheRoute(cacheKey, validRoutes[0]);
+      }
+
+      setRoutes(validRoutes);
+      setSelectedRouteIndex(0);
+      
+      console.log('Routes set:', validRoutes.length, 'valid route(s)');
+
+      // Initialize navigation state with first route
+      if (fetchedRoutes.length > 0) {
+        const route = fetchedRoutes[0];
+        const remaining = calculateRemainingRoute(
+          effectiveUserLocation.latitude,
+          effectiveUserLocation.longitude,
+          route
+        );
+
+        setNavState({
+          currentStepIndex: remaining.currentStepIndex,
+          remainingDistance: remaining.remainingDistance,
+          remainingTime: remaining.remainingTime,
+          currentInstruction: route.steps[remaining.currentStepIndex]?.instruction || 'Head towards destination',
+          isOnRoute: true,
+          offRouteDistance: 0,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error loading routes:', error);
+      setRouteError(error.message || 'Failed to load routes');
+    } finally {
+      setIsLoadingRoute(false);
+    }
+  }, [effectiveUserLocation.latitude, effectiveUserLocation.longitude, station.latitude, station.longitude]);
+
+  // Update navigation state when route changes
+  useEffect(() => {
+    if (selectedRoute && !isNavigating) {
+      const remaining = calculateRemainingRoute(
+        effectiveUserLocation.latitude,
+        effectiveUserLocation.longitude,
+        selectedRoute
+      );
+
+      setNavState({
+        currentStepIndex: remaining.currentStepIndex,
+        remainingDistance: remaining.remainingDistance,
+        remainingTime: remaining.remainingTime,
+        currentInstruction: selectedRoute.steps[remaining.currentStepIndex]?.instruction || 'Head towards destination',
+        isOnRoute: true,
+        offRouteDistance: 0,
+      });
+    }
+  }, [selectedRouteIndex, selectedRoute, effectiveUserLocation.latitude, effectiveUserLocation.longitude, isNavigating]);
+
+  // Start location tracking
+  const startLocationTracking = useCallback(() => {
+    if (!navigator.geolocation) {
+      console.warn('Geolocation not supported');
+      return;
+    }
+
+    const options = {
+      enableHighAccuracy: true,
+      timeout: 5000,
+      maximumAge: 1000,
+    };
+
+    locationWatchId.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const newLocation = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
+        setCurrentLocation(newLocation);
+
+        if (isNavigating && selectedRoute) {
+          updateNavigationState(newLocation);
+        }
+      },
+      (error) => {
+        console.error('Location tracking error:', error);
+      },
+      options
+    );
+  }, [isNavigating, selectedRoute]);
+
+  // Stop location tracking
+  const stopLocationTracking = useCallback(() => {
+    if (locationWatchId.current !== null) {
+      navigator.geolocation.clearWatch(locationWatchId.current);
+      locationWatchId.current = null;
+    }
+  }, []);
+
+  // Update navigation state
+  const updateNavigationState = useCallback(
+    (location: { latitude: number; longitude: number }) => {
+      if (!selectedRoute) return;
+
+      const onRoute = isOnRoute(location.latitude, location.longitude, selectedRoute.polyline, 50);
+      const { distance: offRouteDist } = findNearestPointOnRoute(
+        location.latitude,
+        location.longitude,
+        selectedRoute.polyline
+      );
+
+      const remaining = calculateRemainingRoute(location.latitude, location.longitude, selectedRoute);
+
+      setNavState({
+        currentStepIndex: remaining.currentStepIndex,
+        remainingDistance: remaining.remainingDistance,
+        remainingTime: remaining.remainingTime,
+        currentInstruction: selectedRoute.steps[remaining.currentStepIndex]?.instruction || 'Head towards destination',
+        isOnRoute: onRoute,
+        offRouteDistance: offRouteDist,
+      });
+
+      if (!onRoute && offRouteDist > 100) {
+        console.log('User is off route, considering rerouting...');
+      }
+    },
+    [selectedRoute]
+  );
+
+  // Start navigation
+  const startNavigation = useCallback(() => {
     setIsNavigating(true);
-    // In a real app, you would start turn-by-turn navigation here
-    // For now, we'll just show that navigation is active
-  };
+    startLocationTracking();
 
-  const stopNavigation = () => {
+    routeCheckInterval.current = setInterval(() => {
+      if (currentLocation && selectedRoute) {
+        updateNavigationState(currentLocation);
+      }
+    }, 5000);
+  }, [currentLocation, selectedRoute, startLocationTracking, updateNavigationState]);
+
+  // Stop navigation
+  const stopNavigation = useCallback(() => {
     setIsNavigating(false);
+    stopLocationTracking();
+    if (routeCheckInterval.current) {
+      clearInterval(routeCheckInterval.current);
+      routeCheckInterval.current = null;
+    }
+  }, [stopLocationTracking]);
+
+  // Re-center map
+  const recenterMap = useCallback(() => {
+    if (currentLocation && mapRef.current) {
+      mapRef.current.setView([currentLocation.latitude, currentLocation.longitude], 16, {
+        animate: true,
+        duration: 0.5,
+      });
+    }
+  }, [currentLocation]);
+
+  // Reroute
+  const handleReroute = useCallback(async () => {
+    if (currentLocation) {
+      setCurrentLocation(currentLocation);
+      await loadRoutes();
+    }
+  }, [currentLocation, loadRoutes]);
+
+  // Get midpoint of route for info bubble
+  const getRouteMidpoint = (polyline: [number, number][]): [number, number] => {
+    if (polyline.length === 0) return [0, 0];
+    const midIndex = Math.floor(polyline.length / 2);
+    return polyline[midIndex];
   };
 
   return (
@@ -247,83 +425,253 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
 
         {/* Map */}
         <div className="map-wrapper">
+          {isLoadingRoute && (
+            <div className="map-loading">
+              <div className="map-spinner"></div>
+              <p>Calculating routes...</p>
+            </div>
+          )}
+
+          {routeError && (
+            <div className="map-error">
+              <AlertCircle size={24} />
+              <p>{routeError}</p>
+              <button onClick={loadRoutes} className="retry-btn">
+                Retry
+              </button>
+            </div>
+          )}
+
           <MapContainer
             center={stationPosition}
             zoom={13}
             style={{ height: '100%', width: '100%' }}
-            scrollWheelZoom={true}
-            zoomControl={true}
+            scrollWheelZoom={!isNavigating}
+            zoomControl={!isNavigating}
           >
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            
-            {/* User location marker */}
-            <Marker position={currentUserLocation} icon={userIcon}>
+
+            {/* Start location marker (red pin) */}
+            <Marker position={userPosition} icon={startIcon}>
               <Popup>
                 <div style={{ padding: '0.5rem', fontFamily: 'system-ui' }}>
-                  <div style={{ fontWeight: 600, color: '#2563EB', marginBottom: '0.25rem' }}>Your Location</div>
+                  <div style={{ fontWeight: 600, color: '#EA4335', marginBottom: '0.25rem' }}>
+                    Your Location
+                  </div>
                 </div>
               </Popup>
             </Marker>
 
-            {/* Station marker */}
-            <Marker position={stationPosition} icon={stationIcon}>
+            {/* Destination marker (black circle like Google Maps) */}
+            <CircleMarker
+              center={stationPosition}
+              radius={8}
+              pathOptions={{
+                color: '#000000',
+                fillColor: '#000000',
+                fillOpacity: 1,
+                weight: 2,
+              }}
+            >
+              <CircleMarker
+                center={stationPosition}
+                radius={4}
+                pathOptions={{
+                  color: '#FFFFFF',
+                  fillColor: '#FFFFFF',
+                  fillOpacity: 1,
+                  weight: 0,
+                }}
+              />
               <Popup>
                 <div style={{ padding: '0.5rem', fontFamily: 'system-ui' }}>
-                  <div style={{ fontWeight: 600, color: '#14532D', marginBottom: '0.25rem' }}>{station.name}</div>
+                  <div style={{ fontWeight: 600, color: '#14532D', marginBottom: '0.25rem' }}>
+                    {station.name}
+                  </div>
                   <div style={{ fontSize: '0.875rem', color: '#6B7280' }}>{station.address}</div>
                 </div>
               </Popup>
-            </Marker>
+            </CircleMarker>
 
-            {/* Routing Control - Shows actual route */}
-            <RoutingControl 
-              userPos={currentUserLocation} 
+            {/* Route polylines (primary + alternatives) */}
+            {routes.map((route, index) => {
+              const isSelected = index === selectedRouteIndex;
+              const isPrimary = index === 0;
+              
+              return (
+                <div key={index}>
+                  <Polyline
+                    positions={route.polyline}
+                    pathOptions={{
+                      color: isSelected ? '#4285F4' : isPrimary ? '#4285F4' : '#9AA0A6',
+                      weight: isSelected ? 6 : isPrimary ? 5 : 4,
+                      opacity: isSelected ? 0.9 : isPrimary ? 0.7 : 0.5,
+                      lineJoin: 'round',
+                      lineCap: 'round',
+                    }}
+                    eventHandlers={{
+                      click: () => {
+                        setSelectedRouteIndex(index);
+                      },
+                    }}
+                  />
+                  {/* Route info bubble */}
+                  {route.polyline.length > 0 && (
+                    <RouteInfoBubble
+                      route={route}
+                      position={getRouteMidpoint(route.polyline)}
+                    />
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Map controller */}
+            <MapController
+              userPos={userPosition}
               stationPos={stationPosition}
-              onRouteFound={handleRouteFound}
+              routePolylines={routes.map(r => r.polyline)}
+              isNavigating={isNavigating}
+              onMapReady={handleMapReady}
             />
-
-            {/* Fit bounds */}
-            <MapBounds userPos={currentUserLocation} stationPos={stationPosition} />
           </MapContainer>
-        </div>
 
-        {/* Route Info Card */}
-        <div className="route-info-card">
-          <div className="route-info-item">
-            <div className="route-icon">
-              <Route size={20} />
-            </div>
-            <div className="route-details">
-              <span className="route-label">Distance</span>
-              <span className="route-value">{estimatedDistance}</span>
-            </div>
-          </div>
-          <div className="route-info-item">
-            <div className="route-icon">
-              <Clock size={20} />
-            </div>
-            <div className="route-details">
-              <span className="route-label">Est. Time</span>
-              <span className="route-value">{estimatedTime}</span>
-            </div>
-          </div>
-          {!isNavigating ? (
-            <button className="navigate-btn" onClick={startNavigation}>
-              <Play size={18} />
-              <span>Start Navigation</span>
+          {/* Re-center button */}
+          {isNavigating && (
+            <button className="recenter-btn" onClick={recenterMap} title="Re-center map">
+              <Navigation size={20} />
             </button>
-          ) : (
-            <button className="navigate-btn stop-nav" onClick={stopNavigation}>
-              <Square size={18} />
-              <span>Stop</span>
-            </button>
+          )}
+
+          {/* Off-route indicator */}
+          {isNavigating && !navState.isOnRoute && navState.offRouteDistance > 50 && (
+            <div className="off-route-alert">
+              <AlertCircle size={20} />
+              <span>You're off route</span>
+              <button onClick={handleReroute} className="reroute-btn">
+                Reroute
+              </button>
+            </div>
           )}
         </div>
 
-        {/* Navigation Status (when active) */}
+        {/* Route Selection Panel (when multiple routes available) */}
+        {!isNavigating && routes.length > 1 && (
+          <div className="route-selection-panel">
+            <div className="route-selection-title">Choose a route</div>
+            <div className="route-options">
+              {routes.map((route, index) => (
+                <button
+                  key={index}
+                  className={`route-option ${index === selectedRouteIndex ? 'selected' : ''}`}
+                  onClick={() => setSelectedRouteIndex(index)}
+                >
+                  <div className="route-option-content">
+                    <div className="route-option-time">{formatTime(route.duration)}</div>
+                    <div className="route-option-distance">{formatDistance(route.distance)}</div>
+                  </div>
+                  {index === selectedRouteIndex && (
+                    <div className="route-option-check">
+                      <CheckCircle size={20} />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Route Info Card / Navigation Panel */}
+        {!isNavigating ? (
+          <div className="route-info-card">
+            <div className="route-info-item">
+              <div className="route-icon">
+                <Route size={20} />
+              </div>
+              <div className="route-details">
+                <span className="route-label">Distance</span>
+                <span className="route-value">
+                  {selectedRoute ? formatDistance(selectedRoute.distance) : 'Calculating...'}
+                </span>
+              </div>
+            </div>
+            <div className="route-info-item">
+              <div className="route-icon">
+                <Clock size={20} />
+              </div>
+              <div className="route-details">
+                <span className="route-label">Est. Time</span>
+                <span className="route-value">
+                  {selectedRoute ? formatTime(selectedRoute.duration) : 'Calculating...'}
+                </span>
+              </div>
+            </div>
+            <button
+              className="navigate-btn"
+              onClick={startNavigation}
+              disabled={!selectedRoute || isLoadingRoute}
+            >
+              <Play size={18} />
+              <span>Start Navigation</span>
+            </button>
+          </div>
+        ) : (
+          <div className="navigation-panel">
+            {/* Current instruction */}
+            <div className="nav-instruction">
+              <div className="nav-instruction-icon">
+                <Navigation size={24} />
+              </div>
+              <div className="nav-instruction-text">
+                <span className="nav-instruction-main">{navState.currentInstruction}</span>
+                {navState.remainingDistance > 0 && (
+                  <span className="nav-instruction-distance">
+                    in {formatDistance(navState.remainingDistance)}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Stats row */}
+            <div className="nav-stats">
+              <div className="nav-stat-item">
+                <div className="nav-stat-icon">
+                  <Route size={18} />
+                </div>
+                <div className="nav-stat-content">
+                  <span className="nav-stat-label">Remaining</span>
+                  <span className="nav-stat-value">{formatDistance(navState.remainingDistance)}</span>
+                </div>
+              </div>
+              <div className="nav-stat-item">
+                <div className="nav-stat-icon">
+                  <Clock size={18} />
+                </div>
+                <div className="nav-stat-content">
+                  <span className="nav-stat-label">ETA</span>
+                  <span className="nav-stat-value">{formatTime(navState.remainingTime)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="nav-actions">
+              <button className="nav-action-btn secondary" onClick={stopNavigation}>
+                <Square size={18} />
+                <span>Stop</span>
+              </button>
+              <button className="nav-action-btn secondary" onClick={handleReroute}>
+                <RotateCcw size={18} />
+                <span>Reroute</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Navigation Status Bar */}
         {isNavigating && (
           <div className="navigation-status">
             <div className="nav-status-content">
@@ -334,6 +682,11 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
                 <span className="nav-status-label">Navigating to</span>
                 <span className="nav-status-destination">{station.name}</span>
               </div>
+              {navState.isOnRoute && (
+                <div className="nav-status-indicator">
+                  <CheckCircle size={20} />
+                </div>
+              )}
             </div>
           </div>
         )}
