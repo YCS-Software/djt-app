@@ -7,9 +7,9 @@ const mysql = require('mysql2/promise');
 
 // MySQL Configuration
 const USER = "root";
-const PWD = "YcsPass@2025";
-const DATABASE = "DJTDB"; 
-const DB_HOST_NAME = '13.202.34.243';
+const PWD = "Djt@2026#";
+const DATABASE = "DJT_POWERTECH_DEV"; 
+const DB_HOST_NAME = '3.110.84.196';
 const PORT = 3306;
 const MAX_POOL_SIZE = 200;
 
@@ -86,21 +86,30 @@ module.exports = {
     MSSQLConPool: MySQLConPool, // Alias for compatibility with old code
     pool: pool,
     config: config,
-    connect: async () => {
-        try {
-            // Test connection
-            const connection = await pool.getConnection();
-            await connection.ping();
-            connection.release();
-            console.log('✅ MySQL Database connected successfully');
-            console.log(`   Host: ${DB_HOST_NAME}:${PORT}`);
-            console.log(`   Database: ${DATABASE}`);
-            return pool;
-        } catch (err) {
-            console.error('❌ Error connecting to MySQL database:', err);
-            console.error(`   Host: ${DB_HOST_NAME}:${PORT}`);
-            console.error(`   Database: ${DATABASE}`);
-            throw err;
+    connect: async (retries = 5, delayMs = 3000) => {
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+                // Test connection
+                const connection = await pool.getConnection();
+                await connection.ping();
+                connection.release();
+                console.log('✅ MySQL Database connected successfully');
+                console.log(`   Host: ${DB_HOST_NAME}:${PORT}`);
+                console.log(`   Database: ${DATABASE}`);
+                return pool;
+            } catch (err) {
+                const transient = TRANSIENT_ERRORS.includes(err.code);
+                console.error(`❌ Error connecting to MySQL database (attempt ${attempt}/${retries}):`, err.code || err.message);
+                console.error(`   Host: ${DB_HOST_NAME}:${PORT}`);
+                console.error(`   Database: ${DATABASE}`);
+                // Retry only on transient connectivity errors with attempts remaining
+                if (transient && attempt < retries) {
+                    console.warn(`   Transient error — retrying in ${delayMs}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
+                    continue;
+                }
+                throw err;
+            }
         }
     },
     close: async () => {
