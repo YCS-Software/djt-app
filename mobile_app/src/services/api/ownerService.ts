@@ -31,6 +31,15 @@ export interface PowerOption {
   default_connector_type: string;
 }
 
+export interface OcppConnection {
+  ocpp_id: string;
+  machine_id: number | null;
+  station_id: number | null;
+  connected_at: string;
+  last_seen: string;
+  authorized_user: number | null;
+}
+
 export interface OwnerMachine {
   machine_id: number;
   station_id: number;
@@ -151,6 +160,12 @@ export const ownerService = {
   getPowerOptions: async (): Promise<PowerOption[]> => {
     const res = await apiClient.get<{ data: { power_options: PowerOption[] } }>('/owner/power-options', AUTH);
     return res.data?.power_options || [];
+  },
+
+  // Live-connected charge points (in-memory OCPP registry) — used for online/offline status
+  getOcppConnections: async (): Promise<OcppConnection[]> => {
+    const res = await apiClient.get<{ data: { connections: OcppConnection[] } }>('/ocpp/connections', AUTH);
+    return res.data?.connections || [];
   },
 
   addMachine: async (stationId: number, data: CreateMachineRequest): Promise<AddMachineResult> => {

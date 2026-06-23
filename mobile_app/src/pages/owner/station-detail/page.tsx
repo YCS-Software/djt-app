@@ -2,14 +2,21 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ownerService } from '../../../services/api';
 import type { OwnerStation, OwnerMachine, PowerOption, AddMachineResult } from '../../../services/api/ownerService';
+import Dropdown from '../../../components/Dropdown';
 import {
   ArrowLeft, Cpu, Plug, PlusCircle, MapPin, Zap, Loader2, X, IndianRupee, Star, Power,
-  Copy, Check, Wifi, CheckCircle2, Hash,
+  Copy, Check, Wifi, WifiOff, CheckCircle2, Hash, RefreshCw,
 } from 'lucide-react';
 
 const CONNECTOR_TYPES = ['CCS2', 'CHAdeMO', 'Type2', 'GB/T', 'Bharat AC', 'Bharat DC'];
 const MACHINE_STATUS: Record<string, string> = {
   available: 'Available', in_use: 'In use', offline: 'Offline', faulted: 'Faulted', maintenance: 'Maintenance',
+};
+// Friendly machine-type labels (codes come from the power-options master)
+const MACHINE_TYPE_LABELS: Record<string, string> = {
+  AC: 'AC — Alternating Current',
+  DC: 'DC — Direct Current',
+  DCS: 'DCS — DC Super (high power)',
 };
 
 export default function StationDetailPage() {
@@ -20,6 +27,9 @@ export default function StationDetailPage() {
   const [station, setStation] = useState<OwnerStation | null>(null);
   const [machines, setMachines] = useState<OwnerMachine[]>([]);
   const [powerOptions, setPowerOptions] = useState<PowerOption[]>([]);
+  const [powerLoading, setPowerLoading] = useState(false);
+  const [powerError, setPowerError] = useState('');
+  const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -30,7 +40,7 @@ export default function StationDetailPage() {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState('');
 
-  const [mForm, setMForm] = useState<{ name: string; mchn_pwr_id: string; serial_no: string }>({ name: '', mchn_pwr_id: '', serial_no: '' });
+  const [mForm, setMForm] = useState<{ name: string; machine_type: string; mchn_pwr_id: string; serial_no: string }>({ name: '', machine_type: '', mchn_pwr_id: '', serial_no: '' });
   const [cForm, setCForm] = useState({ connector_type: 'CCS2', power: '', name: '' });
 
   const load = async () => {
@@ -47,11 +57,43 @@ export default function StationDetailPage() {
     }
   };
 
+  const loadPowerOptions = async () => {
+    setPowerLoading(true);
+    setPowerError('');
+    try {
+      const opts = await ownerService.getPowerOptions();
+      setPowerOptions(opts);
+      if (opts.length === 0) setPowerError('No power ratings configured');
+    } catch (e: any) {
+      setPowerError(e?.message || 'Failed to load power ratings');
+    } finally {
+      setPowerLoading(false);
+    }
+  };
+
+  const refreshConnections = async () => {
+    try {
+      const conns = await ownerService.getOcppConnections();
+      setOnlineIds(new Set(conns.map((c) => c.ocpp_id)));
+    } catch { /* connectivity is supplementary — ignore failures */ }
+  };
+
   useEffect(() => {
     if (sid) load();
-    ownerService.getPowerOptions().then(setPowerOptions).catch(() => {});
+    loadPowerOptions();
+    refreshConnections();
+    // live online/offline: refresh the connection registry periodically
+    const timer = setInterval(refreshConnections, 20000);
+    return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sid]);
+
+  // online (live socket) | offline (configured, not connected) | unconfigured (no OCPP id)
+  const connState = (m: OwnerMachine): 'online' | 'offline' | 'unconfigured' => {
+    if (!m.ocpp_id) return 'unconfigured';
+    return onlineIds.has(m.ocpp_id) ? 'online' : 'offline';
+  };
+  const CONN_LABEL = { online: 'Online', offline: 'Offline', unconfigured: 'Not configured' } as const;
 
   const copy = async (text: string, key: string) => {
     try {
@@ -62,13 +104,15 @@ export default function StationDetailPage() {
   };
 
   const openMachineModal = () => {
-    setMForm({ name: `Charger ${machines.length + 1}`, mchn_pwr_id: '', serial_no: '' });
+    setMForm({ name: `Charger ${machines.length + 1}`, machine_type: '', mchn_pwr_id: '', serial_no: '' });
     setError('');
+    if (powerOptions.length === 0 && !powerLoading) loadPowerOptions();
     setMachineModal(true);
   };
 
   const submitMachine = async () => {
     if (!mForm.name.trim()) return setError('Machine name is required');
+    if (!mForm.machine_type) return setError('Please select a machine type');
     if (!mForm.mchn_pwr_id) return setError('Please select a power rating');
     setSaving(true);
     setError('');
@@ -109,11 +153,16 @@ export default function StationDetailPage() {
     }
   };
 
-  // group power options by machine type for the dropdown
-  const groupedPower = powerOptions.reduce((acc, p) => {
-    (acc[p.machine_type] = acc[p.machine_type] || []).push(p);
-    return acc;
-  }, {} as Record<string, PowerOption[]>);
+  // Distinct machine types (preserve master sort order) → dropdown options
+  const machineTypeOptions = powerOptions
+    .map((p) => p.machine_type)
+    .filter((t, i, arr) => arr.indexOf(t) === i)
+    .map((t) => ({ value: t, label: MACHINE_TYPE_LABELS[t] || t, badge: t }));
+
+  // Power ratings for the chosen machine type
+  const powerOptionsForType = powerOptions
+    .filter((p) => p.machine_type === mForm.machine_type)
+    .map((p) => ({ value: String(p.power_id), label: p.label, hint: p.default_connector_type }));
 
   if (loading) {
     return <div className="owner-page"><div className="owner-loading"><Loader2 className="owner-spin" size={26} /> Loading…</div></div>;
@@ -164,7 +213,9 @@ export default function StationDetailPage() {
         </div>
       ) : (
         <div className="owner-machine-list">
-          {machines.map((m) => (
+          {machines.map((m) => {
+            const cs = connState(m);
+            return (
             <div key={m.machine_id} className="owner-machine-card">
               <div className="owner-machine-head">
                 <div className="owner-machine-icon"><Power size={18} /></div>
@@ -173,6 +224,10 @@ export default function StationDetailPage() {
                   <div className="owner-machine-meta">
                     <span className={`owner-type-badge type-${(m.machine_type || '').toLowerCase()}`}>{m.machine_type}</span>
                     {(m.power_label || m.max_power) && <span className="owner-power-chip"><Zap size={11} /> {m.power_label || m.max_power}</span>}
+                    <span className={`owner-conn owner-conn-${cs}`}>
+                      {cs === 'online' ? <Wifi size={11} /> : <WifiOff size={11} />}
+                      <span className="owner-conn-dot" /> {CONN_LABEL[cs]}
+                    </span>
                   </div>
                 </div>
                 <span className={`owner-mstatus owner-status-${m.status}`}>{MACHINE_STATUS[m.status] || m.status}</span>
@@ -182,20 +237,28 @@ export default function StationDetailPage() {
               <div className="owner-ocpp-box">
                 <div className="owner-ocpp-row">
                   <span className="owner-ocpp-label"><Hash size={12} /> OCPP ID</span>
-                  <span className="owner-ocpp-val">{m.ocpp_id || '—'}</span>
-                  {m.ocpp_id && (
-                    <button className="owner-copy-btn" onClick={() => copy(m.ocpp_id!, `id-${m.machine_id}`)}>
-                      {copied === `id-${m.machine_id}` ? <Check size={13} /> : <Copy size={13} />}
-                    </button>
+                  {m.ocpp_id ? (
+                    <>
+                      <span className="owner-ocpp-val">{m.ocpp_id}</span>
+                      <button className="owner-copy-btn" onClick={() => copy(m.ocpp_id!, `id-${m.machine_id}`)}>
+                        {copied === `id-${m.machine_id}` ? <Check size={13} /> : <Copy size={13} />}
+                      </button>
+                    </>
+                  ) : (
+                    <span className="owner-ocpp-val owner-ocpp-unset">Not configured</span>
                   )}
                 </div>
                 <div className="owner-ocpp-row">
                   <span className="owner-ocpp-label"><Wifi size={12} /> WebSocket</span>
-                  <span className="owner-ocpp-val owner-ocpp-url">{m.ws_url || '—'}</span>
-                  {m.ws_url && (
-                    <button className="owner-copy-btn" onClick={() => copy(m.ws_url!, `ws-${m.machine_id}`)}>
-                      {copied === `ws-${m.machine_id}` ? <Check size={13} /> : <Copy size={13} />}
-                    </button>
+                  {m.ws_url ? (
+                    <>
+                      <span className="owner-ocpp-val owner-ocpp-url">{m.ws_url}</span>
+                      <button className="owner-copy-btn" onClick={() => copy(m.ws_url!, `ws-${m.machine_id}`)}>
+                        {copied === `ws-${m.machine_id}` ? <Check size={13} /> : <Copy size={13} />}
+                      </button>
+                    </>
+                  ) : (
+                    <span className="owner-ocpp-val owner-ocpp-unset">Not configured</span>
                   )}
                 </div>
               </div>
@@ -211,7 +274,8 @@ export default function StationDetailPage() {
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
       <div className="owner-bottom-space" />
@@ -233,18 +297,37 @@ export default function StationDetailPage() {
             </div>
 
             <div className="owner-field">
+              <label><Cpu size={12} /> Machine type *</label>
+              <Dropdown
+                ariaLabel="Machine type"
+                value={mForm.machine_type}
+                options={machineTypeOptions}
+                placeholder={powerLoading ? 'Loading…' : 'Select machine type…'}
+                disabled={powerLoading || machineTypeOptions.length === 0}
+                emptyText="No machine types"
+                onChange={(v) => setMForm({ ...mForm, machine_type: v, mchn_pwr_id: '' })}
+              />
+            </div>
+
+            <div className="owner-field">
               <label><Zap size={12} /> Power rating *</label>
-              <select className="owner-input" value={mForm.mchn_pwr_id} onChange={(e) => setMForm({ ...mForm, mchn_pwr_id: e.target.value })}>
-                <option value="">Select power…</option>
-                {Object.keys(groupedPower).map((type) => (
-                  <optgroup key={type} label={type}>
-                    {groupedPower[type].map((p) => (
-                      <option key={p.power_id} value={p.power_id}>{p.code}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-              <p className="owner-field-hint">Machine type is set automatically from the power rating.</p>
+              <Dropdown
+                ariaLabel="Power rating"
+                value={mForm.mchn_pwr_id}
+                options={powerOptionsForType}
+                placeholder={!mForm.machine_type ? 'Select a machine type first' : 'Select power rating…'}
+                disabled={powerLoading || !mForm.machine_type}
+                emptyText="No power ratings for this type"
+                onChange={(v) => setMForm({ ...mForm, mchn_pwr_id: v })}
+              />
+              {powerError && (
+                <div className="owner-field-error">
+                  <span>{powerError}</span>
+                  <button type="button" className="owner-link-btn" onClick={loadPowerOptions} disabled={powerLoading}>
+                    <RefreshCw size={12} className={powerLoading ? 'owner-spin' : ''} /> Retry
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="owner-field">
@@ -305,9 +388,12 @@ export default function StationDetailPage() {
             <p className="owner-modal-sub">To machine: <strong>{connectorFor.name}</strong></p>
             <div className="owner-field">
               <label>Connector type *</label>
-              <select className="owner-input" value={cForm.connector_type} onChange={(e) => setCForm({ ...cForm, connector_type: e.target.value })}>
-                {CONNECTOR_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
+              <Dropdown
+                ariaLabel="Connector type"
+                value={cForm.connector_type}
+                options={CONNECTOR_TYPES.map((t) => ({ value: t, label: t }))}
+                onChange={(v) => setCForm({ ...cForm, connector_type: v })}
+              />
             </div>
             <div className="owner-grid-2">
               <div className="owner-field">
