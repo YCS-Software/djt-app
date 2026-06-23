@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ splash icon: the logo with padding so it is centred, not zoomed/cropped -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:width="140dp"
+        android:height="146dp"
+        android:gravity="center"
+        android:drawable="@drawable/djt_logo" />
+</layer-list>

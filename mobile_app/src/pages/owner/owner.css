@@ -1,20 +1,20 @@
-/* ============================================================
-   OWNER CONSOLE — Dark navy + cyan/teal AI theme
+﻿/* ============================================================
+   OWNER CONSOLE — Cosmic night-sky theme (matches login)
    ============================================================ */
 :root {
-  --o-bg: #0B1220;
-  --o-bg-2: #0E1729;
-  --o-card: rgba(17, 27, 46, 0.85);
-  --o-card-solid: #111B2E;
-  --o-border: rgba(148, 163, 184, 0.16);
-  --o-border-hi: rgba(34, 211, 238, 0.5);
-  --o-text: #E2E8F0;
-  --o-text-dim: #94A3B8;
-  --o-text-faint: #64748B;
-  --o-cyan: #22D3EE;
-  --o-teal: #2DD4BF;
-  --o-cyan-glow: rgba(34, 211, 238, 0.18);
-  --o-grad: linear-gradient(135deg, #22D3EE 0%, #14B8A6 100%);
+  --o-bg: transparent;
+  --o-bg-2: rgba(9, 24, 42, 0.5);
+  --o-card: rgba(16, 34, 58, 0.55);
+  --o-card-solid: rgba(13, 30, 50, 0.78);
+  --o-border: rgba(255, 255, 255, 0.12);
+  --o-border-hi: rgba(94, 234, 212, 0.55);
+  --o-text: #E8F0F7;
+  --o-text-dim: #9FBBD4;
+  --o-text-faint: #6F8AA6;
+  --o-cyan: #38BDF8;
+  --o-teal: #5EEAD4;
+  --o-cyan-glow: rgba(56, 189, 248, 0.22);
+  --o-grad: linear-gradient(135deg, #2DD4BF 0%, #38BDF8 100%);
   --o-danger: #F87171;
   --o-warn: #FBBF24;
   --o-green: #34D399;
@@ -24,8 +24,8 @@
 .owner-shell {
   min-height: 100vh;
   background:
-    radial-gradient(900px 500px at 100% -10%, rgba(34, 211, 238, 0.10), transparent 60%),
-    radial-gradient(700px 500px at -10% 10%, rgba(45, 212, 191, 0.08), transparent 55%),
+    radial-gradient(900px 500px at 100% -10%, rgba(56, 189, 248, 0.10), transparent 60%),
+    radial-gradient(700px 500px at -10% 10%, rgba(94, 234, 212, 0.08), transparent 55%),
     var(--o-bg);
   color: var(--o-text);
   font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -43,7 +43,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.8rem 1rem;
-  background: rgba(11, 18, 32, 0.82);
+  background: rgba(7, 18, 33, 0.82);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--o-border);
 }
@@ -61,7 +61,7 @@
 .owner-icon-btn {
   display: grid; place-items: center;
   width: 36px; height: 36px; border-radius: 10px;
-  background: rgba(148, 163, 184, 0.10); border: 1px solid var(--o-border);
+  background: rgba(255, 255, 255, 0.10); border: 1px solid var(--o-border);
   color: var(--o-text-dim); cursor: pointer; transition: all 180ms ease;
 }
 .owner-icon-btn:hover { color: var(--o-cyan); border-color: var(--o-border-hi); }
@@ -78,7 +78,7 @@
 .owner-back {
   flex: none; width: 38px; height: 38px; border-radius: 11px;
   display: grid; place-items: center;
-  background: rgba(148, 163, 184, 0.10); border: 1px solid var(--o-border);
+  background: rgba(255, 255, 255, 0.10); border: 1px solid var(--o-border);
   color: var(--o-text); cursor: pointer; transition: all 180ms ease;
 }
 .owner-back:hover { border-color: var(--o-border-hi); color: var(--o-cyan); }
@@ -95,7 +95,7 @@
   width: 34px; height: 34px; border-radius: 10px; margin: 0 auto 0.4rem;
   display: grid; place-items: center; color: #06121A;
 }
-.owner-stat-card.tone-cyan .owner-stat-icon { background: linear-gradient(135deg, #22D3EE, #0EA5E9); }
+.owner-stat-card.tone-cyan .owner-stat-icon { background: linear-gradient(135deg, #38BDF8, #2E9FD6); }
 .owner-stat-card.tone-teal .owner-stat-icon { background: linear-gradient(135deg, #2DD4BF, #14B8A6); }
 .owner-stat-card.tone-violet .owner-stat-icon { background: linear-gradient(135deg, #A78BFA, #8B5CF6); }
 .owner-stat-card.tone-green .owner-stat-icon { background: linear-gradient(135deg, #34D399, #10B981); }
@@ -120,7 +120,7 @@
 .owner-field > label { display: flex; align-items: center; gap: 0.3rem; font-size: 0.76rem; font-weight: 600; color: var(--o-text-dim); margin-bottom: 0.35rem; }
 .owner-input {
   width: 100%; padding: 0.7rem 0.8rem; border-radius: 11px;
-  background: rgba(11, 18, 32, 0.7); border: 1.5px solid var(--o-border);
+  background: rgba(7, 18, 33, 0.7); border: 1.5px solid var(--o-border);
   color: var(--o-text); font-size: 0.9rem; font-family: inherit;
   transition: border-color 180ms ease, box-shadow 180ms ease;
   outline: none;
@@ -134,7 +134,7 @@ select.owner-input { appearance: none; }
 /* Switch */
 .owner-switch { display: flex; align-items: center; gap: 0.6rem; cursor: pointer; margin-top: 0.25rem; }
 .owner-switch input { display: none; }
-.owner-switch-track { width: 44px; height: 25px; border-radius: 999px; background: rgba(148,163,184,0.25); position: relative; transition: background 200ms ease; flex: none; }
+.owner-switch-track { width: 44px; height: 25px; border-radius: 999px; background: rgba(255, 255, 255,0.25); position: relative; transition: background 200ms ease; flex: none; }
 .owner-switch-thumb { position: absolute; top: 3px; left: 3px; width: 19px; height: 19px; border-radius: 50%; background: #fff; transition: transform 200ms ease; }
 .owner-switch input:checked + .owner-switch-track { background: var(--o-grad); }
 .owner-switch input:checked + .owner-switch-track .owner-switch-thumb { transform: translateX(19px); }
@@ -156,11 +156,11 @@ select.owner-input { appearance: none; }
 
 /* Location picker */
 .loc-picker { position: relative; border-radius: 14px; overflow: hidden; border: 1px solid var(--o-border); }
-.loc-picker-map { width: 100%; background: #0E1729; }
+.loc-picker-map { width: 100%; background: rgba(9, 24, 42, 0.5); }
 .loc-picker-locate {
   position: absolute; top: 10px; right: 10px; z-index: 500;
   display: inline-flex; align-items: center; gap: 0.35rem;
-  background: rgba(11, 18, 32, 0.9); color: var(--o-cyan);
+  background: rgba(7, 18, 33, 0.9); color: var(--o-cyan);
   border: 1px solid var(--o-border-hi); border-radius: 10px;
   padding: 0.45rem 0.65rem; font-size: 0.78rem; font-weight: 600; cursor: pointer;
   backdrop-filter: blur(6px);
@@ -168,12 +168,12 @@ select.owner-input { appearance: none; }
 .loc-picker-hint {
   position: absolute; bottom: 10px; left: 10px; z-index: 500;
   display: inline-flex; align-items: center; gap: 0.35rem;
-  background: rgba(11, 18, 32, 0.85); color: var(--o-text-dim);
+  background: rgba(7, 18, 33, 0.85); color: var(--o-text-dim);
   border-radius: 9px; padding: 0.35rem 0.55rem; font-size: 0.72rem;
 }
 .owner-coords {
   display: flex; gap: 1rem; margin-top: 0.7rem; padding: 0.6rem 0.8rem;
-  background: rgba(34, 211, 238, 0.08); border: 1px solid var(--o-border-hi);
+  background: rgba(56, 189, 248, 0.08); border: 1px solid var(--o-border-hi);
   border-radius: 11px; font-size: 0.82rem; color: var(--o-text);
 }
 .owner-coords strong { color: var(--o-cyan); }
@@ -206,7 +206,7 @@ select.owner-input { appearance: none; }
 .owner-chip {
   display: inline-flex; align-items: center; gap: 0.25rem;
   font-size: 0.7rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 999px;
-  background: rgba(148, 163, 184, 0.12); color: var(--o-text-dim);
+  background: rgba(255, 255, 255, 0.12); color: var(--o-text-dim);
 }
 .owner-tag { display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.68rem; font-weight: 700; padding: 0.12rem 0.45rem; border-radius: 999px; }
 .owner-tag-fast { background: var(--o-cyan-glow); color: var(--o-cyan); }
@@ -216,12 +216,12 @@ select.owner-input { appearance: none; }
 .owner-status-available { background: rgba(52, 211, 153, 0.15); color: var(--o-green); }
 .owner-status-pending { background: rgba(251, 191, 36, 0.15); color: var(--o-warn); }
 .owner-status-rejected, .owner-status-faulted, .owner-status-offline { background: rgba(248, 113, 113, 0.15); color: #FCA5A5; }
-.owner-status-in_use { background: rgba(34, 211, 238, 0.15); color: var(--o-cyan); }
+.owner-status-in_use { background: rgba(56, 189, 248, 0.15); color: var(--o-cyan); }
 .owner-status-maintenance, .owner-status-suspended { background: rgba(168, 139, 250, 0.15); color: #C4B5FD; }
 
 /* Summary card */
 .owner-summary-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
-.owner-code { font-family: ui-monospace, monospace; font-size: 0.78rem; color: var(--o-cyan); background: rgba(34,211,238,0.08); padding: 0.18rem 0.5rem; border-radius: 7px; }
+.owner-code { font-family: ui-monospace, monospace; font-size: 0.78rem; color: var(--o-cyan); background: rgba(56, 189, 248,0.08); padding: 0.18rem 0.5rem; border-radius: 7px; }
 .owner-summary-stats { display: flex; gap: 1.2rem; }
 .owner-summary-stats > div { display: flex; align-items: center; gap: 0.3rem; font-weight: 700; font-size: 1rem; }
 .owner-summary-stats svg { color: var(--o-cyan); }
@@ -231,19 +231,19 @@ select.owner-input { appearance: none; }
 .owner-machine-list { display: flex; flex-direction: column; gap: 0.7rem; }
 .owner-machine-card { background: var(--o-card); border: 1px solid var(--o-border); border-radius: 15px; padding: 0.85rem; }
 .owner-machine-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.7rem; }
-.owner-machine-icon { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: rgba(34, 211, 238, 0.12); color: var(--o-cyan); flex: none; }
+.owner-machine-icon { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: rgba(56, 189, 248, 0.12); color: var(--o-cyan); flex: none; }
 .owner-machine-info { flex: 1; min-width: 0; }
 .owner-machine-name { font-weight: 700; font-size: 0.92rem; }
 .owner-machine-meta { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; font-size: 0.72rem; color: var(--o-text-dim); }
 .owner-mstatus { font-size: 0.68rem; font-weight: 700; padding: 0.18rem 0.5rem; border-radius: 999px; flex: none; }
 .owner-connectors { display: flex; flex-wrap: wrap; gap: 0.4rem; padding-top: 0.7rem; border-top: 1px dashed var(--o-border); }
-.owner-connector-pill { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; font-weight: 600; padding: 0.28rem 0.55rem; border-radius: 9px; background: rgba(45, 212, 191, 0.12); color: var(--o-teal); }
+.owner-connector-pill { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; font-weight: 600; padding: 0.28rem 0.55rem; border-radius: 9px; background: rgba(94, 234, 212, 0.12); color: var(--o-teal); }
 .owner-add-connector { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; font-weight: 600; padding: 0.28rem 0.55rem; border-radius: 9px; background: transparent; border: 1px dashed var(--o-border-hi); color: var(--o-cyan); cursor: pointer; }
 .owner-add-connector:hover { background: var(--o-cyan-glow); }
 
 /* Empty / loading */
 .owner-empty { text-align: center; padding: 2.2rem 1rem; background: var(--o-card); border: 1px dashed var(--o-border); border-radius: 16px; }
-.owner-empty-icon { width: 64px; height: 64px; border-radius: 18px; margin: 0 auto 0.9rem; display: grid; place-items: center; background: rgba(34, 211, 238, 0.10); color: var(--o-cyan); }
+.owner-empty-icon { width: 64px; height: 64px; border-radius: 18px; margin: 0 auto 0.9rem; display: grid; place-items: center; background: rgba(56, 189, 248, 0.10); color: var(--o-cyan); }
 .owner-empty h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.3rem; }
 .owner-empty p { font-size: 0.84rem; color: var(--o-text-dim); margin-bottom: 1rem; max-width: 320px; margin-left: auto; margin-right: auto; }
 .owner-loading { display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 2.5rem; color: var(--o-text-dim); }
@@ -258,7 +258,7 @@ select.owner-input { appearance: none; }
 .owner-modal-sub strong { color: var(--o-text); }
 
 /* Bottom nav */
-.owner-bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; display: flex; background: rgba(11, 18, 32, 0.92); backdrop-filter: blur(14px); border-top: 1px solid var(--o-border); padding: 0.4rem 0.5rem calc(0.4rem + env(safe-area-inset-bottom)); }
+.owner-bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; display: flex; background: rgba(7, 18, 33, 0.92); backdrop-filter: blur(14px); border-top: 1px solid var(--o-border); padding: 0.4rem 0.5rem calc(0.4rem + env(safe-area-inset-bottom)); }
 .owner-nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.15rem; background: none; border: none; color: var(--o-text-faint); font-size: 0.68rem; font-weight: 600; padding: 0.4rem 0; cursor: pointer; font-family: inherit; transition: color 180ms ease; }
 .owner-nav-item.active { color: var(--o-cyan); }
 .owner-nav-item.active svg { filter: drop-shadow(0 0 6px var(--o-cyan-glow)); }
@@ -274,5 +274,88 @@ select.owner-input { appearance: none; }
 @keyframes owner-slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
 /* Leaflet dark tweaks */
-.loc-picker .leaflet-control-zoom a { background: #111B2E; color: var(--o-cyan); border-color: var(--o-border); }
-.loc-picker .leaflet-control-zoom a:hover { background: #16223A; }
+.loc-picker .leaflet-control-zoom a { background: rgba(16, 34, 58, 0.55); color: var(--o-cyan); border-color: var(--o-border); }
+.loc-picker .leaflet-control-zoom a:hover { background: rgba(24, 46, 74, 0.6); }
+
+/* ===== Machine card: type badge + power + OCPP connectivity ===== */
+.owner-type-badge {
+  font-size: 0.66rem; font-weight: 800; letter-spacing: 0.04em;
+  padding: 0.14rem 0.45rem; border-radius: 6px;
+  background: rgba(255, 255, 255,0.15); color: var(--o-text-dim);
+}
+.owner-type-badge.type-ac { background: rgba(52,211,153,0.16); color: var(--o-green); }
+.owner-type-badge.type-dc { background: rgba(56, 189, 248,0.16); color: var(--o-cyan); }
+.owner-type-badge.type-dcs { background: rgba(168,139,250,0.16); color: #C4B5FD; }
+.owner-power-chip {
+  display: inline-flex; align-items: center; gap: 0.2rem;
+  font-size: 0.72rem; font-weight: 700; color: var(--o-teal);
+}
+.owner-power-chip svg { color: var(--o-teal); }
+
+.owner-ocpp-box {
+  margin: 0.6rem 0 0.2rem;
+  background: rgba(7, 18, 33,0.55);
+  border: 1px solid var(--o-border);
+  border-radius: 11px;
+  padding: 0.5rem 0.6rem;
+  display: flex; flex-direction: column; gap: 0.35rem;
+}
+.owner-ocpp-row { display: flex; align-items: center; gap: 0.5rem; }
+.owner-ocpp-label {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  font-size: 0.68rem; font-weight: 600; color: var(--o-text-faint);
+  flex: none; width: 86px;
+}
+.owner-ocpp-label svg { color: var(--o-cyan); }
+.owner-ocpp-val {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.74rem; color: var(--o-text);
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.owner-ocpp-url { color: var(--o-cyan); }
+.owner-copy-btn {
+  flex: none; display: inline-flex; align-items: center; gap: 0.25rem;
+  background: rgba(56, 189, 248,0.10); border: 1px solid var(--o-border-hi);
+  color: var(--o-cyan); border-radius: 7px; padding: 0.22rem 0.4rem;
+  cursor: pointer; font-size: 0.7rem; font-weight: 600; transition: background 160ms ease;
+}
+.owner-copy-btn:hover { background: rgba(56, 189, 248,0.2); }
+.owner-copy-btn.lg { padding: 0.45rem 0.7rem; font-size: 0.78rem; }
+
+/* ===== Add-machine form helpers ===== */
+.owner-field-hint { font-size: 0.7rem; color: var(--o-text-faint); margin-top: 0.3rem; }
+.owner-optional { color: var(--o-text-faint); font-weight: 400; }
+.owner-note {
+  display: flex; align-items: center; gap: 0.45rem;
+  font-size: 0.76rem; color: var(--o-text-dim);
+  background: rgba(56, 189, 248,0.08); border: 1px solid rgba(56, 189, 248,0.25);
+  border-radius: 10px; padding: 0.55rem 0.7rem; margin: 0.2rem 0 0.9rem;
+}
+.owner-note svg { color: var(--o-cyan); flex: none; }
+.owner-note strong { color: var(--o-text); }
+optgroup { color: var(--o-text-dim); background: rgba(9, 24, 42, 0.5); }
+
+/* ===== Machine-added success panel ===== */
+.owner-success-head { text-align: center; margin-bottom: 1rem; }
+.owner-success-icon {
+  width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 0.6rem;
+  display: grid; place-items: center;
+  background: rgba(52,211,153,0.15); color: var(--o-green);
+}
+.owner-success-head h3 { font-size: 1.15rem; font-weight: 800; }
+.owner-success-head p { font-size: 0.82rem; color: var(--o-text-dim); margin-top: 0.2rem; }
+.owner-success-label {
+  display: flex; align-items: center; gap: 0.3rem;
+  font-size: 0.74rem; font-weight: 600; color: var(--o-text-dim);
+  margin: 0.7rem 0 0.35rem;
+}
+.owner-success-label svg { color: var(--o-cyan); }
+.owner-copy-field {
+  display: flex; align-items: center; gap: 0.5rem;
+  background: rgba(7, 18, 33,0.7); border: 1px solid var(--o-border-hi);
+  border-radius: 11px; padding: 0.55rem 0.6rem;
+}
+.owner-copy-text {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.78rem; color: var(--o-text);
+}

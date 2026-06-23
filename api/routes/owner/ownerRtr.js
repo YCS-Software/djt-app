@@ -15,6 +15,9 @@ router.use(accessCtrl.isOwner);
 // Dashboard summary
 router.get('/dashboard', ownerCtrl.getDashboard);
 
+// Machine power options (master list for the dropdown)
+router.get('/power-options', ownerCtrl.getPowerOptions);
+
 // Stations
 router.get('/stations', ownerCtrl.getMyStations);
 router.post('/stations', ownerCtrl.createStation);

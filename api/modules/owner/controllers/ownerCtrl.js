@@ -7,12 +7,25 @@
 const ownerMdl = require('../models/ownerMdl');
 const std = require(appRoot + '/utils/standardMessages');
 const df = require(appRoot + '/utils/dateFormatUtil');
+const config = require(appRoot + '/config/config');
 const cntxtDtls = "ownerCtrl";
 
 // Generate a reasonably-unique station code, e.g. DJT-LZ4F9K2
 function genStationCode() {
     return 'DJT-' + Date.now().toString(36).toUpperCase().slice(-6) +
         Math.floor(Math.random() * 90 + 10);
+}
+
+// Auto-generate an OCPP ChargePoint identity, e.g. DJT-12-CP3-K7Q
+function genOcppId(stationId, seq) {
+    const rand = Math.random().toString(36).toUpperCase().slice(2, 5);
+    return `DJT-${stationId}-CP${seq}-${rand}`;
+}
+
+// Build the WebSocket URL a charge point uses to connect to the CSMS.
+function ocppWsUrl(ocppId) {
+    const base = (config.ocpp && config.ocpp.wsBaseUrl) || `ws://localhost:${config.port}`;
+    return `${base.replace(/\/$/, '')}/ocpp/${encodeURIComponent(ocppId)}`;
 }
 
 function badRequest(res, message) {
@@ -61,10 +74,16 @@ function mapMachine(m) {
         name: m.mchn_nm_tx,
         serial_no: m.mchn_srl_no_tx,
         ocpp_id: m.ocpp_id_tx,
+        ws_url: m.ocpp_id_tx ? ocppWsUrl(m.ocpp_id_tx) : null,
         machine_type: m.mchn_typ_cd,
+        power_id: m.mchn_pwr_id || null,
+        power_code: m.pwr_cd || null,
+        power_label: m.pwr_lbl_tx || (m.max_pwr_tx ? `${m.mchn_typ_cd} ${m.max_pwr_tx}` : null),
+        kw: m.kw_nbr !== undefined && m.kw_nbr !== null ? parseFloat(m.kw_nbr) : null,
         max_power: m.max_pwr_tx,
         total_connectors: m.ttl_cnntrs_nbr,
         status: m.sttus_cd,
+        last_heartbeat: m.lst_hb_ts || null,
         created_at: m.i_ts
     };
 }
@@ -301,8 +320,36 @@ exports.getStationMachines = function(req, res) {
 };
 
 /*****************************************************************************
+* Function      : getPowerOptions
+* Description   : Master list of selectable power tiers (AC/DC/DCS)
+******************************************************************************/
+exports.getPowerOptions = function(req, res) {
+    const fnm = "getPowerOptions";
+    ownerMdl.getPowerOptionsMdl()
+        .then(function(rows) {
+            const options = (rows || []).map(function(p) {
+                return {
+                    power_id: p.mchn_pwr_id,
+                    code: p.pwr_cd,
+                    label: p.pwr_lbl_tx,
+                    machine_type: p.mchn_typ_cd,
+                    kw: parseFloat(p.kw_nbr),
+                    default_connector_type: p.dflt_cnntr_typ_cd
+                };
+            });
+            return df.formatSucessRes(req, res, { power_options: options }, cntxtDtls, fnm, {});
+        })
+        .catch(function(error) {
+            console.error('[ownerCtrl] getPowerOptions error:', error);
+            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+        });
+};
+
+/*****************************************************************************
 * Function      : addMachine
-* Description   : Add a charging machine (charger) to an owned station
+* Description   : Add a charger. OCPP id + WS URL are auto-generated, machine type
+*                 and power come from the selected power tier, and N default
+*                 connectors (2) are created automatically.
 ******************************************************************************/
 exports.addMachine = function(req, res) {
     const fnm = "addMachine";
@@ -314,26 +361,68 @@ exports.addMachine = function(req, res) {
     const name = (data.name || '').trim();
     if (!name) return badRequest(res, 'Machine name is required');
 
+    const powerId = parseInt(data.mchn_pwr_id || data.power_id);
+    if (!powerId) return badRequest(res, 'Please select a power rating');
+
+    // default 2 connectors, clamp 1..6
+    const connectorCount = Math.min(Math.max(parseInt(data.connector_count) || 2, 1), 6);
+
     ownerMdl.getOwnedStationMdl({ ownerId, stationId })
         .then(function(rows) {
             if (!rows || rows.length === 0) return notFound(res, 'Station not found');
-            return ownerMdl.createMachineMdl({
-                stationId,
-                name,
-                serialNo: data.serial_no || null,
-                ocppId: data.ocpp_id || null,
-                machineType: data.machine_type || 'DC',
-                maxPower: data.max_power || null,
-                totalConnectors: data.total_connectors || 1,
-                status: data.status || 'available'
-            }).then(function(result) {
-                // refresh station counters after inventory change
-                return ownerMdl.recalcStationCountersMdl({ stationId })
-                    .then(function() {
-                        return df.formatSucessRes(req, res,
-                            { machine_id: result.insertId },
-                            cntxtDtls, fnm, { message: 'Machine added' });
+
+            return ownerMdl.getPowerByIdMdl(powerId).then(function(pRows) {
+                const power = pRows && pRows[0];
+                if (!power) return badRequest(res, 'Invalid power option');
+
+                const machineType = power.mchn_typ_cd;            // AC | DC | DCS
+                const maxPower = `${parseFloat(power.kw_nbr)}kW`;  // e.g. 60kW
+                const connectorType = power.dflt_cnntr_typ_cd || (machineType === 'AC' ? 'Type2' : 'CCS2');
+
+                // OCPP id sequence = existing machine count + 1
+                return ownerMdl.getMachineCountMdl(stationId).then(function(cRows) {
+                    const seq = (cRows && cRows[0] ? Number(cRows[0].cnt) : 0) + 1;
+                    const ocppId = genOcppId(stationId, seq);
+
+                    return ownerMdl.createMachineMdl({
+                        stationId, name,
+                        serialNo: data.serial_no || null,
+                        ocppId,
+                        machineType,
+                        powerId,
+                        maxPower,
+                        totalConnectors: connectorCount,
+                        status: 'available'
+                    }).then(function(result) {
+                        const machineId = result.insertId;
+
+                        // auto-create the default connectors
+                        const connPromises = [];
+                        for (let i = 1; i <= connectorCount; i++) {
+                            connPromises.push(ownerMdl.createConnectorMdl({
+                                stationId, machineId,
+                                connectorType,
+                                name: `Connector ${i}`,
+                                power: maxPower
+                            }));
+                        }
+
+                        return Promise.all(connPromises)
+                            .then(function() { return ownerMdl.recalcStationCountersMdl({ stationId }); })
+                            .then(function() {
+                                return df.formatSucessRes(req, res, {
+                                    machine_id: machineId,
+                                    ocpp_id: ocppId,
+                                    ws_url: ocppWsUrl(ocppId),
+                                    machine_type: machineType,
+                                    max_power: maxPower,
+                                    power_label: power.pwr_lbl_tx,
+                                    connector_type: connectorType,
+                                    connectors_created: connectorCount
+                                }, cntxtDtls, fnm, { message: `Machine added with ${connectorCount} connectors` });
+                            });
                     });
+                });
             });
         })
         .catch(function(error) {

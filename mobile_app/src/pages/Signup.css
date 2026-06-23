@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Signup Page Styles — DJT AI dark theme (cyan/teal on navy)
  */
 
@@ -23,9 +23,9 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(900px 600px at 100% -10%, rgba(34, 211, 238, 0.18), transparent 60%),
-    radial-gradient(700px 500px at -10% 110%, rgba(45, 212, 191, 0.14), transparent 55%),
-    linear-gradient(160deg, #0B1220 0%, #0E1729 55%, #0B1220 100%);
+    radial-gradient(900px 600px at 100% -10%, rgba(56, 189, 248, 0.18), transparent 60%),
+    radial-gradient(700px 500px at -10% 110%, rgba(94, 234, 212, 0.14), transparent 55%),
+    linear-gradient(160deg, rgba(6, 16, 31, 0.5) 0%, rgba(9, 24, 42, 0.5) 55%, rgba(6, 16, 31, 0.5) 100%);
 }
 
 /* Signup card */
@@ -34,14 +34,14 @@
   z-index: 10;
   width: 100%;
   max-width: 420px;
-  background: rgba(17, 27, 46, 0.92);
+  background: rgba(16, 34, 58, 0.92);
   backdrop-filter: blur(14px);
-  border: 1px solid rgba(148, 163, 184, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 2rem;
   padding: 2.5rem 1.75rem;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(34, 211, 238, 0.06);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(56, 189, 248, 0.06);
   animation: cardAppear 0.6s ease-out;
-  color: #E2E8F0;
+  color: #E8F0F7;
 }
 
 @keyframes cardAppear {
@@ -57,18 +57,18 @@
   height: 100%;
   object-fit: contain;
   border-radius: 50%;
-  background: linear-gradient(135deg, #22D3EE 0%, #14B8A6 100%);
+  background: linear-gradient(135deg, #38BDF8 0%, #14B8A6 100%);
   padding: 0.625rem;
-  box-shadow: 0 8px 25px rgba(34, 211, 238, 0.35);
+  box-shadow: 0 8px 25px rgba(56, 189, 248, 0.35);
 }
 .signup-card .app-title { font-size: 1.75rem; font-weight: 800; margin: 0; }
 .signup-card .brand-text {
-  background: linear-gradient(135deg, #67E8F9 0%, #22D3EE 100%);
+  background: linear-gradient(135deg, #5EEAD4 0%, #38BDF8 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
-.signup-card .app-subtitle { font-size: 0.95rem; color: #94A3B8; margin-top: 0.5rem; font-weight: 500; }
+.signup-card .app-subtitle { font-size: 0.95rem; color: #9FBBD4; margin-top: 0.5rem; font-weight: 500; }
 
 /* Form step */
 .signup-card .form-step { animation: stepSlideIn 0.4s ease-out; }
@@ -77,8 +77,8 @@
   to { opacity: 1; transform: translateX(0); }
 }
 .signup-card .step-header { text-align: center; margin-bottom: 1.75rem; }
-.signup-card .step-header h2 { font-size: 1.5rem; font-weight: 700; color: #E2E8F0; margin: 0 0 0.5rem; }
-.signup-card .step-header p { font-size: 0.9rem; color: #94A3B8; margin: 0; }
+.signup-card .step-header h2 { font-size: 1.5rem; font-weight: 700; color: #E8F0F7; margin: 0 0 0.5rem; }
+.signup-card .step-header p { font-size: 0.9rem; color: #9FBBD4; margin: 0; }
 
 /* Messages */
 .signup-card .message {
@@ -91,44 +91,44 @@
 
 /* Form group */
 .signup-card .form-group { margin-bottom: 1.25rem; }
-.signup-card .form-group label { display: block; font-size: 0.875rem; font-weight: 600; color: #94A3B8; margin-bottom: 0.5rem; }
+.signup-card .form-group label { display: block; font-size: 0.875rem; font-weight: 600; color: #9FBBD4; margin-bottom: 0.5rem; }
 .signup-card .input-wrapper { position: relative; }
 .signup-card .input-icon {
   position: absolute; left: 1rem; top: 50%; transform: translateY(-50%);
-  color: #22D3EE; z-index: 1; display: flex; align-items: center; justify-content: center;
+  color: #38BDF8; z-index: 1; display: flex; align-items: center; justify-content: center;
 }
 .signup-card .form-input {
   width: 100%;
   padding: 1rem 1rem 1rem 3.25rem;
   font-size: 1rem; font-weight: 500;
-  background: rgba(11, 18, 32, 0.7);
-  border: 1.5px solid rgba(148, 163, 184, 0.2);
+  background: rgba(7, 18, 33, 0.7);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
   border-radius: 1rem;
-  color: #E2E8F0;
+  color: #E8F0F7;
   outline: none;
   transition: all 0.25s ease;
 }
 .signup-card .form-input:focus {
-  border-color: #22D3EE;
-  background: rgba(11, 18, 32, 0.9);
-  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.15);
+  border-color: #38BDF8;
+  background: rgba(7, 18, 33, 0.9);
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.15);
 }
-.signup-card .form-input::placeholder { color: #64748B; font-weight: 400; }
+.signup-card .form-input::placeholder { color: #6F8AA6; font-weight: 400; }
 
 /* Submit button */
 .signup-card .submit-btn {
   width: 100%;
   display: flex; align-items: center; justify-content: center; gap: 0.75rem;
   padding: 1.125rem 1.5rem;
-  background: linear-gradient(135deg, #22D3EE 0%, #14B8A6 100%);
+  background: linear-gradient(135deg, #38BDF8 0%, #14B8A6 100%);
   border: none; border-radius: 1rem;
   color: #06121A;
   font-size: 1.0625rem; font-weight: 700; cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 6px 20px rgba(34, 211, 238, 0.35);
+  box-shadow: 0 6px 20px rgba(56, 189, 248, 0.35);
   margin-top: 0.75rem;
 }
-.signup-card .submit-btn:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(34, 211, 238, 0.45); }
+.signup-card .submit-btn:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(56, 189, 248, 0.45); }
 .signup-card .submit-btn:active:not(:disabled) { transform: translateY(-1px); }
 .signup-card .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 .signup-card .spin { animation: spinRotate 0.8s linear infinite; }
@@ -140,14 +140,14 @@
   display: flex; align-items: center; justify-content: center; gap: 0.5rem;
   padding: 0.875rem 1.5rem;
   background: transparent;
-  border: 1.5px solid rgba(148, 163, 184, 0.25);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
   border-radius: 1rem;
-  color: #94A3B8;
+  color: #9FBBD4;
   font-size: 0.9375rem; font-weight: 600; cursor: pointer;
   transition: all 0.25s ease;
   margin-top: 1rem;
 }
-.signup-card .back-btn:hover { border-color: #22D3EE; color: #22D3EE; background: rgba(34, 211, 238, 0.08); }
+.signup-card .back-btn:hover { border-color: #38BDF8; color: #38BDF8; background: rgba(56, 189, 248, 0.08); }
 
 /* OTP */
 .signup-card .otp-group { margin-bottom: 1.5rem; }
@@ -155,15 +155,15 @@
 .signup-card .otp-input {
   width: 3.75rem; height: 4rem;
   font-size: 1.75rem; font-weight: 800; text-align: center;
-  background: rgba(11, 18, 32, 0.7);
-  border: 1.5px solid rgba(148, 163, 184, 0.2);
+  background: rgba(7, 18, 33, 0.7);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
   border-radius: 1rem;
-  color: #E2E8F0;
+  color: #E8F0F7;
   outline: none;
   transition: all 0.25s ease;
 }
-.signup-card .otp-input:focus { border-color: #22D3EE; background: rgba(11, 18, 32, 0.95); box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.15); transform: scale(1.05); }
-.signup-card .otp-input.filled { border-color: #22D3EE; background: rgba(34, 211, 238, 0.12); }
+.signup-card .otp-input:focus { border-color: #38BDF8; background: rgba(7, 18, 33, 0.95); box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.15); transform: scale(1.05); }
+.signup-card .otp-input.filled { border-color: #38BDF8; background: rgba(56, 189, 248, 0.12); }
 
 /* Responsive */
 @media (max-width: 380px) {

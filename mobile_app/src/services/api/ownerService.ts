@@ -22,17 +22,43 @@ export interface OwnerConnector {
   is_available: boolean;
 }
 
+export interface PowerOption {
+  power_id: number;
+  code: string;          // e.g. DC-60kW
+  label: string;         // e.g. DC 60 kW
+  machine_type: string;  // AC | DC | DCS
+  kw: number;
+  default_connector_type: string;
+}
+
 export interface OwnerMachine {
   machine_id: number;
   station_id: number;
   name: string;
   serial_no: string | null;
   ocpp_id: string | null;
+  ws_url: string | null;
   machine_type: string;
+  power_id?: number | null;
+  power_code?: string | null;
+  power_label?: string | null;
+  kw?: number | null;
   max_power: string | null;
   total_connectors: number;
   status: string;
+  last_heartbeat?: string | null;
   connectors?: OwnerConnector[];
+}
+
+export interface AddMachineResult {
+  machine_id: number;
+  ocpp_id: string;
+  ws_url: string;
+  machine_type: string;
+  max_power: string;
+  power_label: string;
+  connector_type: string;
+  connectors_created: number;
 }
 
 export interface OwnerStation {
@@ -79,11 +105,8 @@ export interface CreateStationRequest {
 export interface CreateMachineRequest {
   name: string;
   serial_no?: string;
-  ocpp_id?: string;
-  machine_type?: string; // AC | DC
-  max_power?: string;
-  total_connectors?: number;
-  status?: string;
+  mchn_pwr_id: number;       // selected power tier (drives machine type + power)
+  connector_count?: number;  // default 2
 }
 
 export interface CreateConnectorRequest {
@@ -125,9 +148,14 @@ export const ownerService = {
     return res.data?.machines || [];
   },
 
-  addMachine: async (stationId: number, data: CreateMachineRequest): Promise<number> => {
-    const res = await apiClient.post<{ data: { machine_id: number } }>(`/owner/stations/${stationId}/machines`, data, AUTH);
-    return res.data.machine_id;
+  getPowerOptions: async (): Promise<PowerOption[]> => {
+    const res = await apiClient.get<{ data: { power_options: PowerOption[] } }>('/owner/power-options', AUTH);
+    return res.data?.power_options || [];
+  },
+
+  addMachine: async (stationId: number, data: CreateMachineRequest): Promise<AddMachineResult> => {
+    const res = await apiClient.post<{ data: AddMachineResult }>(`/owner/stations/${stationId}/machines`, data, AUTH);
+    return res.data;
   },
 
   updateMachine: async (machineId: number, data: Partial<CreateMachineRequest>): Promise<void> => {

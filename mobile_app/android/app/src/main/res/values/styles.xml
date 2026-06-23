@@ -14,9 +14,8 @@
     </style>
 
     <style name="AppTheme.NoActionBarLaunch" parent="AppTheme.NoActionBar">
-        <item name="android:background">@drawable/splash</item>
-        <item name="android:windowBackground">@drawable/splash</item>
-        <item name="android:windowFullscreen">true</item>
+        <item name="android:background">@drawable/launch_splash</item>
+        <item name="android:windowBackground">@drawable/launch_splash</item>
         <item name="android:windowContentOverlay">@null</item>
         <item name="android:windowNoTitle">true</item>
     </style>

@@ -8,10 +8,10 @@
   /* ═══════════════════════════════════════════
      PRIMARY BRAND COLORS - DJT AI (Cyan / Teal)
      ═══════════════════════════════════════════ */
-  --ev-primary: #22D3EE;
-  --ev-primary-dark: #06B6D4;
-  --ev-primary-light: #67E8F9;
-  --ev-primary-soft: rgba(34, 211, 238, 0.12);
+  --ev-primary: #38BDF8;
+  --ev-primary-dark: #22D3EE;
+  --ev-primary-light: #5EEAD4;
+  --ev-primary-soft: rgba(56, 189, 248, 0.14);
 
   /* Secondary Colors */
   --ev-secondary: #2DD4BF;
@@ -19,29 +19,29 @@
   --ev-secondary-light: #5EEAD4;
 
   /* Accent */
-  --ev-accent: #38BDF8;
-  --ev-accent-dark: #0EA5E9;
-  --ev-accent-light: #7DD3FC;
+  --ev-accent: #5EEAD4;
+  --ev-accent-dark: #2DD4BF;
+  --ev-accent-light: #99F6E4;
 
   /* ═══════════════════════════════════════════
-     BACKGROUNDS  (dark navy AI theme)
+     BACKGROUNDS  (Cosmic night-sky theme)
      ═══════════════════════════════════════════ */
-  --ev-bg-app: #0B1220;
-  --ev-bg-card: #111B2E;
-  --ev-bg-card-hover: #16223A;
-  --ev-bg-dark: #060B16;
-  --ev-bg-gradient: linear-gradient(135deg, #22D3EE 0%, #0EA5E9 50%, #0B1220 100%);
-  --ev-bg-gradient-soft: linear-gradient(180deg, #0B1220 0%, #0E1729 100%);
-  --ev-bg-header: linear-gradient(135deg, #0E1729 0%, #0B1220 100%);
+  --ev-bg-app: transparent;
+  --ev-bg-card: rgba(16, 34, 58, 0.55);
+  --ev-bg-card-hover: rgba(24, 46, 74, 0.62);
+  --ev-bg-dark: #050d1a;
+  --ev-bg-gradient: linear-gradient(135deg, #2DD4BF 0%, #38BDF8 100%);
+  --ev-bg-gradient-soft: linear-gradient(180deg, rgba(10,28,48,0.5) 0%, rgba(6,16,31,0.6) 100%);
+  --ev-bg-header: linear-gradient(135deg, rgba(10,28,48,0.55) 0%, rgba(6,16,31,0.7) 100%);
 
   /* ═══════════════════════════════════════════
      TEXT COLORS
      ═══════════════════════════════════════════ */
-  --ev-text-primary: #E2E8F0;
-  --ev-text-secondary: #94A3B8;
-  --ev-text-muted: #64748B;
+  --ev-text-primary: #E8F0F7;
+  --ev-text-secondary: #9FBBD4;
+  --ev-text-muted: #6F8AA6;
   --ev-text-light: #FFFFFF;
-  --ev-text-accent: #22D3EE;
+  --ev-text-accent: #5EEAD4;
 
   /* ═══════════════════════════════════════════
      SEMANTIC COLORS
@@ -58,16 +58,16 @@
   /* ═══════════════════════════════════════════
      BORDERS & SHADOWS
      ═══════════════════════════════════════════ */
-  --ev-border: rgba(148, 163, 184, 0.16);
-  --ev-border-light: rgba(148, 163, 184, 0.10);
-  --ev-border-dark: rgba(34, 211, 238, 0.45);
+  --ev-border: rgba(255, 255, 255, 0.12);
+  --ev-border-light: rgba(255, 255, 255, 0.08);
+  --ev-border-dark: rgba(94, 234, 212, 0.5);
 
   --ev-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --ev-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
   --ev-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.45), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
   --ev-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
-  --ev-shadow-glow: 0 0 24px rgba(34, 211, 238, 0.32);
-  --ev-shadow-card: 0 8px 28px rgba(0, 0, 0, 0.35);
+  --ev-shadow-glow: 0 0 24px rgba(56, 189, 248, 0.4);
+  --ev-shadow-card: 0 12px 34px rgba(0, 0, 0, 0.45);
 
   /* ═══════════════════════════════════════════
      SPACING
@@ -126,12 +126,66 @@ html {
 
 body {
   font-family: var(--ev-font-family);
-  background: var(--ev-bg-app);
   color: var(--ev-text-primary);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
+  /* Cosmic night-sky base (matches the login screen) */
+  background:
+    radial-gradient(40% 26% at 82% 8%, rgba(150, 200, 240, 0.20), transparent 70%),
+    radial-gradient(120% 50% at 50% 106%, rgba(46, 150, 178, 0.40), transparent 60%),
+    linear-gradient(180deg, #050d1a 0%, #081d31 38%, #0e3a57 70%, #14506e 100%);
+  background-attachment: fixed;
+}
+
+/* Fixed star field + horizon mountains behind all app content */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1.6px 1.6px at 20px 32px, #ffffff, transparent),
+    radial-gradient(1.1px 1.1px at 60px 80px, rgba(255,255,255,0.85), transparent),
+    radial-gradient(1.3px 1.3px at 120px 50px, #ffffff, transparent),
+    radial-gradient(1px 1px at 160px 120px, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1.4px 1.4px at 90px 160px, #ffffff, transparent),
+    radial-gradient(1px 1px at 30px 140px, rgba(200,225,255,0.8), transparent),
+    radial-gradient(1.2px 1.2px at 175px 20px, rgba(255,255,255,0.9), transparent),
+    radial-gradient(1px 1px at 140px 190px, rgba(255,255,255,0.65), transparent);
+  background-repeat: repeat;
+  background-size: 220px 220px;
+  opacity: 0.85;
+  animation: ev-twinkle 5.5s ease-in-out infinite alternate;
+}
+body::after {
+  content: '';
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  height: 30vh;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320' preserveAspectRatio='none'%3E%3Cpath fill='%23061320' fill-opacity='0.85' d='M0,288 L90,232 L190,280 L300,200 L410,262 L520,196 L650,256 L770,210 L900,268 L1020,206 L1150,258 L1270,214 L1370,260 L1440,232 L1440,320 L0,320 Z'/%3E%3C/svg%3E")
+    bottom / 100% 100% no-repeat;
+}
+@keyframes ev-twinkle { from { opacity: 0.5; } to { opacity: 0.95; } }
+
+/* App content floats above the cosmic sky */
+#root { position: relative; z-index: 1; }
+
+/* Page/shell wrappers stay transparent so the sky shows through */
+.app-layout, .app-content, .home-page, .wallet-page, .charging-page, .profile-page,
+.owner-shell, .owner-main { background: transparent !important; }
+
+/* Frosted-glass surfaces across the app (match the login card) */
+.ev-card, .owner-card, .owner-station-card, .owner-machine-card, .owner-stat-card,
+.owner-summary, .owner-empty, .owner-modal, .glass-card, .card, .stat-card,
+.wallet-balance-card, .session-card, .station-card {
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 /* ═══════════════════════════════════════════

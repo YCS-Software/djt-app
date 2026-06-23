@@ -19,6 +19,26 @@ function num(v, def) {
 }
 
 /*****************************************************************************
+* POWER OPTIONS (master)
+******************************************************************************/
+
+exports.getPowerOptionsMdl = function() {
+    const QRY_TO_EXEC = `SELECT * FROM mchn_pwr_lst_t WHERE a_in = 1 ORDER BY srt_nbr ASC`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};
+
+exports.getPowerByIdMdl = function(powerId) {
+    const QRY_TO_EXEC = `SELECT * FROM mchn_pwr_lst_t WHERE mchn_pwr_id = ${num(powerId)} AND a_in = 1 LIMIT 1`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};
+
+// Count existing machines at a station (used for OCPP id sequence)
+exports.getMachineCountMdl = function(stationId) {
+    const QRY_TO_EXEC = `SELECT COUNT(*) AS cnt FROM mchn_lst_t WHERE sttn_id = ${num(stationId)} AND a_in = 1`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};
+
+/*****************************************************************************
 * STATIONS
 ******************************************************************************/
 
@@ -106,10 +126,10 @@ exports.recalcStationCountersMdl = function(data) {
 
 exports.createMachineMdl = function(data) {
     const QRY_TO_EXEC = `INSERT INTO mchn_lst_t
-        (sttn_id, mchn_nm_tx, mchn_srl_no_tx, ocpp_id_tx, mchn_typ_cd, max_pwr_tx, ttl_cnntrs_nbr, sttus_cd, a_in, i_ts)
+        (sttn_id, mchn_nm_tx, mchn_srl_no_tx, ocpp_id_tx, mchn_typ_cd, mchn_pwr_id, max_pwr_tx, ttl_cnntrs_nbr, sttus_cd, a_in, i_ts)
         VALUES
         (${num(data.stationId)}, ${esc(data.name)}, ${esc(data.serialNo)}, ${esc(data.ocppId)},
-         ${esc(data.machineType || 'DC')}, ${esc(data.maxPower)}, ${num(data.totalConnectors, 1)},
+         ${esc(data.machineType || 'DC')}, ${num(data.powerId, 'NULL')}, ${esc(data.maxPower)}, ${num(data.totalConnectors, 2)},
          ${esc(data.status || 'available')}, 1, NOW())`;
 
     console.log('[createMachineMdl] Query:', QRY_TO_EXEC);
@@ -117,9 +137,11 @@ exports.createMachineMdl = function(data) {
 };
 
 exports.getMachinesByStationMdl = function(data) {
-    const QRY_TO_EXEC = `SELECT * FROM mchn_lst_t
-        WHERE sttn_id = ${num(data.stationId)} AND a_in = 1
-        ORDER BY mchn_id ASC`;
+    const QRY_TO_EXEC = `SELECT m.*, p.pwr_cd, p.pwr_lbl_tx, p.kw_nbr
+        FROM mchn_lst_t m
+        LEFT JOIN mchn_pwr_lst_t p ON m.mchn_pwr_id = p.mchn_pwr_id
+        WHERE m.sttn_id = ${num(data.stationId)} AND m.a_in = 1
+        ORDER BY m.mchn_id ASC`;
 
     console.log('[getMachinesByStationMdl] Query:', QRY_TO_EXEC);
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);

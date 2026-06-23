@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Splash background (Android < 12): logo centred on a solid colour, not stretched -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/splash_bg" />
+    <item
+        android:width="180dp"
+        android:height="187dp"
+        android:gravity="center"
+        android:drawable="@drawable/djt_logo" />
+</layer-list>

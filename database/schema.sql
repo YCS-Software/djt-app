@@ -164,6 +164,20 @@ CREATE TABLE sttn_lst_t (
     FOREIGN KEY (ownr_usr_id) REFERENCES usr_lst_t(usr_id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Charging station information';
 
+-- Machine power options (master) — each power tier maps to a machine type
+CREATE TABLE mchn_pwr_lst_t (
+    mchn_pwr_id INT PRIMARY KEY AUTO_INCREMENT,
+    pwr_cd VARCHAR(20) NOT NULL UNIQUE COMMENT 'e.g. DC-60kW',
+    pwr_lbl_tx VARCHAR(40) NOT NULL COMMENT 'Display label e.g. DC 60 kW',
+    mchn_typ_cd VARCHAR(10) NOT NULL COMMENT 'AC, DC, DCS',
+    kw_nbr DECIMAL(6,2) NOT NULL COMMENT 'Power in kW',
+    dflt_cnntr_typ_cd VARCHAR(20) COMMENT 'Default connector type for this power tier',
+    srt_nbr INT DEFAULT 0 COMMENT 'Sort order',
+    a_in TINYINT(1) DEFAULT 1,
+    i_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_type (mchn_typ_cd)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Machine power options master';
+
 -- Charging machines / chargers (physical units installed at a station)
 CREATE TABLE mchn_lst_t (
     mchn_id INT PRIMARY KEY AUTO_INCREMENT,
@@ -171,7 +185,8 @@ CREATE TABLE mchn_lst_t (
     mchn_nm_tx VARCHAR(100) NOT NULL COMMENT 'Machine label e.g. Charger 1',
     mchn_srl_no_tx VARCHAR(100) COMMENT 'Manufacturer serial number',
     ocpp_id_tx VARCHAR(100) COMMENT 'OCPP ChargePoint identity (unique per machine)',
-    mchn_typ_cd VARCHAR(20) DEFAULT 'DC' COMMENT 'AC, DC',
+    mchn_typ_cd VARCHAR(20) DEFAULT 'DC' COMMENT 'AC, DC, DCS',
+    mchn_pwr_id INT NULL COMMENT 'Power tier (FK mchn_pwr_lst_t)',
     max_pwr_tx VARCHAR(20) COMMENT 'Max power e.g. 60kW',
     ttl_cnntrs_nbr INT DEFAULT 1 COMMENT 'Number of connectors on this machine',
     sttus_cd VARCHAR(20) DEFAULT 'available' COMMENT 'available, in_use, offline, faulted, maintenance',
@@ -180,10 +195,24 @@ CREATE TABLE mchn_lst_t (
     i_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     u_ts TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (sttn_id) REFERENCES sttn_lst_t(sttn_id) ON DELETE CASCADE,
+    FOREIGN KEY (mchn_pwr_id) REFERENCES mchn_pwr_lst_t(mchn_pwr_id) ON DELETE SET NULL,
     INDEX idx_station (sttn_id),
     INDEX idx_status (sttus_cd),
-    INDEX idx_ocpp (ocpp_id_tx)
+    INDEX idx_ocpp (ocpp_id_tx),
+    INDEX idx_power (mchn_pwr_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Charging machines per station (OCPP charge points)';
+
+-- Seed: machine power options
+INSERT INTO mchn_pwr_lst_t (pwr_cd, pwr_lbl_tx, mchn_typ_cd, kw_nbr, dflt_cnntr_typ_cd, srt_nbr) VALUES
+('AC-3.3kW','AC 3.3 kW','AC',3.3,'Type2',1),
+('AC-7.4kW','AC 7.4 kW','AC',7.4,'Type2',2),
+('DC-15kW','DC 15 kW','DC',15,'CCS2',3),
+('DC-60kW','DC 60 kW','DC',60,'CCS2',4),
+('DC-120kW','DC 120 kW','DC',120,'CCS2',5),
+('DC-180kW','DC 180 kW','DC',180,'CCS2',6),
+('DCS-240kW','DCS 240 kW','DCS',240,'CCS2',7),
+('DC-360kW','DC 360 kW','DC',360,'CCS2',8),
+('DC-480kW','DC 480 kW','DC',480,'CCS2',9);
 
 -- Charging station connectors (ports on a machine)
 CREATE TABLE cnntr_lst_t (

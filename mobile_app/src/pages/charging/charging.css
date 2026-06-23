@@ -5,7 +5,7 @@
 
 .charging-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #0E1729 0%, #0E1729 12%, #0B1220 28%, #0B1220 100%);
+  background: linear-gradient(180deg, rgba(9, 24, 42, 0.5) 0%, rgba(9, 24, 42, 0.5) 12%, rgba(6, 16, 31, 0.5) 28%, rgba(6, 16, 31, 0.5) 100%);
   padding-bottom: 6rem;
 }
 
@@ -61,7 +61,7 @@
    IDLE STATE - SCAN QR
    ═══════════════════════════════════════════ */
 .scan-card {
-  background: #111B2E;
+  background: rgba(16, 34, 58, 0.55);
   border-radius: 1.5rem;
   padding: 2rem 1.5rem;
   text-align: center;
@@ -81,19 +81,19 @@
 .phone-frame {
   width: 4rem;
   height: 5rem;
-  background: linear-gradient(135deg, #22D3EE 0%, #06B6D4 100%);
+  background: linear-gradient(135deg, #38BDF8 0%, #22D3EE 100%);
   border-radius: 0.75rem;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: 0 4px 12px rgba(34, 211, 238, 0.3);
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);
 }
 
 .qr-frame {
   width: 4.5rem;
   height: 4.5rem;
-  background: #111B2E;
+  background: rgba(16, 34, 58, 0.55);
   border: 3px dashed var(--ev-border);
   border-radius: 0.75rem;
   display: flex;
@@ -153,7 +153,7 @@
   justify-content: center;
   gap: 0.75rem;
   padding: 1rem 1.5rem;
-  background: linear-gradient(135deg, #22D3EE 0%, #06B6D4 100%);
+  background: linear-gradient(135deg, #38BDF8 0%, #22D3EE 100%);
   border: none;
   border-radius: 1rem;
   color: white;
@@ -161,12 +161,12 @@
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 15px rgba(34, 211, 238, 0.3);
+  box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3);
 }
 
 .scan-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(34, 211, 238, 0.4);
+  box-shadow: 0 6px 20px rgba(56, 189, 248, 0.4);
 }
 
 /* ═══════════════════════════════════════════
@@ -229,7 +229,7 @@
 }
 
 .station-info-card {
-  background: #111B2E;
+  background: rgba(16, 34, 58, 0.55);
   border-radius: 1.5rem;
   padding: 1.5rem;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
@@ -238,7 +238,7 @@
 }
 
 .station-card {
-  background: linear-gradient(135deg, #06B6D4 0%, #0E1729 100%);
+  background: linear-gradient(135deg, #22D3EE 0%, rgba(9, 24, 42, 0.5) 100%);
   border-radius: 1.5rem;
   padding: 1.5rem;
   color: white;
@@ -338,7 +338,7 @@
 
 /* Purchase Card */
 .purchase-card {
-  background: #111B2E;
+  background: rgba(16, 34, 58, 0.55);
   border-radius: 1.5rem;
   padding: 1.5rem;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
@@ -392,10 +392,10 @@
   -webkit-appearance: none;
   width: 28px;
   height: 28px;
-  background: linear-gradient(135deg, #22D3EE 0%, #06B6D4 100%);
+  background: linear-gradient(135deg, #38BDF8 0%, #22D3EE 100%);
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(34, 211, 238, 0.4);
+  box-shadow: 0 2px 8px rgba(56, 189, 248, 0.4);
   transition: transform 0.2s ease;
 }
 
@@ -462,7 +462,7 @@
   justify-content: center;
   gap: 0.75rem;
   padding: 1rem;
-  background: linear-gradient(135deg, #22D3EE 0%, #06B6D4 100%);
+  background: linear-gradient(135deg, #38BDF8 0%, #22D3EE 100%);
   border: none;
   border-radius: 1rem;
   color: white;
@@ -470,12 +470,12 @@
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 15px rgba(34, 211, 238, 0.3);
+  box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3);
 }
 
 .pay-btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(34, 211, 238, 0.4);
+  box-shadow: 0 6px 20px rgba(56, 189, 248, 0.4);
 }
 
 .pay-btn:disabled {
@@ -487,7 +487,7 @@
    CHARGING STATE
    ═══════════════════════════════════════════ */
 .charging-active-card {
-  background: #111B2E;
+  background: rgba(16, 34, 58, 0.55);
   border-radius: 1.5rem;
   padding: 2rem 1.5rem;
   text-align: center;
@@ -510,20 +510,20 @@
 }
 
 .status-icon.charging {
-  background: linear-gradient(135deg, #22D3EE 0%, #06B6D4 100%);
+  background: linear-gradient(135deg, #38BDF8 0%, #22D3EE 100%);
   color: white;
   animation: charging-pulse 1.5s ease-in-out infinite;
-  box-shadow: 0 0 20px rgba(34, 211, 238, 0.4);
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
 }
 
 @keyframes charging-pulse {
   0%, 100% {
     transform: scale(1);
-    box-shadow: 0 0 20px rgba(34, 211, 238, 0.4);
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
   }
   50% {
     transform: scale(1.05);
-    box-shadow: 0 0 30px rgba(34, 211, 238, 0.6);
+    box-shadow: 0 0 30px rgba(56, 189, 248, 0.6);
   }
 }
 
@@ -654,7 +654,7 @@
    COMPLETED STATE
    ═══════════════════════════════════════════ */
 .completed-card {
-  background: #111B2E;
+  background: rgba(16, 34, 58, 0.55);
   border-radius: 1.5rem;
   padding: 2rem 1.5rem;
   text-align: center;
@@ -776,7 +776,7 @@
 .done-btn {
   width: 100%;
   padding: 1rem;
-  background: linear-gradient(135deg, #22D3EE 0%, #06B6D4 100%);
+  background: linear-gradient(135deg, #38BDF8 0%, #22D3EE 100%);
   border: none;
   border-radius: 1rem;
   color: white;
@@ -784,12 +784,12 @@
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 15px rgba(34, 211, 238, 0.3);
+  box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3);
 }
 
 .done-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(34, 211, 238, 0.4);
+  box-shadow: 0 6px 20px rgba(56, 189, 248, 0.4);
 }
 
 /* ═══════════════════════════════════════════
@@ -806,7 +806,7 @@
   align-items: center;
   justify-content: center;
   padding: 4rem 2rem;
-  background: #111B2E;
+  background: rgba(16, 34, 58, 0.55);
   border-radius: 1.5rem;
   gap: 1rem;
 }
@@ -814,8 +814,8 @@
 .loading-spinner {
   width: 3rem;
   height: 3rem;
-  border: 3px solid rgba(148, 163, 184, 0.2);
-  border-top-color: #22D3EE;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #38BDF8;
   border-radius: 50%;
   animation: ev-spin 0.8s linear infinite;
 }
@@ -832,8 +832,8 @@
   align-items: center;
   gap: 0.875rem;
   padding: 1rem;
-  background: #111B2E;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(16, 34, 58, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 1rem;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -843,8 +843,8 @@
 .session-card {
   display: flex;
   flex-direction: column;
-  background: #111B2E;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(16, 34, 58, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 1rem;
   transition: all 0.2s ease;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
@@ -852,8 +852,8 @@
 }
 
 .session-card.expanded {
-  border-color: #22D3EE;
-  box-shadow: 0 4px 12px rgba(34, 211, 238, 0.15);
+  border-color: #38BDF8;
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15);
 }
 
 .session-card-header {
@@ -866,12 +866,12 @@
 }
 
 .session-card-header:hover {
-  background: #0E1729;
+  background: rgba(9, 24, 42, 0.5);
 }
 
 .station-card:hover {
-  border-color: #22D3EE;
-  box-shadow: 0 4px 12px rgba(34, 211, 238, 0.1);
+  border-color: #38BDF8;
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.1);
   transform: translateY(-2px);
 }
 
@@ -879,12 +879,12 @@
 .session-icon {
   width: 3rem;
   height: 3rem;
-  background: linear-gradient(135deg, rgba(34, 211, 238, 0.12) 0%, rgba(148, 163, 184, 0.2) 100%);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.12) 0%, rgba(255, 255, 255, 0.2) 100%);
   border-radius: 0.875rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #22D3EE;
+  color: #38BDF8;
   flex-shrink: 0;
 }
 
@@ -898,7 +898,7 @@
 .session-station {
   font-size: 0.9375rem;
   font-weight: 600;
-  color: #E2E8F0;
+  color: #E8F0F7;
   margin: 0 0 0.375rem;
   white-space: nowrap;
   overflow: hidden;
@@ -907,7 +907,7 @@
 
 .station-address {
   font-size: 0.8125rem;
-  color: #94A3B8;
+  color: #9FBBD4;
   margin: 0 0 0.5rem;
   white-space: nowrap;
   overflow: hidden;
@@ -932,7 +932,7 @@
   align-items: center;
   gap: 0.25rem;
   font-size: 0.75rem;
-  color: #94A3B8;
+  color: #9FBBD4;
 }
 
 .station-rating {
@@ -940,7 +940,7 @@
 }
 
 .station-chargers.available {
-  color: #22D3EE;
+  color: #38BDF8;
   font-weight: 500;
 }
 
@@ -961,7 +961,7 @@
 .expand-btn {
   background: transparent;
   border: none;
-  color: #94A3B8;
+  color: #9FBBD4;
   cursor: pointer;
   padding: 0.25rem;
   display: flex;
@@ -973,14 +973,14 @@
 }
 
 .expand-btn:hover {
-  color: #22D3EE;
+  color: #38BDF8;
   transform: scale(1.1);
 }
 
 .session-details-expanded {
   padding: 1rem;
-  border-top: 1px solid rgba(148, 163, 184, 0.2);
-  background: #0E1729;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(9, 24, 42, 0.5);
   animation: slideDown 0.3s ease;
 }
 
@@ -1000,7 +1000,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 0;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .detail-row:last-child {
@@ -1010,13 +1010,13 @@
 .detail-label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #94A3B8;
+  color: #9FBBD4;
 }
 
 .detail-value {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #E2E8F0;
+  color: #E8F0F7;
   text-align: right;
 }
 
@@ -1029,8 +1029,8 @@
 }
 
 .status-text.completed {
-  background: rgba(34, 211, 238, 0.12);
-  color: #22D3EE;
+  background: rgba(56, 189, 248, 0.12);
+  color: #38BDF8;
 }
 
 .status-text.active {
@@ -1044,8 +1044,8 @@
 }
 
 .status-text.paid {
-  background: rgba(34, 211, 238, 0.12);
-  color: #22D3EE;
+  background: rgba(56, 189, 248, 0.12);
+  color: #38BDF8;
 }
 
 .price-value,
@@ -1053,13 +1053,13 @@
   display: block;
   font-size: 1rem;
   font-weight: 700;
-  color: #E2E8F0;
+  color: #E8F0F7;
 }
 
 .price-unit {
   display: block;
   font-size: 0.6875rem;
-  color: #64748B;
+  color: #6F8AA6;
   margin-top: 0.125rem;
 }
 
@@ -1083,7 +1083,7 @@
 }
 
 .status-badge.completed {
-  color: #22D3EE;
+  color: #38BDF8;
 }
 
 .status-badge.active {
@@ -1100,10 +1100,10 @@
   align-items: center;
   justify-content: center;
   padding: 4rem 2rem;
-  background: #111B2E;
-  border: 1px dashed rgba(148, 163, 184, 0.25);
+  background: rgba(16, 34, 58, 0.55);
+  border: 1px dashed rgba(255, 255, 255, 0.25);
   border-radius: 1.5rem;
-  color: #64748B;
+  color: #6F8AA6;
   text-align: center;
   gap: 1rem;
 }

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Bottom Navigation Styles
  * DJT HAIKA EV Charging App
  */
@@ -9,7 +9,7 @@
   left: 0;
   right: 0;
   z-index: 50;
-  background: rgba(17, 27, 46, 0.92);
+  background: rgba(16, 34, 58, 0.92);
   backdrop-filter: blur(14px);
   border-top: 1px solid var(--ev-border);
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
@@ -72,20 +72,20 @@
 .charging-icon-wrap {
   width: 3.5rem;
   height: 3.5rem;
-  background: linear-gradient(135deg, #22D3EE 0%, #14B8A6 100%);
+  background: linear-gradient(135deg, #38BDF8 0%, #14B8A6 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #06121A;
-  box-shadow: 0 4px 15px rgba(34, 211, 238, 0.4);
+  box-shadow: 0 4px 15px rgba(56, 189, 248, 0.4);
   transition: all 0.2s ease;
 }
 
 .nav-item.charging-tab:hover .charging-icon-wrap,
 .nav-item.charging-tab.active .charging-icon-wrap {
   transform: scale(1.05);
-  box-shadow: 0 6px 20px rgba(34, 211, 238, 0.55);
+  box-shadow: 0 6px 20px rgba(56, 189, 248, 0.55);
 }
 
 .nav-item.charging-tab .nav-label {

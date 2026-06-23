@@ -5,7 +5,7 @@
 
 .wallet-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #0E1729 0%, #0E1729 12%, #0B1220 28%, #0B1220 100%);
+  background: linear-gradient(180deg, rgba(9, 24, 42, 0.5) 0%, rgba(9, 24, 42, 0.5) 12%, rgba(6, 16, 31, 0.5) 28%, rgba(6, 16, 31, 0.5) 100%);
   padding-bottom: 6rem;
 }
 
@@ -17,14 +17,14 @@
   justify-content: center;
   min-height: 100vh;
   gap: 1rem;
-  color: #94A3B8;
+  color: #9FBBD4;
 }
 
 .wallet-loading .loading-spinner {
   width: 3rem;
   height: 3rem;
-  border: 3px solid rgba(148, 163, 184, 0.2);
-  border-top-color: #22D3EE;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #38BDF8;
   border-radius: 50%;
   animation: ev-spin 0.8s linear infinite;
 }
@@ -63,7 +63,7 @@
    BALANCE CARD
    ═══════════════════════════════════════════ */
 .balance-card {
-  background: linear-gradient(135deg, #06B6D4 0%, #0E1729 100%);
+  background: linear-gradient(135deg, #22D3EE 0%, rgba(9, 24, 42, 0.5) 100%);
   border-radius: 1.5rem;
   padding: 1.5rem;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
@@ -118,7 +118,7 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 1rem;
-  background: #111B2E;
+  background: rgba(16, 34, 58, 0.55);
   border: none;
   border-radius: 1rem;
   color: var(--ev-primary-dark);
@@ -162,7 +162,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 1rem;
-  background: #111B2E;
+  background: rgba(16, 34, 58, 0.55);
   border: 1px solid var(--ev-border-light);
   border-radius: 1rem;
   cursor: pointer;
@@ -201,7 +201,7 @@
 }
 
 .transactions-list {
-  background: #111B2E;
+  background: rgba(16, 34, 58, 0.55);
   border-radius: 1rem;
   border: 1px solid var(--ev-border-light);
   overflow: hidden;
@@ -305,7 +305,7 @@
 }
 
 .modal-content {
-  background: #111B2E;
+  background: rgba(16, 34, 58, 0.55);
   border-radius: 1.5rem 1.5rem 0 0;
   padding: 1.5rem;
   width: 100%;
@@ -392,7 +392,7 @@
 
 .quick-amount-btn {
   padding: 0.75rem;
-  background: #111B2E;
+  background: rgba(16, 34, 58, 0.55);
   border: 2px solid var(--ev-border);
   border-radius: 0.75rem;
   font-size: 0.875rem;
@@ -436,7 +436,7 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.875rem 1rem;
-  background: #111B2E;
+  background: rgba(16, 34, 58, 0.55);
   border: 2px solid var(--ev-border-light);
   border-radius: 0.875rem;
   font-size: 0.9375rem;
@@ -468,7 +468,7 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 1rem;
-  background: linear-gradient(135deg, #22D3EE 0%, #06B6D4 100%);
+  background: linear-gradient(135deg, #38BDF8 0%, #22D3EE 100%);
   border: none;
   border-radius: 1rem;
   color: white;
@@ -476,12 +476,12 @@
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(34, 211, 238, 0.3);
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);
 }
 
 .modal-add-btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(34, 211, 238, 0.4);
+  box-shadow: 0 6px 16px rgba(56, 189, 248, 0.4);
 }
 
 .modal-add-btn:disabled {

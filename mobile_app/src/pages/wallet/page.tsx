@@ -13,6 +13,11 @@ import {
 } from 'lucide-react';
 import { walletService, type Transaction } from '../../services/api/walletService';
 import { paymentService } from '../../services/api/paymentService';
+import { Capacitor, registerPlugin } from '@capacitor/core';
+
+// Native Razorpay SDK plugin (Android/iOS) — enables UPI/GPay/PhonePe app intents,
+// which the web checkout inside a WebView cannot show.
+const RazorpayCheckout = registerPlugin<{ open(options: Record<string, string>): Promise<any> }>('RazorpayCheckout');
 import './wallet.css';
 
 declare global {
@@ -112,68 +117,23 @@ export default function Wallet() {
         payment_method: 'razorpay'
       });
 
-      // Initialize Razorpay
-      if (!window.Razorpay) {
-        throw new Error('Razorpay SDK not loaded');
-      }
-
-      const options = {
-        key: orderData.key_id,
-        amount: Math.round(amount * 100), // Convert to paise
-        currency: orderData.currency,
-        name: 'DJT HAIKA EV Charging',
-        description: 'Wallet Top-up',
-        order_id: orderData.order_id,
-        handler: async function(response: any) {
-          try {
-            // Verify payment — the server credits the wallet on success
-            await paymentService.verifyPayment({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature
-            });
-
-            // Refresh wallet data (balance already updated server-side)
-            await fetchWalletData();
-
-            setShowAddMoney(false);
-            setAddAmount('');
-            alert('Money added successfully!');
-          } catch (error) {
-            console.error('Payment verification error:', error);
-            alert('Payment verification failed. Please contact support.');
-          } finally {
-            setIsLoading(false);
-          }
-        },
-        prefill: {
-          name: 'User',
-          email: '',
-          contact: ''
-        },
-        theme: {
-          color: '#22D3EE'
-        },
-        modal: {
-          ondismiss: function() {
-            setIsLoading(false);
-          }
-        }
+      // Verify on the server (which credits the wallet) then refresh the UI
+      const finishTopup = async (resp: { razorpay_order_id?: string; razorpay_payment_id?: string; razorpay_signature?: string }) => {
+        await paymentService.verifyPayment({
+          razorpay_order_id: resp.razorpay_order_id || orderData.order_id,
+          razorpay_payment_id: resp.razorpay_payment_id,
+          razorpay_signature: resp.razorpay_signature,
+        });
+        await fetchWalletData();
+        setShowAddMoney(false);
+        setAddAmount('');
       };
 
-      // For mock payments (when Razorpay is not configured)
+      // 1) Mock mode (no real gateway configured) — simulate then verify
       if (orderData.mock) {
-        // Simulate the gateway, then verify — the server credits the wallet
         setTimeout(async () => {
           try {
-            await paymentService.verifyPayment({
-              razorpay_order_id: orderData.order_id,
-              razorpay_payment_id: `pay_mock_${Date.now()}`
-            });
-
-            await fetchWalletData();
-            setShowAddMoney(false);
-            setAddAmount('');
+            await finishTopup({ razorpay_order_id: orderData.order_id, razorpay_payment_id: `pay_mock_${Date.now()}` });
             alert('Money added successfully! (Mock payment)');
           } catch (error) {
             console.error('Error adding money:', error);
@@ -185,7 +145,58 @@ export default function Wallet() {
         return;
       }
 
-      // Open Razorpay checkout
+      // 2) Native app (Android/iOS) — use the native Razorpay SDK so UPI/GPay/PhonePe appear
+      if (Capacitor.isNativePlatform()) {
+        try {
+          const result: any = await RazorpayCheckout.open({
+            key: orderData.key_id,
+            amount: String(Math.round(amount * 100)), // paise (string for the native bridge)
+            currency: orderData.currency || 'INR',
+            name: 'DJT HAIKA EV Charging',
+            description: 'Wallet Top-up',
+            order_id: orderData.order_id,
+            color: '#22D3EE',
+          });
+          const resp = (result && result.response) || result || {};
+          await finishTopup(resp);
+          alert('Money added successfully!');
+        } catch (e: any) {
+          // Don't show a scary error when the user simply cancels/dismisses
+          if (!(e?.code === '0' || /cancel|dismiss/i.test(e?.message || ''))) {
+            alert(e?.message || 'Payment failed');
+          }
+        } finally {
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      // 3) Web browser — hosted checkout.js
+      if (!window.Razorpay) {
+        throw new Error('Razorpay SDK not loaded');
+      }
+      const options = {
+        key: orderData.key_id,
+        amount: Math.round(amount * 100), // Convert to paise
+        currency: orderData.currency,
+        name: 'DJT HAIKA EV Charging',
+        description: 'Wallet Top-up',
+        order_id: orderData.order_id,
+        handler: async function(response: any) {
+          try {
+            await finishTopup(response);
+            alert('Money added successfully!');
+          } catch (error) {
+            console.error('Payment verification error:', error);
+            alert('Payment verification failed. Please contact support.');
+          } finally {
+            setIsLoading(false);
+          }
+        },
+        prefill: { name: 'User', email: '', contact: '' },
+        theme: { color: '#22D3EE' },
+        modal: { ondismiss: function() { setIsLoading(false); } }
+      };
       const razorpay = new window.Razorpay(options);
       razorpay.open();
       

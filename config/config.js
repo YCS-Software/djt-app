@@ -20,6 +20,14 @@ module.exports = {
     expiryMinutes: 5,
     maxAttempts: 3
   },
+
+  // OCPP settings
+  ocpp: {
+    // Public base a charge point uses to reach the OCPP WebSocket server.
+    // Full URL becomes: <wsBaseUrl>/ocpp/<chargePointId>
+    // Override with OCPP_WS_BASE_URL (e.g. ws://203.0.113.10:8080 or wss://ocpp.djthaika.com)
+    wsBaseUrl: process.env.OCPP_WS_BASE_URL || `ws://localhost:${process.env.PORT || 5000}`
+  },
   
   // CORS settings
   cors: {

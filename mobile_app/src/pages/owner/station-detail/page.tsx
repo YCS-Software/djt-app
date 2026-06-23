@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ownerService } from '../../../services/api';
-import type { OwnerStation, OwnerMachine, CreateMachineRequest } from '../../../services/api/ownerService';
+import type { OwnerStation, OwnerMachine, PowerOption, AddMachineResult } from '../../../services/api/ownerService';
 import {
   ArrowLeft, Cpu, Plug, PlusCircle, MapPin, Zap, Loader2, X, IndianRupee, Star, Power,
+  Copy, Check, Wifi, CheckCircle2, Hash,
 } from 'lucide-react';
 
 const CONNECTOR_TYPES = ['CCS2', 'CHAdeMO', 'Type2', 'GB/T', 'Bharat AC', 'Bharat DC'];
@@ -18,15 +19,18 @@ export default function StationDetailPage() {
 
   const [station, setStation] = useState<OwnerStation | null>(null);
   const [machines, setMachines] = useState<OwnerMachine[]>([]);
+  const [powerOptions, setPowerOptions] = useState<PowerOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   // modals
   const [machineModal, setMachineModal] = useState(false);
   const [connectorFor, setConnectorFor] = useState<OwnerMachine | null>(null);
+  const [addedMachine, setAddedMachine] = useState<AddMachineResult | null>(null);
   const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState('');
 
-  const [mForm, setMForm] = useState<CreateMachineRequest>({ name: '', machine_type: 'DC', max_power: '', serial_no: '', ocpp_id: '' });
+  const [mForm, setMForm] = useState<{ name: string; mchn_pwr_id: string; serial_no: string }>({ name: '', mchn_pwr_id: '', serial_no: '' });
   const [cForm, setCForm] = useState({ connector_type: 'CCS2', power: '', name: '' });
 
   const load = async () => {
@@ -45,17 +49,38 @@ export default function StationDetailPage() {
 
   useEffect(() => {
     if (sid) load();
+    ownerService.getPowerOptions().then(setPowerOptions).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sid]);
 
+  const copy = async (text: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(key);
+      setTimeout(() => setCopied(''), 1600);
+    } catch { /* clipboard not available */ }
+  };
+
+  const openMachineModal = () => {
+    setMForm({ name: `Charger ${machines.length + 1}`, mchn_pwr_id: '', serial_no: '' });
+    setError('');
+    setMachineModal(true);
+  };
+
   const submitMachine = async () => {
-    if (!mForm.name?.trim()) return setError('Machine name is required');
+    if (!mForm.name.trim()) return setError('Machine name is required');
+    if (!mForm.mchn_pwr_id) return setError('Please select a power rating');
     setSaving(true);
     setError('');
     try {
-      await ownerService.addMachine(sid, mForm);
+      const result = await ownerService.addMachine(sid, {
+        name: mForm.name.trim(),
+        serial_no: mForm.serial_no.trim() || undefined,
+        mchn_pwr_id: Number(mForm.mchn_pwr_id),
+        connector_count: 2,
+      });
       setMachineModal(false);
-      setMForm({ name: '', machine_type: 'DC', max_power: '', serial_no: '', ocpp_id: '' });
+      setAddedMachine(result); // show OCPP id + WS URL panel
       await load();
     } catch (e: any) {
       setError(e?.message || 'Failed to add machine');
@@ -84,6 +109,12 @@ export default function StationDetailPage() {
     }
   };
 
+  // group power options by machine type for the dropdown
+  const groupedPower = powerOptions.reduce((acc, p) => {
+    (acc[p.machine_type] = acc[p.machine_type] || []).push(p);
+    return acc;
+  }, {} as Record<string, PowerOption[]>);
+
   if (loading) {
     return <div className="owner-page"><div className="owner-loading"><Loader2 className="owner-spin" size={26} /> Loading…</div></div>;
   }
@@ -98,7 +129,7 @@ export default function StationDetailPage() {
         </div>
       </div>
 
-      {error && <div className="owner-alert owner-alert-error">{error}</div>}
+      {error && !machineModal && <div className="owner-alert owner-alert-error">{error}</div>}
 
       {/* Station summary */}
       <div className="owner-card owner-summary">
@@ -117,7 +148,7 @@ export default function StationDetailPage() {
       {/* Infrastructure */}
       <div className="owner-section-head">
         <h2 className="owner-h2">Infrastructure</h2>
-        <button className="owner-btn owner-btn-primary owner-btn-sm" onClick={() => setMachineModal(true)}>
+        <button className="owner-btn owner-btn-primary owner-btn-sm" onClick={openMachineModal}>
           <PlusCircle size={15} /> Machine
         </button>
       </div>
@@ -126,8 +157,8 @@ export default function StationDetailPage() {
         <div className="owner-empty">
           <div className="owner-empty-icon"><Cpu size={28} /></div>
           <h3>No machines yet</h3>
-          <p>Add charging machines, then add connector ports to each.</p>
-          <button className="owner-btn owner-btn-primary" onClick={() => setMachineModal(true)}>
+          <p>Add a charger — we auto-generate its OCPP ID, WebSocket URL and 2 connectors.</p>
+          <button className="owner-btn owner-btn-primary" onClick={openMachineModal}>
             <PlusCircle size={18} /> Add Machine
           </button>
         </div>
@@ -140,12 +171,33 @@ export default function StationDetailPage() {
                 <div className="owner-machine-info">
                   <div className="owner-machine-name">{m.name}</div>
                   <div className="owner-machine-meta">
-                    <span>{m.machine_type}</span>
-                    {m.max_power && (<><span className="owner-dot">•</span><span>{m.max_power}</span></>)}
-                    {m.ocpp_id && (<><span className="owner-dot">•</span><span>OCPP: {m.ocpp_id}</span></>)}
+                    <span className={`owner-type-badge type-${(m.machine_type || '').toLowerCase()}`}>{m.machine_type}</span>
+                    {(m.power_label || m.max_power) && <span className="owner-power-chip"><Zap size={11} /> {m.power_label || m.max_power}</span>}
                   </div>
                 </div>
                 <span className={`owner-mstatus owner-status-${m.status}`}>{MACHINE_STATUS[m.status] || m.status}</span>
+              </div>
+
+              {/* OCPP connectivity */}
+              <div className="owner-ocpp-box">
+                <div className="owner-ocpp-row">
+                  <span className="owner-ocpp-label"><Hash size={12} /> OCPP ID</span>
+                  <span className="owner-ocpp-val">{m.ocpp_id || '—'}</span>
+                  {m.ocpp_id && (
+                    <button className="owner-copy-btn" onClick={() => copy(m.ocpp_id!, `id-${m.machine_id}`)}>
+                      {copied === `id-${m.machine_id}` ? <Check size={13} /> : <Copy size={13} />}
+                    </button>
+                  )}
+                </div>
+                <div className="owner-ocpp-row">
+                  <span className="owner-ocpp-label"><Wifi size={12} /> WebSocket</span>
+                  <span className="owner-ocpp-val owner-ocpp-url">{m.ws_url || '—'}</span>
+                  {m.ws_url && (
+                    <button className="owner-copy-btn" onClick={() => copy(m.ws_url!, `ws-${m.machine_id}`)}>
+                      {copied === `ws-${m.machine_id}` ? <Check size={13} /> : <Copy size={13} />}
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="owner-connectors">
@@ -172,36 +224,72 @@ export default function StationDetailPage() {
               <h3><Cpu size={17} /> Add machine</h3>
               <button className="owner-icon-btn" onClick={() => setMachineModal(false)}><X size={18} /></button>
             </div>
+
+            {error && <div className="owner-alert owner-alert-error">{error}</div>}
+
             <div className="owner-field">
               <label>Machine name *</label>
               <input className="owner-input" value={mForm.name} onChange={(e) => setMForm({ ...mForm, name: e.target.value })} placeholder="e.g. Charger 1" />
             </div>
-            <div className="owner-grid-2">
-              <div className="owner-field">
-                <label>Type</label>
-                <select className="owner-input" value={mForm.machine_type} onChange={(e) => setMForm({ ...mForm, machine_type: e.target.value })}>
-                  <option value="DC">DC (Fast)</option>
-                  <option value="AC">AC</option>
-                </select>
-              </div>
-              <div className="owner-field">
-                <label>Max power</label>
-                <input className="owner-input" value={mForm.max_power} onChange={(e) => setMForm({ ...mForm, max_power: e.target.value })} placeholder="e.g. 60kW" />
-              </div>
+
+            <div className="owner-field">
+              <label><Zap size={12} /> Power rating *</label>
+              <select className="owner-input" value={mForm.mchn_pwr_id} onChange={(e) => setMForm({ ...mForm, mchn_pwr_id: e.target.value })}>
+                <option value="">Select power…</option>
+                {Object.keys(groupedPower).map((type) => (
+                  <optgroup key={type} label={type}>
+                    {groupedPower[type].map((p) => (
+                      <option key={p.power_id} value={p.power_id}>{p.code}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              <p className="owner-field-hint">Machine type is set automatically from the power rating.</p>
             </div>
-            <div className="owner-grid-2">
-              <div className="owner-field">
-                <label>Serial no.</label>
-                <input className="owner-input" value={mForm.serial_no} onChange={(e) => setMForm({ ...mForm, serial_no: e.target.value })} placeholder="Optional" />
-              </div>
-              <div className="owner-field">
-                <label>OCPP ID</label>
-                <input className="owner-input" value={mForm.ocpp_id} onChange={(e) => setMForm({ ...mForm, ocpp_id: e.target.value })} placeholder="ChargePoint ID" />
-              </div>
+
+            <div className="owner-field">
+              <label>Serial no. <span className="owner-optional">(optional)</span></label>
+              <input className="owner-input" value={mForm.serial_no} onChange={(e) => setMForm({ ...mForm, serial_no: e.target.value })} placeholder="Manufacturer serial" />
             </div>
+
+            <div className="owner-note">
+              <CheckCircle2 size={14} /> OCPP ID, WebSocket URL &amp; <strong>2 connectors</strong> are generated automatically.
+            </div>
+
             <button className="owner-btn owner-btn-primary owner-btn-block" onClick={submitMachine} disabled={saving}>
-              {saving ? <><Loader2 className="owner-spin" size={16} /> Saving…</> : 'Add machine'}
+              {saving ? <><Loader2 className="owner-spin" size={16} /> Creating…</> : 'Add machine'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Machine-added success panel (OCPP id + WS URL) */}
+      {addedMachine && (
+        <div className="owner-modal-overlay" onClick={() => setAddedMachine(null)}>
+          <div className="owner-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="owner-success-head">
+              <div className="owner-success-icon"><CheckCircle2 size={30} /></div>
+              <h3>Machine added</h3>
+              <p>{addedMachine.power_label} · {addedMachine.connectors_created} connectors ({addedMachine.connector_type})</p>
+            </div>
+
+            <label className="owner-success-label"><Hash size={13} /> OCPP Charge Point ID</label>
+            <div className="owner-copy-field">
+              <span className="owner-copy-text">{addedMachine.ocpp_id}</span>
+              <button className="owner-copy-btn lg" onClick={() => copy(addedMachine.ocpp_id, 'a-id')}>
+                {copied === 'a-id' ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy</>}
+              </button>
+            </div>
+
+            <label className="owner-success-label"><Wifi size={13} /> WebSocket URL (configure on the charger)</label>
+            <div className="owner-copy-field">
+              <span className="owner-copy-text owner-ocpp-url">{addedMachine.ws_url}</span>
+              <button className="owner-copy-btn lg" onClick={() => copy(addedMachine.ws_url, 'a-ws')}>
+                {copied === 'a-ws' ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy</>}
+              </button>
+            </div>
+
+            <button className="owner-btn owner-btn-primary owner-btn-block" onClick={() => setAddedMachine(null)}>Done</button>
           </div>
         </div>
       )}
