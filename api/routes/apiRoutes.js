@@ -43,8 +43,11 @@ router.use('/ocpp', require('./ocpp/ocppRtr'));
 // Charging session routes
 router.use('/sessions', require('./sessions/sessionRtr'));
 
-// Dashboard routes
+// Dashboard routes (per-user, mobile app)
 router.use('/dashboard', require('./dashboard/dashboardRtr'));
+
+// Web admin console routes (djt-web): /web/dashboard/*, admin-only
+router.use('/web', require('./web/webRtr'));
 
 // Payment routes
 router.use('/payment', require('./payment/paymentRtr'));
