@@ -7,7 +7,6 @@ import {
   Smartphone,
   CreditCard,
   Building2,
-  Check,
   Zap,
   ArrowDownLeft,
   ArrowUpRight
@@ -28,7 +27,6 @@ export default function Wallet() {
   const navigate = useNavigate();
   const [showAddMoney, setShowAddMoney] = useState(false);
   const [addAmount, setAddAmount] = useState('');
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('upi');
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -107,11 +105,11 @@ export default function Wallet() {
     try {
       const amount = parseFloat(addAmount);
       
-      // Create payment order
+      // Create payment order (method is selected inside the Razorpay popup)
       const orderData = await paymentService.createOrder({
         amount: amount,
         currency: 'INR',
-        payment_method: selectedPaymentMethod
+        payment_method: 'razorpay'
       });
 
       // Initialize Razorpay
@@ -391,33 +389,7 @@ export default function Wallet() {
               ))}
             </div>
 
-            {/* Payment Methods */}
-            <div className="modal-methods">
-              <p className="modal-methods-title">Payment Method</p>
-              <div className="modal-methods-list">
-                {[
-                  { id: 'upi', label: 'UPI', icon: Smartphone },
-                  { id: 'card', label: 'Debit/Credit Card', icon: CreditCard },
-                  { id: 'netbanking', label: 'Net Banking', icon: Building2 }
-                ].map((method) => {
-                  const Icon = method.icon;
-                  return (
-                    <button
-                      key={method.id}
-                      onClick={() => !isLoading && setSelectedPaymentMethod(method.id)}
-                      className={`modal-method-btn ${selectedPaymentMethod === method.id ? 'selected' : ''}`}
-                      disabled={isLoading}
-                    >
-                      <Icon size={20} />
-                      <span>{method.label}</span>
-                      {selectedPaymentMethod === method.id && (
-                        <Check size={18} className="check-icon" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            {/* Payment method is chosen inside the Razorpay checkout popup */}
 
             {/* Add Button */}
             <button 

@@ -16,8 +16,8 @@ const paymentMdl = require('../models/paymentMdl');
 const walletMdl = require('../../wallet/models/walletMdl');
 const cntxtDtls = "paymentCtrl";
 
-const KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_1DP5mmOlF5G5ag';
-const KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || '';
+const KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_live_T50sL9YFAg8I9t';
+const KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'KOJBf0KsXqA3e32JkywmR62L';
 
 // We are in mock mode unless a real (non-placeholder) secret is configured.
 function isMockMode() {
