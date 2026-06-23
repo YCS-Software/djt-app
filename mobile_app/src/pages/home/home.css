@@ -1,11 +1,11 @@
-/**
+﻿/**
  * Home Page Styles
  * DJT HAIKA EV Charging App
  */
 
 .home-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #14532D 0%, #166534 12%, #F0FDF4 25%, #F0FDF4 100%);
+  background: linear-gradient(180deg, #0E1729 0%, #0E1729 12%, #0B1220 25%, #0B1220 100%);
   padding-bottom: 6rem;
 }
 
@@ -103,10 +103,10 @@
    WALLET CARD - COMPACT (60% height)
    ═══════════════════════════════════════════ */
 .wallet-card {
-  background: linear-gradient(135deg, #16A34A 0%, #14532D 100%);
+  background: linear-gradient(135deg, #06B6D4 0%, #0E1729 100%);
   border-radius: 1rem;
   padding: 0.875rem 1.25rem;
-  box-shadow: 0 6px 20px rgba(20, 83, 45, 0.25);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
   animation: ev-slide-up 0.4s ease-out;
   display: flex;
   align-items: center;
@@ -170,7 +170,7 @@
   background: rgba(255, 255, 255, 0.95);
   border: none;
   border-radius: 2rem;
-  color: #16A34A;
+  color: #22D3EE;
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
@@ -179,7 +179,7 @@
 }
 
 .add-money-btn:hover {
-  background: white;
+  background: #111B2E;
   transform: scale(1.05);
 }
 
@@ -201,14 +201,14 @@
   text-align: center;
   gap: 1rem;
   padding: 1.5rem 1.25rem;
-  background: white;
-  border: 3px solid #22C55E;
+  background: #111B2E;
+  border: 3px solid #22D3EE;
   border-radius: 1.5rem;
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 
-    0 8px 25px rgba(34, 197, 94, 0.2),
-    0 0 0 4px rgba(34, 197, 94, 0.1);
+    0 8px 25px rgba(34, 211, 238, 0.2),
+    0 0 0 4px rgba(34, 211, 238, 0.1);
   position: relative;
   overflow: hidden;
 }
@@ -217,15 +217,15 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.03) 0%, rgba(34, 197, 94, 0.08) 100%);
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.03) 0%, rgba(34, 211, 238, 0.08) 100%);
   pointer-events: none;
 }
 
 .scan-qr-btn:hover {
-  border-color: #16A34A;
+  border-color: #22D3EE;
   box-shadow: 
-    0 12px 35px rgba(34, 197, 94, 0.3),
-    0 0 0 6px rgba(34, 197, 94, 0.15);
+    0 12px 35px rgba(34, 211, 238, 0.3),
+    0 0 0 6px rgba(34, 211, 238, 0.15);
   transform: translateY(-3px);
 }
 
@@ -247,19 +247,19 @@
   z-index: 2;
   width: 4.5rem;
   height: 4.5rem;
-  background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
+  background: linear-gradient(135deg, #22D3EE 0%, #06B6D4 100%);
   border-radius: 1.25rem;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4);
+  box-shadow: 0 6px 20px rgba(34, 211, 238, 0.4);
 }
 
 .scan-ring {
   position: absolute;
   border-radius: 1.25rem;
-  border: 3px solid #22C55E;
+  border: 3px solid #22D3EE;
   opacity: 0.4;
   animation: scan-pulse 2s ease-out infinite;
 }
@@ -298,18 +298,18 @@
   gap: 0.5rem;
   font-size: 1.25rem;
   font-weight: 700;
-  color: #14532D;
+  color: #E2E8F0;
   margin-bottom: 0.375rem;
 }
 
 .scan-subtitle {
   display: block;
   font-size: 0.875rem;
-  color: #6B7280;
+  color: #94A3B8;
 }
 
 .scan-zap {
-  color: #22C55E;
+  color: #22D3EE;
   animation: zap-pulse 1.5s ease-in-out infinite;
 }
 
@@ -336,7 +336,7 @@
 .section-title {
   font-size: 1rem;
   font-weight: 700;
-  color: #14532D;
+  color: #E2E8F0;
   margin-bottom: 0.75rem;
 }
 
@@ -351,18 +351,18 @@
   align-items: center;
   gap: 0.875rem;
   padding: 0.875rem;
-  background: white;
-  border: 1px solid #E5E7EB;
+  background: #111B2E;
+  border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 1rem;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 6px rgba(20, 83, 45, 0.04);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
 }
 
 .shortcut-card:hover {
-  border-color: #22C55E;
+  border-color: #22D3EE;
   transform: translateX(4px);
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.1);
+  box-shadow: 0 4px 12px rgba(34, 211, 238, 0.1);
 }
 
 .shortcut-icon {
@@ -385,25 +385,25 @@
   display: block;
   font-size: 0.9rem;
   font-weight: 600;
-  color: #14532D;
+  color: #E2E8F0;
   margin-bottom: 0.125rem;
 }
 
 .shortcut-subtitle {
   display: block;
   font-size: 0.75rem;
-  color: #6B7280;
+  color: #94A3B8;
 }
 
 .shortcut-arrow {
-  color: #9CA3AF;
+  color: #64748B;
   transition: all 0.2s ease;
   flex-shrink: 0;
 }
 
 .shortcut-card:hover .shortcut-arrow {
   transform: translateX(4px);
-  color: #22C55E;
+  color: #22D3EE;
 }
 
 /* ═══════════════════════════════════════════
@@ -414,8 +414,8 @@
   align-items: center;
   gap: 0.875rem;
   padding: 0.875rem 1rem;
-  background: linear-gradient(135deg, #DCFCE7 0%, #BBF7D0 100%);
-  border: 1px solid #86EFAC;
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.12) 0%, rgba(148, 163, 184, 0.2) 100%);
+  border: 1px solid rgba(34, 211, 238, 0.4);
   border-radius: 1rem;
   animation: ev-slide-up 0.7s ease-out;
   animation-delay: 0.3s;
@@ -425,13 +425,13 @@
 .eco-icon {
   width: 2.5rem;
   height: 2.5rem;
-  background: white;
+  background: #111B2E;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #22C55E;
-  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.2);
+  color: #22D3EE;
+  box-shadow: 0 2px 8px rgba(34, 211, 238, 0.2);
   flex-shrink: 0;
 }
 
@@ -443,7 +443,7 @@
 .eco-title {
   display: block;
   font-size: 0.75rem;
-  color: #166534;
+  color: #94A3B8;
   margin-bottom: 0.125rem;
 }
 
@@ -451,7 +451,7 @@
   display: block;
   font-size: 0.9375rem;
   font-weight: 700;
-  color: #14532D;
+  color: #E2E8F0;
 }
 
 /* ═══════════════════════════════════════════

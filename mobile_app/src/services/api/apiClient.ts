@@ -24,7 +24,8 @@ function getApiBaseUrl(): string {
   // For Android emulator: use 10.0.2.2 instead of localhost
   // For physical device: use your computer's local IP (e.g., 192.168.1.XXX)
   // For production: use your production API URL
-  const defaultUrl = 'http://13.202.34.243:5001/api';
+  // const defaultUrl = 'http://13.202.34.243:5001/api';
+  const defaultUrl = 'http://localhost:5000/api';
   
   if (Capacitor.isNativePlatform()) {
     // Check if running on Android emulator

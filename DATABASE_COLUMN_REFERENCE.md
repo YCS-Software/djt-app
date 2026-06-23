@@ -1,10 +1,10 @@
-# Database Column Reference Guide
+﻿# Database Column Reference Guide
 
 Complete mapping of all database columns used across the application.
 
 ---
 
-## 1. users_t (User Information)
+## 1. usr_lst_t (User Information)
 
 | Column Name | Type | API Field | Description |
 |------------|------|-----------|-------------|
@@ -25,7 +25,7 @@ Complete mapping of all database columns used across the application.
 
 ---
 
-## 2. auth_otp_t (OTP Authentication)
+## 2. otp_lst_t (OTP Authentication)
 
 | Column Name | Type | API Field | Description |
 |------------|------|-----------|-------------|
@@ -43,12 +43,12 @@ Complete mapping of all database columns used across the application.
 
 ---
 
-## 3. wallet_t (User Wallet)
+## 3. wllt_lst_t (User Wallet)
 
 | Column Name | Type | API Field | Description |
 |------------|------|-----------|-------------|
 | `wllt_id` | INT | `wallet_id` | Primary key - Wallet ID |
-| `usr_id` | INT | `user_id` | Foreign key to users_t |
+| `usr_id` | INT | `user_id` | Foreign key to usr_lst_t |
 | `blnce_amt` | DECIMAL(10,2) | `balance` | Current wallet balance |
 | `lst_updtd_ts` | TIMESTAMP | `last_updated` | Last update time |
 | `a_in` | TINYINT(1) | - | Active indicator |
@@ -59,13 +59,13 @@ Complete mapping of all database columns used across the application.
 
 ---
 
-## 4. wallet_transactions_t (Transaction History)
+## 4. trxn_lst_t (Transaction History)
 
 | Column Name | Type | API Field | Description |
 |------------|------|-----------|-------------|
 | `trxn_id` | INT | `transaction_id` | Primary key - Transaction ID |
-| `wllt_id` | INT | `wallet_id` | Foreign key to wallet_t |
-| `usr_id` | INT | `user_id` | Foreign key to users_t |
+| `wllt_id` | INT | `wallet_id` | Foreign key to wllt_lst_t |
+| `usr_id` | INT | `user_id` | Foreign key to usr_lst_t |
 | `trxn_typ_cd` | VARCHAR(20) | `type` | credit/debit/refund |
 | `trxn_ctgry_cd` | VARCHAR(30) | `category` | charging/topup/transfer/refund |
 | `amt` | DECIMAL(10,2) | `amount` | Transaction amount |
@@ -84,7 +84,7 @@ Complete mapping of all database columns used across the application.
 
 ---
 
-## 5. charging_stations_t (Charging Stations)
+## 5. sttn_lst_t (Charging Stations)
 
 | Column Name | Type | API Field | Description |
 |------------|------|-----------|-------------|
@@ -116,12 +116,12 @@ Complete mapping of all database columns used across the application.
 
 ---
 
-## 6. station_connectors_t (Connector Types)
+## 6. cnntr_lst_t (Connector Types)
 
 | Column Name | Type | API Field | Description |
 |------------|------|-----------|-------------|
 | `cnntr_id` | INT | `connector_id` | Primary key - Connector ID |
-| `sttn_id` | INT | `station_id` | Foreign key to charging_stations_t |
+| `sttn_id` | INT | `station_id` | Foreign key to sttn_lst_t |
 | `cnntr_typ_cd` | VARCHAR(30) | `type` | CCS2/CHAdeMO/Type2 |
 | `cnntr_nm_tx` | VARCHAR(50) | `name` | Connector name |
 | `pwr_tx` | VARCHAR(20) | `power` | Power rating |
@@ -133,13 +133,13 @@ Complete mapping of all database columns used across the application.
 
 ---
 
-## 7. user_favorite_stations_t (User Favorites)
+## 7. fvrt_lst_t (User Favorites)
 
 | Column Name | Type | API Field | Description |
 |------------|------|-----------|-------------|
 | `fvrt_id` | INT | `favorite_id` | Primary key |
-| `usr_id` | INT | `user_id` | Foreign key to users_t |
-| `sttn_id` | INT | `station_id` | Foreign key to charging_stations_t |
+| `usr_id` | INT | `user_id` | Foreign key to usr_lst_t |
+| `sttn_id` | INT | `station_id` | Foreign key to sttn_lst_t |
 | `a_in` | TINYINT(1) | - | Active indicator |
 | `i_ts` | TIMESTAMP | `favorited_at` | When favorited |
 
@@ -147,15 +147,15 @@ Complete mapping of all database columns used across the application.
 
 ---
 
-## 8. charging_sessions_t (Charging Sessions)
+## 8. sssn_lst_t (Charging Sessions)
 
 | Column Name | Type | API Field | Description |
 |------------|------|-----------|-------------|
 | `sssn_id` | INT | `session_id` | Primary key - Session ID |
 | `sssn_cd` | VARCHAR(50) | `session_code` | Unique session code |
-| `usr_id` | INT | `user_id` | Foreign key to users_t |
-| `sttn_id` | INT | `station_id` | Foreign key to charging_stations_t |
-| `cnntr_id` | INT | `connector_id` | Foreign key to station_connectors_t |
+| `usr_id` | INT | `user_id` | Foreign key to usr_lst_t |
+| `sttn_id` | INT | `station_id` | Foreign key to sttn_lst_t |
+| `cnntr_id` | INT | `connector_id` | Foreign key to cnntr_lst_t |
 | `strt_ts` | TIMESTAMP | `start_time` | Session start time |
 | `end_ts` | TIMESTAMP | `end_time` | Session end time |
 | `durn_mnts_nbr` | INT | `duration_minutes` | Session duration |
@@ -165,7 +165,7 @@ Complete mapping of all database columns used across the application.
 | `prgrss_pct` | INT | `progress` | Charging progress % |
 | `sttus_cd` | VARCHAR(20) | `status` | initiated/active/completed/cancelled/failed |
 | `pymnt_sttus_cd` | VARCHAR(20) | `payment_status` | pending/paid/refunded |
-| `wllt_trxn_id` | INT | `wallet_transaction_id` | FK to wallet_transactions_t |
+| `wllt_trxn_id` | INT | `wallet_transaction_id` | FK to trxn_lst_t |
 | `qr_cd_tx` | VARCHAR(100) | `qr_code` | QR code scanned |
 | `a_in` | TINYINT(1) | - | Active indicator |
 | `i_ts` | TIMESTAMP | `created_at` | Creation time |
@@ -175,12 +175,12 @@ Complete mapping of all database columns used across the application.
 
 ---
 
-## 9. charging_session_logs_t (Session Logs)
+## 9. sssn_log_lst_t (Session Logs)
 
 | Column Name | Type | API Field | Description |
 |------------|------|-----------|-------------|
 | `log_id` | INT | `log_id` | Primary key |
-| `sssn_id` | INT | `session_id` | Foreign key to charging_sessions_t |
+| `sssn_id` | INT | `session_id` | Foreign key to sssn_lst_t |
 | `prgrss_pct` | INT | `progress` | Progress percentage |
 | `enrgy_cnsmd_kwh` | DECIMAL(10,3) | `energy_consumed` | Energy consumed |
 | `crnt_cst_amt` | DECIMAL(10,2) | `current_cost` | Current cost |
@@ -191,14 +191,14 @@ Complete mapping of all database columns used across the application.
 
 ---
 
-## 10. station_bookings_t (Station Bookings)
+## 10. bkng_lst_t (Station Bookings)
 
 | Column Name | Type | API Field | Description |
 |------------|------|-----------|-------------|
 | `bkng_id` | INT | `booking_id` | Primary key |
 | `bkng_cd` | VARCHAR(50) | `booking_code` | Unique booking code |
-| `usr_id` | INT | `user_id` | Foreign key to users_t |
-| `sttn_id` | INT | `station_id` | Foreign key to charging_stations_t |
+| `usr_id` | INT | `user_id` | Foreign key to usr_lst_t |
+| `sttn_id` | INT | `station_id` | Foreign key to sttn_lst_t |
 | `cnntr_id` | INT | `connector_id` | Foreign key (nullable) |
 | `bkng_dte` | DATE | `booking_date` | Booking date |
 | `bkng_tm` | TIME | `booking_time` | Booking time |
@@ -214,12 +214,12 @@ Complete mapping of all database columns used across the application.
 
 ---
 
-## 11. user_vehicles_t (User Vehicles)
+## 11. vhcl_lst_t (User Vehicles)
 
 | Column Name | Type | API Field | Description |
 |------------|------|-----------|-------------|
 | `vhcl_id` | INT | `vehicle_id` | Primary key |
-| `usr_id` | INT | `user_id` | Foreign key to users_t |
+| `usr_id` | INT | `user_id` | Foreign key to usr_lst_t |
 | `vhcl_nm_tx` | VARCHAR(100) | `vehicle_name` | Vehicle nickname |
 | `mke_tx` | VARCHAR(50) | `make` | Tesla, Tata, etc |
 | `mdl_tx` | VARCHAR(50) | `model` | Model name |
@@ -236,12 +236,12 @@ Complete mapping of all database columns used across the application.
 
 ---
 
-## 12. user_statistics_t (User Statistics)
+## 12. stt_lst_t (User Statistics)
 
 | Column Name | Type | API Field | Description |
 |------------|------|-----------|-------------|
 | `stt_id` | INT | `stats_id` | Primary key |
-| `usr_id` | INT | `user_id` | Foreign key to users_t (unique) |
+| `usr_id` | INT | `user_id` | Foreign key to usr_lst_t (unique) |
 | `ttl_sssns_nbr` | INT | `total_sessions` | Total sessions count |
 | `ttl_enrgy_kwh` | DECIMAL(12,3) | `total_energy_kwh` | Total energy consumed |
 | `ttl_spnt_amt` | DECIMAL(12,2) | `total_spent` | Total amount spent |

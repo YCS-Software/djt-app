@@ -1,4 +1,4 @@
-# DATABASE TABLE STRUCTURES
+﻿# DATABASE TABLE STRUCTURES
 
 Complete reference for all database tables in the EV Charging Station application.
 
@@ -6,7 +6,7 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ## 1. USERS & AUTHENTICATION
 
-### Table: `users_t`
+### Table: `usr_lst_t`
 **Description**: User information and profiles
 
 | Column | Type | Constraints | Description |
@@ -28,7 +28,7 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ---
 
-### Table: `auth_otp_t`
+### Table: `otp_lst_t`
 **Description**: OTP authentication records
 
 | Column | Type | Constraints | Description |
@@ -47,13 +47,13 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ---
 
-### Table: `user_tokens_t`
+### Table: `tkn_lst_t`
 **Description**: JWT token management
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | tkn_id | INT | PRIMARY KEY, AUTO_INCREMENT | Token ID |
-| usr_id | INT | NOT NULL, FK(users_t) | User ID |
+| usr_id | INT | NOT NULL, FK(usr_lst_t) | User ID |
 | tkn_tx | TEXT | NOT NULL | Token string |
 | tkn_typ_cd | VARCHAR(20) | DEFAULT 'access' | Token type |
 | expry_ts | TIMESTAMP | NOT NULL | Expiry timestamp |
@@ -67,13 +67,13 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ## 2. WALLET & TRANSACTIONS
 
-### Table: `wallet_t`
+### Table: `wllt_lst_t`
 **Description**: User wallet balances
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | wllt_id | INT | PRIMARY KEY, AUTO_INCREMENT | Wallet ID |
-| usr_id | INT | NOT NULL, UNIQUE, FK(users_t) | User ID |
+| usr_id | INT | NOT NULL, UNIQUE, FK(usr_lst_t) | User ID |
 | blnce_amt | DECIMAL(10,2) | DEFAULT 0.00 | Current balance |
 | lst_updtd_ts | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Last updated |
 | a_in | TINYINT(1) | DEFAULT 1 | Active indicator |
@@ -84,14 +84,14 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ---
 
-### Table: `wallet_transactions_t`
+### Table: `trxn_lst_t`
 **Description**: Wallet transaction history
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | trxn_id | INT | PRIMARY KEY, AUTO_INCREMENT | Transaction ID |
-| wllt_id | INT | NOT NULL, FK(wallet_t) | Wallet ID |
-| usr_id | INT | NOT NULL, FK(users_t) | User ID |
+| wllt_id | INT | NOT NULL, FK(wllt_lst_t) | Wallet ID |
+| usr_id | INT | NOT NULL, FK(usr_lst_t) | User ID |
 | trxn_typ_cd | VARCHAR(20) | NOT NULL | Type (credit/debit/refund) |
 | trxn_ctgry_cd | VARCHAR(30) | NOT NULL | Category (charging/topup/transfer) |
 | amt | DECIMAL(10,2) | NOT NULL | Transaction amount |
@@ -112,7 +112,7 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ## 3. CHARGING STATIONS
 
-### Table: `charging_stations_t`
+### Table: `sttn_lst_t`
 **Description**: Charging station information
 
 | Column | Type | Constraints | Description |
@@ -145,13 +145,13 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ---
 
-### Table: `station_connectors_t`
+### Table: `cnntr_lst_t`
 **Description**: Station connector types
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | cnntr_id | INT | PRIMARY KEY, AUTO_INCREMENT | Connector ID |
-| sttn_id | INT | NOT NULL, FK(charging_stations_t) | Station ID |
+| sttn_id | INT | NOT NULL, FK(sttn_lst_t) | Station ID |
 | cnntr_typ_cd | VARCHAR(30) | NOT NULL | Connector type (CCS2/CHAdeMO/Type2) |
 | cnntr_nm_tx | VARCHAR(50) | | Connector name |
 | pwr_tx | VARCHAR(20) | | Power rating |
@@ -163,14 +163,14 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ---
 
-### Table: `user_favorite_stations_t`
+### Table: `fvrt_lst_t`
 **Description**: User favorite stations
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | fvrt_id | INT | PRIMARY KEY, AUTO_INCREMENT | Favorite ID |
-| usr_id | INT | NOT NULL, FK(users_t) | User ID |
-| sttn_id | INT | NOT NULL, FK(charging_stations_t) | Station ID |
+| usr_id | INT | NOT NULL, FK(usr_lst_t) | User ID |
+| sttn_id | INT | NOT NULL, FK(sttn_lst_t) | Station ID |
 | a_in | TINYINT(1) | DEFAULT 1 | Active indicator |
 | i_ts | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Created timestamp |
 
@@ -181,16 +181,16 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ## 4. CHARGING SESSIONS
 
-### Table: `charging_sessions_t`
+### Table: `sssn_lst_t`
 **Description**: Charging session records
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | sssn_id | INT | PRIMARY KEY, AUTO_INCREMENT | Session ID |
 | sssn_cd | VARCHAR(50) | UNIQUE, NOT NULL | Session code |
-| usr_id | INT | NOT NULL, FK(users_t) | User ID |
-| sttn_id | INT | NOT NULL, FK(charging_stations_t) | Station ID |
-| cnntr_id | INT | NOT NULL, FK(station_connectors_t) | Connector ID |
+| usr_id | INT | NOT NULL, FK(usr_lst_t) | User ID |
+| sttn_id | INT | NOT NULL, FK(sttn_lst_t) | Station ID |
+| cnntr_id | INT | NOT NULL, FK(cnntr_lst_t) | Connector ID |
 | strt_ts | TIMESTAMP | NULL | Start time |
 | end_ts | TIMESTAMP | NULL | End time |
 | durn_mnts_nbr | INT | | Duration in minutes |
@@ -200,7 +200,7 @@ Complete reference for all database tables in the EV Charging Station applicatio
 | prgrss_pct | INT | DEFAULT 0 | Progress percentage |
 | sttus_cd | VARCHAR(20) | DEFAULT 'initiated' | Status (initiated/active/completed/cancelled/failed) |
 | pymnt_sttus_cd | VARCHAR(20) | DEFAULT 'pending' | Payment status (pending/paid/refunded) |
-| wllt_trxn_id | INT | NULL, FK(wallet_transactions_t) | Wallet transaction ID |
+| wllt_trxn_id | INT | NULL, FK(trxn_lst_t) | Wallet transaction ID |
 | qr_cd_tx | VARCHAR(100) | | QR code scanned |
 | a_in | TINYINT(1) | DEFAULT 1 | Active indicator |
 | i_ts | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Created timestamp |
@@ -210,13 +210,13 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ---
 
-### Table: `charging_session_logs_t`
+### Table: `sssn_log_lst_t`
 **Description**: Real-time charging session logs
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | log_id | INT | PRIMARY KEY, AUTO_INCREMENT | Log ID |
-| sssn_id | INT | NOT NULL, FK(charging_sessions_t) | Session ID |
+| sssn_id | INT | NOT NULL, FK(sssn_lst_t) | Session ID |
 | prgrss_pct | INT | DEFAULT 0 | Progress percentage |
 | enrgy_cnsmd_kwh | DECIMAL(10,3) | | Energy consumed |
 | crnt_cst_amt | DECIMAL(10,2) | | Current cost |
@@ -229,16 +229,16 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ## 5. BOOKINGS
 
-### Table: `station_bookings_t`
+### Table: `bkng_lst_t`
 **Description**: Station booking reservations
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | bkng_id | INT | PRIMARY KEY, AUTO_INCREMENT | Booking ID |
 | bkng_cd | VARCHAR(50) | UNIQUE, NOT NULL | Booking code |
-| usr_id | INT | NOT NULL, FK(users_t) | User ID |
-| sttn_id | INT | NOT NULL, FK(charging_stations_t) | Station ID |
-| cnntr_id | INT | NULL, FK(station_connectors_t) | Connector ID |
+| usr_id | INT | NOT NULL, FK(usr_lst_t) | User ID |
+| sttn_id | INT | NOT NULL, FK(sttn_lst_t) | Station ID |
+| cnntr_id | INT | NULL, FK(cnntr_lst_t) | Connector ID |
 | bkng_dte | DATE | NOT NULL | Booking date |
 | bkng_tm | TIME | NOT NULL | Booking time |
 | durn_mnts_nbr | INT | NOT NULL | Duration in minutes |
@@ -255,13 +255,13 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ## 6. USER VEHICLES
 
-### Table: `user_vehicles_t`
+### Table: `vhcl_lst_t`
 **Description**: User vehicle information
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | vhcl_id | INT | PRIMARY KEY, AUTO_INCREMENT | Vehicle ID |
-| usr_id | INT | NOT NULL, FK(users_t) | User ID |
+| usr_id | INT | NOT NULL, FK(usr_lst_t) | User ID |
 | vhcl_nm_tx | VARCHAR(100) | | Vehicle name/alias |
 | mke_tx | VARCHAR(50) | | Make (Tesla, Tata, etc) |
 | mdl_tx | VARCHAR(50) | | Model |
@@ -280,15 +280,15 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ## 7. RATINGS & REVIEWS
 
-### Table: `station_reviews_t`
+### Table: `rvw_lst_t`
 **Description**: Station ratings and reviews
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | rvw_id | INT | PRIMARY KEY, AUTO_INCREMENT | Review ID |
-| usr_id | INT | NOT NULL, FK(users_t) | User ID |
-| sttn_id | INT | NOT NULL, FK(charging_stations_t) | Station ID |
-| sssn_id | INT | NULL, FK(charging_sessions_t) | Session ID |
+| usr_id | INT | NOT NULL, FK(usr_lst_t) | User ID |
+| sttn_id | INT | NOT NULL, FK(sttn_lst_t) | Station ID |
+| sssn_id | INT | NULL, FK(sssn_lst_t) | Session ID |
 | rtng_nbr | INT | NOT NULL | Rating (1-5) |
 | rvw_tx | TEXT | | Review text |
 | a_in | TINYINT(1) | DEFAULT 1 | Active indicator |
@@ -301,13 +301,13 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ## 8. NOTIFICATIONS
 
-### Table: `notifications_t`
+### Table: `ntfctn_lst_t`
 **Description**: User notifications
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | ntfctn_id | INT | PRIMARY KEY, AUTO_INCREMENT | Notification ID |
-| usr_id | INT | NOT NULL, FK(users_t) | User ID |
+| usr_id | INT | NOT NULL, FK(usr_lst_t) | User ID |
 | ttl_tx | VARCHAR(200) | NOT NULL | Title |
 | msg_tx | TEXT | NOT NULL | Message |
 | typ_cd | VARCHAR(30) | | Type (session/wallet/booking/system) |
@@ -324,7 +324,7 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ## 9. OFFERS & REWARDS
 
-### Table: `offers_t`
+### Table: `offr_lst_t`
 **Description**: Promotional offers
 
 | Column | Type | Constraints | Description |
@@ -348,15 +348,15 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ---
 
-### Table: `user_offer_usage_t`
+### Table: `usg_lst_t`
 **Description**: User offer usage tracking
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | usg_id | INT | PRIMARY KEY, AUTO_INCREMENT | Usage ID |
-| usr_id | INT | NOT NULL, FK(users_t) | User ID |
-| offr_id | INT | NOT NULL, FK(offers_t) | Offer ID |
-| sssn_id | INT | NULL, FK(charging_sessions_t) | Session ID |
+| usr_id | INT | NOT NULL, FK(usr_lst_t) | User ID |
+| offr_id | INT | NOT NULL, FK(offr_lst_t) | Offer ID |
+| sssn_id | INT | NULL, FK(sssn_lst_t) | Session ID |
 | dscnt_amt | DECIMAL(10,2) | | Discount amount |
 | i_ts | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Created timestamp |
 
@@ -366,13 +366,13 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ## 10. STATISTICS & ANALYTICS
 
-### Table: `user_statistics_t`
+### Table: `stt_lst_t`
 **Description**: User aggregated statistics
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | stt_id | INT | PRIMARY KEY, AUTO_INCREMENT | Statistic ID |
-| usr_id | INT | NOT NULL, UNIQUE, FK(users_t) | User ID |
+| usr_id | INT | NOT NULL, UNIQUE, FK(usr_lst_t) | User ID |
 | ttl_sssns_nbr | INT | DEFAULT 0 | Total sessions |
 | ttl_enrgy_kwh | DECIMAL(12,3) | DEFAULT 0 | Total energy consumed |
 | ttl_spnt_amt | DECIMAL(12,2) | DEFAULT 0 | Total spent |
@@ -387,7 +387,7 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ## 11. AUDIT & LOGS
 
-### Table: `audit_logs_t`
+### Table: `audt_lst_t`
 **Description**: Audit trail logs
 
 | Column | Type | Constraints | Description |
@@ -409,7 +409,7 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ## 12. SETTINGS
 
-### Table: `app_settings_t`
+### Table: `sttng_lst_t`
 **Description**: Application settings
 
 | Column | Type | Constraints | Description |
@@ -426,13 +426,13 @@ Complete reference for all database tables in the EV Charging Station applicatio
 
 ---
 
-### Table: `user_preferences_t`
+### Table: `prf_lst_t`
 **Description**: User preferences
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | prf_id | INT | PRIMARY KEY, AUTO_INCREMENT | Preference ID |
-| usr_id | INT | NOT NULL, UNIQUE, FK(users_t) | User ID |
+| usr_id | INT | NOT NULL, UNIQUE, FK(usr_lst_t) | User ID |
 | lng_cd | VARCHAR(10) | DEFAULT 'en' | Language code |
 | ntfctn_enbl_in | TINYINT(1) | DEFAULT 1 | Notifications enabled |
 | lc_shre_in | TINYINT(1) | DEFAULT 1 | Location sharing enabled |
@@ -469,21 +469,21 @@ Complete reference for all database tables in the EV Charging Station applicatio
 ## RELATIONSHIPS
 
 ### One-to-One:
-- users_t → wallet_t
-- users_t → user_statistics_t
-- users_t → user_preferences_t
+- usr_lst_t → wllt_lst_t
+- usr_lst_t → stt_lst_t
+- usr_lst_t → prf_lst_t
 
 ### One-to-Many:
-- users_t → charging_sessions_t
-- users_t → station_bookings_t
-- users_t → user_vehicles_t
-- users_t → wallet_transactions_t
-- charging_stations_t → station_connectors_t
-- charging_stations_t → charging_sessions_t
-- charging_sessions_t → charging_session_logs_t
+- usr_lst_t → sssn_lst_t
+- usr_lst_t → bkng_lst_t
+- usr_lst_t → vhcl_lst_t
+- usr_lst_t → trxn_lst_t
+- sttn_lst_t → cnntr_lst_t
+- sttn_lst_t → sssn_lst_t
+- sssn_lst_t → sssn_log_lst_t
 
 ### Many-to-Many:
-- users_t ←→ charging_stations_t (via user_favorite_stations_t)
+- usr_lst_t ←→ sttn_lst_t (via fvrt_lst_t)
 
 ---
 

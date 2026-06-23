@@ -1,4 +1,4 @@
--- ============================================
+﻿-- ============================================
 -- SCHEMA VERIFICATION SCRIPT
 -- Run this to verify all tables and columns exist
 -- ============================================
@@ -13,99 +13,99 @@ SELECT
 FROM information_schema.TABLES
 WHERE TABLE_SCHEMA = DATABASE()
 AND TABLE_NAME IN (
-    'users_t',
-    'auth_otp_t',
-    'user_tokens_t',
-    'wallet_t',
-    'wallet_transactions_t',
-    'charging_stations_t',
-    'station_connectors_t',
-    'user_favorite_stations_t',
-    'charging_sessions_t',
-    'charging_session_logs_t',
-    'station_bookings_t',
-    'user_vehicles_t',
-    'station_reviews_t',
-    'notifications_t',
-    'offers_t',
-    'user_offer_usage_t',
-    'user_statistics_t',
-    'audit_logs_t',
-    'app_settings_t',
-    'user_preferences_t'
+    'usr_lst_t',
+    'otp_lst_t',
+    'tkn_lst_t',
+    'wllt_lst_t',
+    'trxn_lst_t',
+    'sttn_lst_t',
+    'cnntr_lst_t',
+    'fvrt_lst_t',
+    'sssn_lst_t',
+    'sssn_log_lst_t',
+    'bkng_lst_t',
+    'vhcl_lst_t',
+    'rvw_lst_t',
+    'ntfctn_lst_t',
+    'offr_lst_t',
+    'usg_lst_t',
+    'stt_lst_t',
+    'audt_lst_t',
+    'sttng_lst_t',
+    'prf_lst_t'
 )
 ORDER BY TABLE_NAME;
 
--- Check users_t columns
-SELECT 'Verifying users_t columns...' as status;
+-- Check usr_lst_t columns
+SELECT 'Verifying usr_lst_t columns...' as status;
 SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_KEY
 FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = DATABASE()
-AND TABLE_NAME = 'users_t'
+AND TABLE_NAME = 'usr_lst_t'
 ORDER BY ORDINAL_POSITION;
 
--- Check auth_otp_t columns
-SELECT 'Verifying auth_otp_t columns...' as status;
+-- Check otp_lst_t columns
+SELECT 'Verifying otp_lst_t columns...' as status;
 SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_KEY
 FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = DATABASE()
-AND TABLE_NAME = 'auth_otp_t'
+AND TABLE_NAME = 'otp_lst_t'
 ORDER BY ORDINAL_POSITION;
 
--- Check wallet_t columns
-SELECT 'Verifying wallet_t columns...' as status;
+-- Check wllt_lst_t columns
+SELECT 'Verifying wllt_lst_t columns...' as status;
 SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_KEY
 FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = DATABASE()
-AND TABLE_NAME = 'wallet_t'
+AND TABLE_NAME = 'wllt_lst_t'
 ORDER BY ORDINAL_POSITION;
 
--- Check wallet_transactions_t columns
-SELECT 'Verifying wallet_transactions_t columns...' as status;
+-- Check trxn_lst_t columns
+SELECT 'Verifying trxn_lst_t columns...' as status;
 SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_KEY
 FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = DATABASE()
-AND TABLE_NAME = 'wallet_transactions_t'
+AND TABLE_NAME = 'trxn_lst_t'
 ORDER BY ORDINAL_POSITION;
 
--- Check charging_stations_t columns
-SELECT 'Verifying charging_stations_t columns...' as status;
+-- Check sttn_lst_t columns
+SELECT 'Verifying sttn_lst_t columns...' as status;
 SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_KEY
 FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = DATABASE()
-AND TABLE_NAME = 'charging_stations_t'
+AND TABLE_NAME = 'sttn_lst_t'
 ORDER BY ORDINAL_POSITION;
 
--- Check station_connectors_t columns
-SELECT 'Verifying station_connectors_t columns...' as status;
+-- Check cnntr_lst_t columns
+SELECT 'Verifying cnntr_lst_t columns...' as status;
 SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_KEY
 FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = DATABASE()
-AND TABLE_NAME = 'station_connectors_t'
+AND TABLE_NAME = 'cnntr_lst_t'
 ORDER BY ORDINAL_POSITION;
 
--- Check charging_sessions_t columns
-SELECT 'Verifying charging_sessions_t columns...' as status;
+-- Check sssn_lst_t columns
+SELECT 'Verifying sssn_lst_t columns...' as status;
 SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_KEY
 FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = DATABASE()
-AND TABLE_NAME = 'charging_sessions_t'
+AND TABLE_NAME = 'sssn_lst_t'
 ORDER BY ORDINAL_POSITION;
 
--- Check user_vehicles_t columns
-SELECT 'Verifying user_vehicles_t columns...' as status;
+-- Check vhcl_lst_t columns
+SELECT 'Verifying vhcl_lst_t columns...' as status;
 SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_KEY
 FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = DATABASE()
-AND TABLE_NAME = 'user_vehicles_t'
+AND TABLE_NAME = 'vhcl_lst_t'
 ORDER BY ORDINAL_POSITION;
 
--- Check station_bookings_t columns
-SELECT 'Verifying station_bookings_t columns...' as status;
+-- Check bkng_lst_t columns
+SELECT 'Verifying bkng_lst_t columns...' as status;
 SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_KEY
 FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = DATABASE()
-AND TABLE_NAME = 'station_bookings_t'
+AND TABLE_NAME = 'bkng_lst_t'
 ORDER BY ORDINAL_POSITION;
 
 -- Verify all foreign keys exist
@@ -147,13 +147,13 @@ ORDER BY EVENT_OBJECT_TABLE, TRIGGER_NAME;
 
 -- Sample data check
 SELECT 'Checking Sample Data...' as status;
-SELECT 'charging_stations_t' as table_name, COUNT(*) as record_count FROM charging_stations_t
+SELECT 'sttn_lst_t' as table_name, COUNT(*) as record_count FROM sttn_lst_t
 UNION ALL
-SELECT 'users_t', COUNT(*) FROM users_t
+SELECT 'usr_lst_t', COUNT(*) FROM usr_lst_t
 UNION ALL
-SELECT 'wallet_t', COUNT(*) FROM wallet_t
+SELECT 'wllt_lst_t', COUNT(*) FROM wllt_lst_t
 UNION ALL
-SELECT 'charging_sessions_t', COUNT(*) FROM charging_sessions_t;
+SELECT 'sssn_lst_t', COUNT(*) FROM sssn_lst_t;
 
 -- Verify database character set
 SELECT 'Checking Database Configuration...' as status;

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * User Vehicle Model
  * Handles user vehicle operations
  */
@@ -7,7 +7,7 @@ const BaseModel = require('./baseModel');
 
 class UserVehicleModel extends BaseModel {
     constructor() {
-        super('user_vehicles_t');
+        super('vhcl_lst_t');
     }
 
     /**

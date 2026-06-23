@@ -128,27 +128,16 @@ export default function Wallet() {
         order_id: orderData.order_id,
         handler: async function(response: any) {
           try {
-            // Verify payment
+            // Verify payment — the server credits the wallet on success
             await paymentService.verifyPayment({
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature
             });
 
-            // Add money to wallet
-            await walletService.addMoney({
-              amount: amount,
-              payment_method: selectedPaymentMethod,
-              payment_details: {
-                order_id: response.razorpay_order_id,
-                payment_id: response.razorpay_payment_id,
-                signature: response.razorpay_signature
-              }
-            });
-
-            // Refresh wallet data
+            // Refresh wallet data (balance already updated server-side)
             await fetchWalletData();
-            
+
             setShowAddMoney(false);
             setAddAmount('');
             alert('Money added successfully!');
@@ -165,7 +154,7 @@ export default function Wallet() {
           contact: ''
         },
         theme: {
-          color: '#16A34A'
+          color: '#22D3EE'
         },
         modal: {
           ondismiss: function() {
@@ -176,17 +165,12 @@ export default function Wallet() {
 
       // For mock payments (when Razorpay is not configured)
       if (orderData.mock) {
-        // Simulate successful payment
+        // Simulate the gateway, then verify — the server credits the wallet
         setTimeout(async () => {
           try {
-            await walletService.addMoney({
-              amount: amount,
-              payment_method: selectedPaymentMethod,
-              payment_details: {
-                order_id: orderData.order_id,
-                payment_id: `pay_mock_${Date.now()}`,
-                mock: true
-              }
+            await paymentService.verifyPayment({
+              razorpay_order_id: orderData.order_id,
+              razorpay_payment_id: `pay_mock_${Date.now()}`
             });
 
             await fetchWalletData();

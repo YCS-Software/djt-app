@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Dashboard Model
  * Handles dashboard statistics and analytics database operations
  */
@@ -21,7 +21,7 @@ exports.getDashboardStatsMdl = function(data) {
             COALESCE(SUM(s.enrgy_cnsmd_kwh) * 0.85, 0) as co2_saved,
             COALESCE(AVG(s.durn_mnts_nbr), 0) as avg_duration,
             COALESCE(AVG(s.ttl_cst_amt), 0) as avg_cost
-        FROM charging_sessions_t s
+        FROM sssn_lst_t s
         WHERE s.usr_id = ${data.userId}
         AND s.a_in = 1
         AND s.sttus_cd = 'completed'`;
@@ -44,7 +44,7 @@ exports.getMonthlyAnalyticsMdl = function(data) {
             COUNT(s.sssn_id) as sessions,
             COALESCE(SUM(s.enrgy_cnsmd_kwh), 0) as energy,
             COALESCE(SUM(s.ttl_cst_amt), 0) as cost
-        FROM charging_sessions_t s
+        FROM sssn_lst_t s
         WHERE s.usr_id = ${data.userId}
         AND s.a_in = 1
         AND s.sttus_cd = 'completed'
@@ -66,7 +66,7 @@ exports.getWeeklyActivityMdl = function(data) {
         SELECT 
             DAYNAME(s.strt_ts) as day,
             COUNT(s.sssn_id) as sessions
-        FROM charging_sessions_t s
+        FROM sssn_lst_t s
         WHERE s.usr_id = ${data.userId}
         AND s.a_in = 1
         AND s.sttus_cd = 'completed'
@@ -90,13 +90,13 @@ exports.getFavoriteStationsAnalyticsMdl = function(data) {
             COUNT(s.sssn_id) as sessions,
             ROUND((COUNT(s.sssn_id) * 100.0 / (
                 SELECT COUNT(*) 
-                FROM charging_sessions_t 
+                FROM sssn_lst_t 
                 WHERE usr_id = ${data.userId} 
                 AND a_in = 1 
                 AND sttus_cd = 'completed'
             )), 0) as percentage
-        FROM charging_sessions_t s
-        INNER JOIN charging_stations_t cs ON s.sttn_id = cs.sttn_id
+        FROM sssn_lst_t s
+        INNER JOIN sttn_lst_t cs ON s.sttn_id = cs.sttn_id
         WHERE s.usr_id = ${data.userId}
         AND s.a_in = 1
         AND s.sttus_cd = 'completed'
@@ -116,7 +116,7 @@ exports.getFavoriteStationsAnalyticsMdl = function(data) {
 exports.getWalletBalanceMdl = function(data) {
     const QRY_TO_EXEC = `
         SELECT wllt_id, blnce_amt, lst_updtd_ts
-        FROM wallet_t
+        FROM wllt_lst_t
         WHERE usr_id = ${data.userId}
         AND a_in = 1
         LIMIT 1`;
@@ -148,7 +148,7 @@ exports.getNearbyStationsMdl = function(data) {
             ltde_nbr,
             lngtde_nbr,
             0 as distance
-        FROM charging_stations_t
+        FROM sttn_lst_t
         WHERE a_in = 1
         AND avlbl_chrgrs_nbr > 0
         ORDER BY rtng_nbr DESC
@@ -178,8 +178,8 @@ exports.getRecentSessionsMdl = function(data) {
             s.ttl_cst_amt,
             s.sttus_cd,
             s.i_ts
-        FROM charging_sessions_t s
-        LEFT JOIN charging_stations_t cs ON s.sttn_id = cs.sttn_id
+        FROM sssn_lst_t s
+        LEFT JOIN sttn_lst_t cs ON s.sttn_id = cs.sttn_id
         WHERE s.usr_id = ${data.userId}
         AND s.a_in = 1
         ORDER BY s.i_ts DESC
@@ -201,7 +201,7 @@ exports.getUserStatsMdl = function(data) {
             COALESCE(SUM(enrgy_cnsmd_kwh), 0) as ttl_enrgy_kwh,
             COALESCE(SUM(ttl_cst_amt), 0) as ttl_spnt_amt,
             COALESCE(SUM(enrgy_cnsmd_kwh) * 0.82, 0) as co2_svd_kg
-        FROM charging_sessions_t
+        FROM sssn_lst_t
         WHERE usr_id = ${data.userId}
         AND a_in = 1
         AND sttus_cd = 'completed'`;

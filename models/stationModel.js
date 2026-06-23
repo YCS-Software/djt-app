@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Charging Station Model
  * Handles charging station operations
  */
@@ -7,7 +7,7 @@ const BaseModel = require('./baseModel');
 
 class ChargingStationModel extends BaseModel {
     constructor() {
-        super('charging_stations_t');
+        super('sttn_lst_t');
     }
 
     /**
@@ -124,7 +124,7 @@ class ChargingStationModel extends BaseModel {
 
 class StationConnectorModel extends BaseModel {
     constructor() {
-        super('station_connectors_t');
+        super('cnntr_lst_t');
     }
 
     /**
@@ -169,7 +169,7 @@ class StationConnectorModel extends BaseModel {
 
 class UserFavoriteStationModel extends BaseModel {
     constructor() {
-        super('user_favorite_stations_t');
+        super('fvrt_lst_t');
     }
 
     /**
@@ -220,7 +220,7 @@ class UserFavoriteStationModel extends BaseModel {
             const query = `
                 SELECT s.*, f.i_ts as favorited_at
                 FROM ${this.tableName} f
-                JOIN charging_stations_t s ON f.sttn_id = s.sttn_id
+                JOIN sttn_lst_t s ON f.sttn_id = s.sttn_id
                 WHERE f.usr_id = ${userId} AND f.a_in = 1 AND s.a_in = 1
                 ORDER BY f.i_ts DESC
             `;

@@ -6,68 +6,68 @@
 
 :root {
   /* ═══════════════════════════════════════════
-     PRIMARY BRAND COLORS - DJT HAIKA Green
+     PRIMARY BRAND COLORS - DJT AI (Cyan / Teal)
      ═══════════════════════════════════════════ */
-  --ev-primary: #22C55E;
-  --ev-primary-dark: #16A34A;
-  --ev-primary-light: #4ADE80;
-  --ev-primary-soft: rgba(34, 197, 94, 0.1);
-  
+  --ev-primary: #22D3EE;
+  --ev-primary-dark: #06B6D4;
+  --ev-primary-light: #67E8F9;
+  --ev-primary-soft: rgba(34, 211, 238, 0.12);
+
   /* Secondary Colors */
-  --ev-secondary: #10B981;
-  --ev-secondary-dark: #059669;
-  --ev-secondary-light: #34D399;
-  
+  --ev-secondary: #2DD4BF;
+  --ev-secondary-dark: #14B8A6;
+  --ev-secondary-light: #5EEAD4;
+
   /* Accent */
-  --ev-accent: #84CC16;
-  --ev-accent-dark: #65A30D;
-  --ev-accent-light: #A3E635;
+  --ev-accent: #38BDF8;
+  --ev-accent-dark: #0EA5E9;
+  --ev-accent-light: #7DD3FC;
 
   /* ═══════════════════════════════════════════
-     BACKGROUNDS
+     BACKGROUNDS  (dark navy AI theme)
      ═══════════════════════════════════════════ */
-  --ev-bg-app: #F0FDF4;
-  --ev-bg-card: #FFFFFF;
-  --ev-bg-card-hover: #F7FEE7;
-  --ev-bg-dark: #14532D;
-  --ev-bg-gradient: linear-gradient(135deg, #22C55E 0%, #16A34A 50%, #14532D 100%);
-  --ev-bg-gradient-soft: linear-gradient(180deg, #F0FDF4 0%, #DCFCE7 100%);
-  --ev-bg-header: linear-gradient(135deg, #16A34A 0%, #14532D 100%);
+  --ev-bg-app: #0B1220;
+  --ev-bg-card: #111B2E;
+  --ev-bg-card-hover: #16223A;
+  --ev-bg-dark: #060B16;
+  --ev-bg-gradient: linear-gradient(135deg, #22D3EE 0%, #0EA5E9 50%, #0B1220 100%);
+  --ev-bg-gradient-soft: linear-gradient(180deg, #0B1220 0%, #0E1729 100%);
+  --ev-bg-header: linear-gradient(135deg, #0E1729 0%, #0B1220 100%);
 
   /* ═══════════════════════════════════════════
      TEXT COLORS
      ═══════════════════════════════════════════ */
-  --ev-text-primary: #14532D;
-  --ev-text-secondary: #166534;
-  --ev-text-muted: #6B7280;
+  --ev-text-primary: #E2E8F0;
+  --ev-text-secondary: #94A3B8;
+  --ev-text-muted: #64748B;
   --ev-text-light: #FFFFFF;
-  --ev-text-accent: #22C55E;
+  --ev-text-accent: #22D3EE;
 
   /* ═══════════════════════════════════════════
      SEMANTIC COLORS
      ═══════════════════════════════════════════ */
-  --ev-success: #22C55E;
-  --ev-success-soft: rgba(34, 197, 94, 0.15);
-  --ev-error: #EF4444;
-  --ev-error-soft: rgba(239, 68, 68, 0.15);
-  --ev-warning: #F59E0B;
-  --ev-warning-soft: rgba(245, 158, 11, 0.15);
-  --ev-info: #3B82F6;
-  --ev-info-soft: rgba(59, 130, 246, 0.15);
+  --ev-success: #34D399;
+  --ev-success-soft: rgba(52, 211, 153, 0.15);
+  --ev-error: #F87171;
+  --ev-error-soft: rgba(248, 113, 113, 0.15);
+  --ev-warning: #FBBF24;
+  --ev-warning-soft: rgba(251, 191, 36, 0.15);
+  --ev-info: #38BDF8;
+  --ev-info-soft: rgba(56, 189, 248, 0.15);
 
   /* ═══════════════════════════════════════════
      BORDERS & SHADOWS
      ═══════════════════════════════════════════ */
-  --ev-border: #BBF7D0;
-  --ev-border-light: #DCFCE7;
-  --ev-border-dark: #86EFAC;
-  
-  --ev-shadow-sm: 0 1px 2px rgba(20, 83, 45, 0.05);
-  --ev-shadow-md: 0 4px 6px -1px rgba(20, 83, 45, 0.1), 0 2px 4px -1px rgba(20, 83, 45, 0.06);
-  --ev-shadow-lg: 0 10px 15px -3px rgba(20, 83, 45, 0.1), 0 4px 6px -2px rgba(20, 83, 45, 0.05);
-  --ev-shadow-xl: 0 20px 25px -5px rgba(20, 83, 45, 0.1), 0 10px 10px -5px rgba(20, 83, 45, 0.04);
-  --ev-shadow-glow: 0 0 20px rgba(34, 197, 94, 0.3);
-  --ev-shadow-card: 0 4px 20px rgba(20, 83, 45, 0.08);
+  --ev-border: rgba(148, 163, 184, 0.16);
+  --ev-border-light: rgba(148, 163, 184, 0.10);
+  --ev-border-dark: rgba(34, 211, 238, 0.45);
+
+  --ev-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --ev-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --ev-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.45), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  --ev-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+  --ev-shadow-glow: 0 0 24px rgba(34, 211, 238, 0.32);
+  --ev-shadow-card: 0 8px 28px rgba(0, 0, 0, 0.35);
 
   /* ═══════════════════════════════════════════
      SPACING

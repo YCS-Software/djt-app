@@ -1,4 +1,4 @@
-# API Testing Guide - Complete Verification
+﻿# API Testing Guide - Complete Verification
 
 This guide helps you test all API endpoints to ensure database queries work correctly.
 
@@ -86,7 +86,7 @@ GET http://localhost:3000/api/wallet/transactions?limit=10&offset=0
 Authorization: Bearer <token>
 ```
 
-**Verifies Columns:** All wallet_transactions_t columns
+**Verifies Columns:** All trxn_lst_t columns
 
 ---
 
@@ -116,7 +116,7 @@ GET http://localhost:3000/api/stations/:stationId
 Authorization: Bearer <token>
 ```
 
-**Verifies Columns:** All charging_stations_t columns + connectors
+**Verifies Columns:** All sttn_lst_t columns + connectors
 
 ### Search Stations
 ```bash
@@ -135,7 +135,7 @@ Content-Type: application/json
 }
 ```
 
-**Verifies Table:** `user_favorite_stations_t`
+**Verifies Table:** `fvrt_lst_t`
 
 ### Get Favorites
 ```bash
@@ -192,7 +192,7 @@ GET http://localhost:3000/api/sessions/history?limit=10&offset=0&status=complete
 Authorization: Bearer <token>
 ```
 
-**Verifies Columns:** All charging_sessions_t query columns
+**Verifies Columns:** All sssn_lst_t query columns
 
 ### Get Session Details
 ```bash
@@ -219,7 +219,7 @@ SELECT
     SUM(enrgy_cnsmd_kwh * 0.82) as co2_saved,
     AVG(durn_mnts_nbr) as avg_duration,
     AVG(ttl_cst_amt) as avg_cost
-FROM charging_sessions_t
+FROM sssn_lst_t
 ```
 
 ### Get Monthly Analytics
@@ -273,36 +273,36 @@ Error: You have an error in your SQL syntax
 ## Database Query Testing Checklist
 
 ### ✅ Users & Authentication
-- [ ] `users_t` - All columns accessible
-- [ ] `auth_otp_t` - OTP storage and retrieval works
-- [ ] `user_tokens_t` - Token management (if used)
+- [ ] `usr_lst_t` - All columns accessible
+- [ ] `otp_lst_t` - OTP storage and retrieval works
+- [ ] `tkn_lst_t` - Token management (if used)
 
 ### ✅ Wallet & Transactions
-- [ ] `wallet_t` - Balance operations work
-- [ ] `wallet_transactions_t` - All transaction types (credit, debit, refund)
+- [ ] `wllt_lst_t` - Balance operations work
+- [ ] `trxn_lst_t` - All transaction types (credit, debit, refund)
 
 ### ✅ Charging Stations
-- [ ] `charging_stations_t` - CRUD operations
-- [ ] `station_connectors_t` - Connector queries
-- [ ] `user_favorite_stations_t` - Favorites work
+- [ ] `sttn_lst_t` - CRUD operations
+- [ ] `cnntr_lst_t` - Connector queries
+- [ ] `fvrt_lst_t` - Favorites work
 
 ### ✅ Charging Sessions
-- [ ] `charging_sessions_t` - Session lifecycle
-- [ ] `charging_session_logs_t` - Log creation (if used)
+- [ ] `sssn_lst_t` - Session lifecycle
+- [ ] `sssn_log_lst_t` - Log creation (if used)
 
 ### ✅ Bookings
-- [ ] `station_bookings_t` - Booking operations (if implemented)
+- [ ] `bkng_lst_t` - Booking operations (if implemented)
 
 ### ✅ Vehicles
-- [ ] `user_vehicles_t` - Vehicle management (if implemented)
+- [ ] `vhcl_lst_t` - Vehicle management (if implemented)
 
 ### ✅ Statistics
-- [ ] `user_statistics_t` - Stats aggregation
+- [ ] `stt_lst_t` - Stats aggregation
 - [ ] Dashboard queries work correctly
 
 ### ✅ Reviews & Notifications
-- [ ] `station_reviews_t` - Review operations (if implemented)
-- [ ] `notifications_t` - Notification creation (if implemented)
+- [ ] `rvw_lst_t` - Review operations (if implemented)
+- [ ] `ntfctn_lst_t` - Notification creation (if implemented)
 
 ---
 
@@ -336,12 +336,12 @@ curl -X GET http://localhost:3000/api/stations/all \
 
 After running all tests, you should have:
 
-1. **users_t**: Test users created
-2. **wallet_t**: Wallets for test users
-3. **wallet_transactions_t**: Transaction records
-4. **charging_stations_t**: Sample stations (from schema.sql)
-5. **charging_sessions_t**: Test session records
-6. **user_favorite_stations_t**: Favorite relationships
+1. **usr_lst_t**: Test users created
+2. **wllt_lst_t**: Wallets for test users
+3. **trxn_lst_t**: Transaction records
+4. **sttn_lst_t**: Sample stations (from schema.sql)
+5. **sssn_lst_t**: Test session records
+6. **fvrt_lst_t**: Favorite relationships
 
 ---
 

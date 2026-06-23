@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Wallet Model
  * Handles wallet-related database operations
  */
@@ -13,7 +13,7 @@ const cntxtDtls = "walletMdl";
 * Arguments     : data object with userId
 ******************************************************************************/
 exports.getUserWalletMdl = function(data) {
-    const QRY_TO_EXEC = `SELECT * FROM wallet_t 
+    const QRY_TO_EXEC = `SELECT * FROM wllt_lst_t 
         WHERE usr_id = ${data.userId} 
         AND a_in = 1 
         LIMIT 1`;
@@ -29,7 +29,7 @@ exports.getUserWalletMdl = function(data) {
 ******************************************************************************/
 exports.createWalletMdl = function(data) {
     const initialAmount = data.initialAmount || 0.00;
-    const QRY_TO_EXEC = `INSERT INTO wallet_t 
+    const QRY_TO_EXEC = `INSERT INTO wllt_lst_t 
         (usr_id, blnce_amt, a_in) 
         VALUES 
         (${data.userId}, ${initialAmount}, 1)`;
@@ -44,10 +44,9 @@ exports.createWalletMdl = function(data) {
 * Arguments     : data object with walletId, amount
 ******************************************************************************/
 exports.addMoneyMdl = function(data) {
-    const QRY_TO_EXEC = `UPDATE wallet_t 
-        SET blnce_amt = blnce_amt + ${data.amount}, 
-            lst_updtd_ts = NOW(), 
-            updte_usr_id = ${data.userId}
+    const QRY_TO_EXEC = `UPDATE wllt_lst_t
+        SET blnce_amt = blnce_amt + ${data.amount},
+            lst_updtd_ts = NOW()
         WHERE wllt_id = ${data.walletId}`;
     
     console.log('[addMoneyMdl] Query:', QRY_TO_EXEC);
@@ -60,10 +59,9 @@ exports.addMoneyMdl = function(data) {
 * Arguments     : data object with walletId, amount
 ******************************************************************************/
 exports.deductMoneyMdl = function(data) {
-    const QRY_TO_EXEC = `UPDATE wallet_t 
-        SET blnce_amt = blnce_amt - ${data.amount}, 
-            lst_updtd_ts = NOW(), 
-            updte_usr_id = ${data.userId}
+    const QRY_TO_EXEC = `UPDATE wllt_lst_t
+        SET blnce_amt = blnce_amt - ${data.amount},
+            lst_updtd_ts = NOW()
         WHERE wllt_id = ${data.walletId}`;
     
     console.log('[deductMoneyMdl] Query:', QRY_TO_EXEC);
@@ -82,7 +80,7 @@ exports.createTransactionMdl = function(data) {
     const paymentDetails = data.paymentDetails ? `'${JSON.stringify(data.paymentDetails).replace(/'/g, "''")}'` : 'NULL';
     const description = data.description ? `'${String(data.description).replace(/'/g, "''")}'` : 'NULL';
     
-    const QRY_TO_EXEC = `INSERT INTO wallet_transactions_t 
+    const QRY_TO_EXEC = `INSERT INTO trxn_lst_t 
         (wllt_id, usr_id, trxn_typ_cd, trxn_ctgry_cd, amt, 
          blnce_bfr_amt, blnce_aftr_amt, dscrptn_tx, 
          pymnt_mthd_cd, pymnt_dtls_json, ref_id, ref_typ_cd, 
@@ -106,7 +104,7 @@ exports.getUserTransactionsMdl = function(data) {
     const limit = data.limit || 50;
     const offset = data.offset || 0;
     
-    const QRY_TO_EXEC = `SELECT * FROM wallet_transactions_t 
+    const QRY_TO_EXEC = `SELECT * FROM trxn_lst_t 
         WHERE usr_id = ${data.userId} 
         AND a_in = 1 
         ORDER BY i_ts DESC 

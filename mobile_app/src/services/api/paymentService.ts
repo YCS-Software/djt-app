@@ -21,14 +21,18 @@ export interface CreateOrderResponse {
 
 export interface VerifyPaymentRequest {
   razorpay_order_id: string;
-  razorpay_payment_id: string;
-  razorpay_signature: string;
+  razorpay_payment_id?: string;
+  razorpay_signature?: string;
 }
 
 export interface VerifyPaymentResponse {
   verified: boolean;
   order_id: string;
-  payment_id: string;
+  payment_id: string | null;
+  transaction_id?: number;
+  amount?: number;
+  new_balance?: number;
+  already_processed?: boolean;
   mock?: boolean;
 }
 

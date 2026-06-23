@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Auth App Model
  * Handles authentication-related database operations
  */
@@ -16,7 +16,7 @@ exports.storeOTPMdl = function(data) {
     const expiryTime = new Date(Date.now() + data.expiryMinutes * 60000);
     const expiryTimestamp = expiryTime.toISOString().slice(0, 19).replace('T', ' ');
     
-    const QRY_TO_EXEC = `INSERT INTO auth_otp_t 
+    const QRY_TO_EXEC = `INSERT INTO otp_lst_t 
         (phn_nmbr_tx, otp_tx, expry_ts, attmpts_nbr, is_vrfd_in, a_in) 
         VALUES 
         ('${data.phoneNumber}', '${data.otp}', '${expiryTimestamp}', 0, 0, 1)`;
@@ -31,7 +31,7 @@ exports.storeOTPMdl = function(data) {
 * Arguments     : data object with phoneNumber
 ******************************************************************************/
 exports.getValidOTPMdl = function(data) {
-    const QRY_TO_EXEC = `SELECT * FROM auth_otp_t
+    const QRY_TO_EXEC = `SELECT * FROM otp_lst_t
         WHERE phn_nmbr_tx = '${data.phoneNumber}'
         AND is_vrfd_in = 0
         AND a_in = 1
@@ -49,7 +49,7 @@ exports.getValidOTPMdl = function(data) {
 * Arguments     : data object with phoneNumber, otp
 ******************************************************************************/
 exports.verifyOTPMdl = function(data) {
-    const QRY_TO_EXEC = `SELECT * FROM auth_otp_t
+    const QRY_TO_EXEC = `SELECT * FROM otp_lst_t
         WHERE phn_nmbr_tx = '${data.phoneNumber}'
         AND otp_tx = '${data.otp}'
         AND is_vrfd_in = 0
@@ -68,7 +68,7 @@ exports.verifyOTPMdl = function(data) {
 * Arguments     : data object with otpId
 ******************************************************************************/
 exports.markOTPVerifiedMdl = function(data) {
-    const QRY_TO_EXEC = `UPDATE auth_otp_t 
+    const QRY_TO_EXEC = `UPDATE otp_lst_t 
         SET is_vrfd_in = 1, 
             vrfd_ts = NOW() 
         WHERE otp_id = ${data.otpId}`;
@@ -83,7 +83,7 @@ exports.markOTPVerifiedMdl = function(data) {
 * Arguments     : data object with otpId
 ******************************************************************************/
 exports.incrementOTPAttemptsMdl = function(data) {
-    const QRY_TO_EXEC = `UPDATE auth_otp_t 
+    const QRY_TO_EXEC = `UPDATE otp_lst_t 
         SET attmpts_nbr = attmpts_nbr + 1 
         WHERE otp_id = ${data.otpId}`;
     
@@ -97,7 +97,7 @@ exports.incrementOTPAttemptsMdl = function(data) {
 * Arguments     : data object with phoneNumber
 ******************************************************************************/
 exports.findUserByPhoneMdl = function(data) {
-    const QRY_TO_EXEC = `SELECT * FROM users_t 
+    const QRY_TO_EXEC = `SELECT * FROM usr_lst_t 
         WHERE phn_nmbr_tx = '${data.phoneNumber}' 
         AND a_in = 1 
         LIMIT 1`;
@@ -113,12 +113,15 @@ exports.findUserByPhoneMdl = function(data) {
 ******************************************************************************/
 exports.createUserMdl = function(data) {
     const emailValue = data.email ? `'${data.email}'` : 'NULL';
-    
-    const QRY_TO_EXEC = `INSERT INTO users_t 
-        (phn_nmbr_tx, nm_tx, eml_tx, usr_typ_cd, a_in) 
-        VALUES 
-        ('${data.phone}', '${data.name}', ${emailValue}, 'customer', 1)`;
-    
+    // Only allow known roles; default to customer
+    const allowedTypes = ['customer', 'owner'];
+    const userType = allowedTypes.indexOf(data.userType) !== -1 ? data.userType : 'customer';
+
+    const QRY_TO_EXEC = `INSERT INTO usr_lst_t
+        (phn_nmbr_tx, nm_tx, eml_tx, usr_typ_cd, a_in)
+        VALUES
+        ('${data.phone}', '${data.name}', ${emailValue}, '${userType}', 1)`;
+
     console.log('[createUserMdl] Query:', QRY_TO_EXEC);
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
 };
@@ -129,7 +132,7 @@ exports.createUserMdl = function(data) {
 * Arguments     : data object with email
 ******************************************************************************/
 exports.findUserByEmailMdl = function(data) {
-    const QRY_TO_EXEC = `SELECT * FROM users_t 
+    const QRY_TO_EXEC = `SELECT * FROM usr_lst_t 
         WHERE eml_tx = '${data.email}' 
         AND a_in = 1 
         LIMIT 1`;
@@ -144,7 +147,7 @@ exports.findUserByEmailMdl = function(data) {
 * Arguments     : data object with userId
 ******************************************************************************/
 exports.getUserByIdMdl = function(data) {
-    const QRY_TO_EXEC = `SELECT * FROM users_t 
+    const QRY_TO_EXEC = `SELECT * FROM usr_lst_t 
         WHERE usr_id = ${data.userId} 
         AND a_in = 1 
         LIMIT 1`;
@@ -166,7 +169,7 @@ exports.updateUserProfileMdl = function(data) {
     updates.push(`u_ts = NOW()`);
     updates.push(`updte_usr_id = ${data.userId}`);
     
-    const QRY_TO_EXEC = `UPDATE users_t 
+    const QRY_TO_EXEC = `UPDATE usr_lst_t 
         SET ${updates.join(', ')} 
         WHERE usr_id = ${data.userId}`;
     

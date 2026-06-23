@@ -1,4 +1,4 @@
-# 🎉 EV CHARGING STATION - DATABASE & API SETUP COMPLETE
+﻿# 🎉 EV CHARGING STATION - DATABASE & API SETUP COMPLETE
 
 ## ✅ What Has Been Delivered
 
@@ -6,26 +6,26 @@
 **Location**: `server/database/schema.sql`
 
 **20 Production-Ready Tables**:
-1. users_t - User accounts
-2. auth_otp_t - OTP authentication
-3. user_tokens_t - JWT tokens
-4. wallet_t - Wallet balances
-5. wallet_transactions_t - Transaction history
-6. charging_stations_t - Station information
-7. station_connectors_t - Connector types
-8. user_favorite_stations_t - Favorite stations
-9. charging_sessions_t - Charging sessions
-10. charging_session_logs_t - Real-time session logs
-11. station_bookings_t - Booking reservations
-12. user_vehicles_t - User vehicles
-13. station_reviews_t - Ratings & reviews
-14. user_statistics_t - User analytics
-15. notifications_t - Push notifications
-16. offers_t - Promotional offers
-17. user_offer_usage_t - Offer redemptions
-18. audit_logs_t - Audit trail
-19. app_settings_t - System configuration
-20. user_preferences_t - User settings
+1. usr_lst_t - User accounts
+2. otp_lst_t - OTP authentication
+3. tkn_lst_t - JWT tokens
+4. wllt_lst_t - Wallet balances
+5. trxn_lst_t - Transaction history
+6. sttn_lst_t - Station information
+7. cnntr_lst_t - Connector types
+8. fvrt_lst_t - Favorite stations
+9. sssn_lst_t - Charging sessions
+10. sssn_log_lst_t - Real-time session logs
+11. bkng_lst_t - Booking reservations
+12. vhcl_lst_t - User vehicles
+13. rvw_lst_t - Ratings & reviews
+14. stt_lst_t - User analytics
+15. ntfctn_lst_t - Push notifications
+16. offr_lst_t - Promotional offers
+17. usg_lst_t - Offer redemptions
+18. audt_lst_t - Audit trail
+19. sttng_lst_t - System configuration
+20. prf_lst_t - User settings
 
 **Features**:
 - ✅ Foreign key relationships
@@ -243,32 +243,32 @@ Documentation Root:
 Based on your app screens, here's what each page uses:
 
 ### Login Screen
-- Tables: `users_t`, `auth_otp_t`
+- Tables: `usr_lst_t`, `otp_lst_t`
 - Models: `User`, `Auth`
 - APIs: `/auth/app/otp`, `/auth/app/verify/otp`
 
 ### Home Dashboard
-- Tables: `wallet_t`, `charging_sessions_t`, `user_statistics_t`
+- Tables: `wllt_lst_t`, `sssn_lst_t`, `stt_lst_t`
 - Models: `Wallet`, `ChargingSession`, `UserStatistics`
 - APIs: `/wallet/balance`, `/sessions/history`, `/dashboard/stats`
 
 ### Wallet Page
-- Tables: `wallet_t`, `wallet_transactions_t`
+- Tables: `wllt_lst_t`, `trxn_lst_t`
 - Models: `Wallet`, `WalletTransaction`
 - APIs: `/wallet/*`
 
 ### Charging Stations Page
-- Tables: `charging_stations_t`, `station_connectors_t`, `user_favorite_stations_t`
+- Tables: `sttn_lst_t`, `cnntr_lst_t`, `fvrt_lst_t`
 - Models: `ChargingStation`, `StationConnector`, `UserFavoriteStation`
 - APIs: `/stations/*`
 
 ### Active Charging Session
-- Tables: `charging_sessions_t`, `charging_session_logs_t`
+- Tables: `sssn_lst_t`, `sssn_log_lst_t`
 - Models: `ChargingSession`, `ChargingSessionLog`
 - APIs: `/sessions/*`
 
 ### Profile Page
-- Tables: `users_t`, `user_vehicles_t`, `user_statistics_t`
+- Tables: `usr_lst_t`, `vhcl_lst_t`, `stt_lst_t`
 - Models: `User`, `UserVehicle`, `UserStatistics`
 - APIs: `/profile`, `/vehicles/*`
 

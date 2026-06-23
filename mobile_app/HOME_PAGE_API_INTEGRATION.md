@@ -1,4 +1,4 @@
-# ✅ HOME PAGE API INTEGRATION COMPLETE
+﻿# ✅ HOME PAGE API INTEGRATION COMPLETE
 
 ## Updated Components
 
@@ -189,11 +189,11 @@ npm start
 All data now comes from MySQL database:
 
 **Tables Used**:
-- `user_statistics_t` → Dashboard stats
-- `charging_sessions_t` → Sessions & analytics
-- `charging_stations_t` → Station info
-- `wallet_t` → Wallet balance
-- `wallet_transactions_t` → Transaction history
+- `stt_lst_t` → Dashboard stats
+- `sssn_lst_t` → Sessions & analytics
+- `sttn_lst_t` → Station info
+- `wllt_lst_t` → Wallet balance
+- `trxn_lst_t` → Transaction history
 
 ---
 

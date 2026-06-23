@@ -1,4 +1,4 @@
-# EV CHARGING STATION - API DOCUMENTATION
+﻿# EV CHARGING STATION - API DOCUMENTATION
 
 Complete API reference for the EV Charging Station application.
 
@@ -944,21 +944,21 @@ Token is returned from `/auth/app/verify/otp` endpoint and should be stored in l
 
 ## Database Tables Summary
 
-1. **users_t** - User information
-2. **auth_otp_t** - OTP authentication
-3. **wallet_t** - User wallet balances
-4. **wallet_transactions_t** - Transaction history
-5. **charging_stations_t** - Charging station details
-6. **station_connectors_t** - Station connector types
-7. **user_favorite_stations_t** - User favorites
-8. **charging_sessions_t** - Charging session records
-9. **charging_session_logs_t** - Real-time session logs
-10. **station_bookings_t** - Station bookings
-11. **user_vehicles_t** - User vehicle information
-12. **user_statistics_t** - User aggregated statistics
-13. **notifications_t** - User notifications
-14. **offers_t** - Promotional offers
-15. **user_offer_usage_t** - Offer usage tracking
+1. **usr_lst_t** - User information
+2. **otp_lst_t** - OTP authentication
+3. **wllt_lst_t** - User wallet balances
+4. **trxn_lst_t** - Transaction history
+5. **sttn_lst_t** - Charging station details
+6. **cnntr_lst_t** - Station connector types
+7. **fvrt_lst_t** - User favorites
+8. **sssn_lst_t** - Charging session records
+9. **sssn_log_lst_t** - Real-time session logs
+10. **bkng_lst_t** - Station bookings
+11. **vhcl_lst_t** - User vehicle information
+12. **stt_lst_t** - User aggregated statistics
+13. **ntfctn_lst_t** - User notifications
+14. **offr_lst_t** - Promotional offers
+15. **usg_lst_t** - Offer usage tracking
 
 ---
 

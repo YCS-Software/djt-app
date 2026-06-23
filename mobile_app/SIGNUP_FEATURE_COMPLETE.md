@@ -1,4 +1,4 @@
-# Signup Feature - Complete Implementation ✅
+﻿# Signup Feature - Complete Implementation ✅
 
 ## 🎉 What's Been Added
 
@@ -33,7 +33,7 @@ A complete user registration system with OTP verification, integrated with your 
    - Validates all input data
    - Checks for duplicate phone/email
    - Generates JWT token
-   - Inserts into `users_t` table
+   - Inserts into `usr_lst_t` table
 
 2. **`server/api/routes/auth/authAppRtr.js`** - Updated with registration routes
    - Added register endpoint
@@ -43,7 +43,7 @@ A complete user registration system with OTP verification, integrated with your 
 
 ## 🗄️ Database Schema Used
 
-### `users_t` Table Fields:
+### `usr_lst_t` Table Fields:
 
 **Required:**
 - ✅ `phn_nmbr_tx` (VARCHAR 15) - Phone number (unique)
@@ -104,7 +104,7 @@ Frontend → POST /api/auth/app/verify/otp (verify OTP)
 Backend:
 1. Validates input
 2. Checks for duplicates
-3. Inserts into users_t
+3. Inserts into usr_lst_t
 4. Generates JWT token
 5. Returns user data + token
 
@@ -260,7 +260,7 @@ Enter OTP: 1234 (or actual OTP from logs)
 
 ### 4. Verify in Database
 ```sql
-SELECT * FROM users_t ORDER BY i_ts DESC LIMIT 1;
+SELECT * FROM usr_lst_t ORDER BY i_ts DESC LIMIT 1;
 ```
 
 You should see your newly created user!
@@ -295,7 +295,7 @@ The signup page uses DJT HAIKA theme:
 When user registers, this data is inserted:
 
 ```sql
-INSERT INTO users_t (
+INSERT INTO usr_lst_t (
     phn_nmbr_tx,
     nm_tx,
     eml_tx,
@@ -381,7 +381,7 @@ Backend:
 └── server/api/routes/auth/authAppRtr.js                 # Updated routes
 
 Database:
-└── server/database/schema.sql    # users_t table definition
+└── server/database/schema.sql    # usr_lst_t table definition
 ```
 
 ---
@@ -398,4 +398,4 @@ Just:
 5. ✅ Verify OTP
 6. ✅ User account created!
 
-**All data saves to the `users_t` table as per your schema!** 🚀
+**All data saves to the `usr_lst_t` table as per your schema!** 🚀

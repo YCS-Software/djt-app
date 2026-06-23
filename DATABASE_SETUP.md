@@ -1,4 +1,4 @@
-# Database Setup Guide
+﻿# Database Setup Guide
 
 This project uses **Microsoft SQL Server (MSSQL)** as its database, configured similar to the APTIS project structure.
 
@@ -39,7 +39,7 @@ const sqldb = require('./config/db.config');
 const pool = sqldb.MSSQLConPool;
 
 // Execute queries
-const results = await pool.query('SELECT * FROM users_t');
+const results = await pool.query('SELECT * FROM usr_lst_t');
 ```
 
 ### 2. Database Utilities (`utils/db.utils.js`)
@@ -133,11 +133,11 @@ const sqldb = require('./config/db.config');
 const pool = sqldb.MSSQLConPool;
 
 // Simple query
-const users = await pool.query('SELECT * FROM users_t WHERE a_in = 1');
+const users = await pool.query('SELECT * FROM usr_lst_t WHERE a_in = 1');
 
 // Parameterized query
 const { execParameterizedQuery } = require('./utils/db.utils');
-const query = 'SELECT * FROM users_t WHERE usr_id = @userId';
+const query = 'SELECT * FROM usr_lst_t WHERE usr_id = @userId';
 const params = { userId: 123 };
 const result = await execParameterizedQuery(pool, query, params);
 ```
@@ -163,8 +163,8 @@ const { execTrnsctnQuery } = require('./utils/db.utils');
 const pool = sqldb.MSSQLConPool;
 
 const queries = [
-    "INSERT INTO users_t (nm_tx, phn_nmbr_tx) VALUES ('John', '1234567890')",
-    "INSERT INTO auth_otp_t (phn_nmbr_tx, otp_tx) VALUES ('1234567890', '1234')"
+    "INSERT INTO usr_lst_t (nm_tx, phn_nmbr_tx) VALUES ('John', '1234567890')",
+    "INSERT INTO otp_lst_t (phn_nmbr_tx, otp_tx) VALUES ('1234567890', '1234')"
 ];
 
 const results = await execTrnsctnQuery(pool, queries, { user_id: 1 });
@@ -231,7 +231,7 @@ npm run dev
 
 ## Database Naming Conventions (APTIS Style)
 
-- Tables end with `_t` (e.g., `users_t`, `auth_otp_t`)
+- Tables end with `_t` (e.g., `usr_lst_t`, `otp_lst_t`)
 - Fields use abbreviated names with `_` separators
 - Common fields:
   - `_id` - Primary key (e.g., `usr_id`, `otp_id`)

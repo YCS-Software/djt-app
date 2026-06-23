@@ -1,4 +1,4 @@
-# Quick Fix Reference - At a Glance
+﻿# Quick Fix Reference - At a Glance
 
 ## ✅ What Was Fixed
 
@@ -8,9 +8,9 @@
 
 **Line 49-55** (getValidOTP method):
 ```diff
-- SELECT TOP 1 * FROM auth_otp_t
+- SELECT TOP 1 * FROM otp_lst_t
 - WHERE expry_ts > GETDATE()
-+ SELECT * FROM auth_otp_t  
++ SELECT * FROM otp_lst_t  
 + WHERE expry_ts > NOW()
 + LIMIT 1
 ```
@@ -23,8 +23,8 @@
 
 **Line 156-160** (getOTPHistory method):
 ```diff
-- SELECT TOP ${limit} * FROM auth_otp_t
-+ SELECT * FROM auth_otp_t
+- SELECT TOP ${limit} * FROM otp_lst_t
++ SELECT * FROM otp_lst_t
 + LIMIT ${limit}
 ```
 
@@ -35,25 +35,25 @@
 Your schema is **100% complete**. All columns referenced in code exist in database.
 
 ### Verified Tables (All ✅):
-- users_t
-- auth_otp_t  
-- wallet_t
-- wallet_transactions_t
-- charging_stations_t
-- station_connectors_t
-- user_favorite_stations_t
-- charging_sessions_t
-- charging_session_logs_t
-- station_bookings_t
-- user_vehicles_t
-- user_statistics_t
-- station_reviews_t
-- notifications_t
-- offers_t
-- user_offer_usage_t
-- audit_logs_t
-- app_settings_t
-- user_preferences_t
+- usr_lst_t
+- otp_lst_t  
+- wllt_lst_t
+- trxn_lst_t
+- sttn_lst_t
+- cnntr_lst_t
+- fvrt_lst_t
+- sssn_lst_t
+- sssn_log_lst_t
+- bkng_lst_t
+- vhcl_lst_t
+- stt_lst_t
+- rvw_lst_t
+- ntfctn_lst_t
+- offr_lst_t
+- usg_lst_t
+- audt_lst_t
+- sttng_lst_t
+- prf_lst_t
 
 ---
 

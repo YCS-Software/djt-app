@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Station Booking Model
  * Handles charging station booking operations
  */
@@ -7,7 +7,7 @@ const BaseModel = require('./baseModel');
 
 class StationBookingModel extends BaseModel {
     constructor() {
-        super('station_bookings_t');
+        super('bkng_lst_t');
     }
 
     /**
@@ -70,8 +70,8 @@ class StationBookingModel extends BaseModel {
                        s.prce_per_kwh_amt,
                        c.cnntr_typ_cd
                 FROM ${this.tableName} b
-                LEFT JOIN charging_stations_t s ON b.sttn_id = s.sttn_id
-                LEFT JOIN station_connectors_t c ON b.cnntr_id = c.cnntr_id
+                LEFT JOIN sttn_lst_t s ON b.sttn_id = s.sttn_id
+                LEFT JOIN cnntr_lst_t c ON b.cnntr_id = c.cnntr_id
                 WHERE ${whereClause}
                 ORDER BY b.bkng_dte DESC, b.bkng_tm DESC
                 LIMIT ${limit} OFFSET ${offset}
@@ -95,7 +95,7 @@ class StationBookingModel extends BaseModel {
                        s.sttn_nm_tx,
                        s.addr_tx
                 FROM ${this.tableName} b
-                LEFT JOIN charging_stations_t s ON b.sttn_id = s.sttn_id
+                LEFT JOIN sttn_lst_t s ON b.sttn_id = s.sttn_id
                 WHERE b.usr_id = ${userId}
                   AND b.sttus_cd = 'confirmed'
                   AND b.bkng_dte >= CURDATE()

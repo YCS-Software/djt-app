@@ -1,0 +1,60 @@
+/* Role selector for Signup — dark AI theme (cyan/teal on navy) */
+.role-group {
+  margin-bottom: 1.1rem;
+}
+.role-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #94A3B8;
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.01em;
+}
+.role-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+.role-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  padding: 0.85rem 0.8rem;
+  border-radius: 0.9rem;
+  border: 1.5px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.55);
+  color: #CBD5E1;
+  cursor: pointer;
+  transition: transform 150ms ease, border-color 200ms ease, box-shadow 200ms ease, background 200ms ease;
+  text-align: left;
+}
+.role-card svg {
+  color: #22D3EE;
+  transition: transform 200ms ease;
+}
+.role-card .role-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #E2E8F0;
+}
+.role-card .role-desc {
+  font-size: 0.7rem;
+  line-height: 1.25;
+  color: #8499B4;
+}
+.role-card:hover {
+  border-color: rgba(34, 211, 238, 0.5);
+  transform: translateY(-2px);
+}
+.role-card.active {
+  border-color: #22D3EE;
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.16) 0%, rgba(13, 148, 136, 0.16) 100%);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.15), 0 8px 24px rgba(34, 211, 238, 0.12);
+}
+.role-card.active svg {
+  transform: scale(1.12);
+}
+.role-card.active .role-title {
+  color: #67E8F9;
+}

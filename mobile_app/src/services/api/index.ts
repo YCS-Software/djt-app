@@ -10,4 +10,5 @@ export * from './sessionService';
 export * from './bookingService';
 export * from './dashboardService';
 export * from './profileService';
+export * from './ownerService';
 export { apiClient } from './apiClient';

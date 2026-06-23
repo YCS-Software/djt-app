@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Authentication Model
  * Handles authentication-related database operations
  */
@@ -7,7 +7,7 @@ const BaseModel = require('./baseModel');
 
 class AuthModel extends BaseModel {
     constructor() {
-        super('auth_otp_t'); // OTP table name
+        super('otp_lst_t'); // OTP table name
     }
 
     /**

@@ -20,7 +20,9 @@ exports.register = function(req, res) {
     var fnm = "register";
     
     const { phone, name, email } = data;
-    
+    // Role: 'customer' (default) or 'owner' (EV station owner)
+    const userType = (data.userType === 'owner') ? 'owner' : 'customer';
+
     // Validation
     if (!phone || !name) {
         return res.status(std.message["BAD_REQUEST"].code).json({
@@ -73,11 +75,11 @@ exports.register = function(req, res) {
                         }
                         
                         // Create user
-                        return createUser({ phone, name, email }, req, res, fnm);
+                        return createUser({ phone, name, email, userType }, req, res, fnm);
                     });
             } else {
                 // Create user without email check
-                return createUser({ phone, name, email }, req, res, fnm);
+                return createUser({ phone, name, email, userType }, req, res, fnm);
             }
         })
         .catch(function(error) {
@@ -89,8 +91,9 @@ exports.register = function(req, res) {
 // Helper function to create user
 function createUser(userData, req, res, fnm) {
     const { phone, name, email } = userData;
-    
-    authAppMdl.createUserMdl({ phone, name, email })
+    const userType = (userData.userType === 'owner') ? 'owner' : 'customer';
+
+    authAppMdl.createUserMdl({ phone, name, email, userType })
         .then(function(createResults) {
             if (!createResults || !createResults.insertId) {
                 return res.status(500).json({
@@ -99,20 +102,20 @@ function createUser(userData, req, res, fnm) {
                     data: null
                 });
             }
-            
+
             const userId = createResults.insertId;
-            
+
             // Generate JWT token
             const token = jwt.sign(
-                { 
+                {
                     userId: userId,
                     phone: phone,
-                    userType: 'customer' 
+                    userType: userType
                 },
                 config.jwtSecret || config.jwt.secret,
                 { expiresIn: config.jwt.expiresIn || '30d' }
             );
-            
+
             return res.json({
                 status: std.message["SUCCESS"].code,
                 message: 'Account created successfully',
@@ -122,7 +125,7 @@ function createUser(userData, req, res, fnm) {
                         phone: phone,
                         name: name,
                         email: email,
-                        userType: 'customer',
+                        userType: userType,
                         profileImage: null
                     },
                     token: token

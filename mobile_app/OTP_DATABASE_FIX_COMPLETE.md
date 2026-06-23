@@ -1,4 +1,4 @@
-# OTP Database Integration - Fixed ✅
+﻿# OTP Database Integration - Fixed ✅
 
 ## 🔧 Problem Identified
 
@@ -43,7 +43,7 @@ const authModel = new AuthModel();
 
 **After:**
 - ✅ Allows OTP for signup (user doesn't need to exist)
-- ✅ Stores OTP in database (`auth_otp_t` table)
+- ✅ Stores OTP in database (`otp_lst_t` table)
 - ✅ Proper async/await handling
 - ✅ Returns database OTP ID
 
@@ -104,12 +104,12 @@ const verifyResponse = await authService.verifyOTP({
 
 ---
 
-## 🗄️ Database Schema (auth_otp_t)
+## 🗄️ Database Schema (otp_lst_t)
 
 OTPs are now properly stored in the database:
 
 ```sql
-CREATE TABLE auth_otp_t (
+CREATE TABLE otp_lst_t (
     otp_id INT PRIMARY KEY AUTO_INCREMENT,
     phn_nmbr_tx VARCHAR(15) NOT NULL,         -- Phone number
     otp_tx VARCHAR(6) NOT NULL,                -- OTP code
@@ -132,13 +132,13 @@ User enters phone → Click "Send OTP"
               ↓
 Backend: POST /api/auth/app/otp
   - Generate OTP
-  - Insert into auth_otp_t
+  - Insert into otp_lst_t
   - Return otp_id
               ↓
 User enters OTP → Click "Verify"
               ↓
 Backend: POST /api/auth/app/verify/otp
-  - Find OTP in auth_otp_t
+  - Find OTP in otp_lst_t
   - Check expiry
   - Verify OTP matches
   - Mark is_vrfd_in = 1
@@ -152,7 +152,7 @@ User enters details → Click "Continue"
               ↓
 Backend: POST /api/auth/app/otp
   - Generate OTP
-  - Insert into auth_otp_t (even if user doesn't exist)
+  - Insert into otp_lst_t (even if user doesn't exist)
   - Return otp_id
               ↓
 User enters OTP → Click "Create Account"
@@ -162,7 +162,7 @@ Backend: POST /api/auth/app/verify/otp
   - User doesn't exist → Return requiresRegistration: true
               ↓
 Frontend: POST /api/auth/register
-  - Create user in users_t
+  - Create user in usr_lst_t
   - Generate JWT token
   - Auto login
 ```
@@ -203,7 +203,7 @@ Frontend: POST /api/auth/register
 
 ### **When OTP is Sent:**
 ```sql
-INSERT INTO auth_otp_t (
+INSERT INTO otp_lst_t (
     phn_nmbr_tx,
     otp_tx,
     expry_ts,
@@ -223,12 +223,12 @@ INSERT INTO auth_otp_t (
 ### **When OTP is Verified:**
 ```sql
 -- Increment attempts
-UPDATE auth_otp_t 
+UPDATE otp_lst_t 
 SET attmpts_nbr = attmpts_nbr + 1 
 WHERE otp_id = 123;
 
 -- Mark as verified (if correct)
-UPDATE auth_otp_t 
+UPDATE otp_lst_t 
 SET is_vrfd_in = 1, 
     vrfd_ts = NOW() 
 WHERE otp_id = 123;
@@ -245,7 +245,7 @@ SELECT
     is_vrfd_in,
     vrfd_ts,
     i_ts
-FROM auth_otp_t
+FROM otp_lst_t
 ORDER BY i_ts DESC
 LIMIT 10;
 ```
@@ -285,7 +285,7 @@ Content-Type: application/json
 
 **Check Database:**
 ```sql
-SELECT * FROM auth_otp_t WHERE phn_nmbr_tx = '9666476298';
+SELECT * FROM otp_lst_t WHERE phn_nmbr_tx = '9666476298';
 ```
 
 ### **2. Test OTP Verification**
@@ -317,7 +317,7 @@ Content-Type: application/json
 **Check Database:**
 ```sql
 SELECT is_vrfd_in, vrfd_ts, attmpts_nbr 
-FROM auth_otp_t 
+FROM otp_lst_t 
 WHERE otp_id = 123;
 -- Should show: is_vrfd_in=1, vrfd_ts=<timestamp>, attmpts_nbr=1
 ```
@@ -341,8 +341,8 @@ Email: test@example.com
 # 5. Enter OTP → Click Create Account
 
 # 6. Verify in database
-SELECT * FROM auth_otp_t WHERE phn_nmbr_tx = '9666476298';
-SELECT * FROM users_t WHERE phn_nmbr_tx = '9666476298';
+SELECT * FROM otp_lst_t WHERE phn_nmbr_tx = '9666476298';
+SELECT * FROM usr_lst_t WHERE phn_nmbr_tx = '9666476298';
 ```
 
 ---
@@ -351,7 +351,7 @@ SELECT * FROM users_t WHERE phn_nmbr_tx = '9666476298';
 
 ### **Check if OTP was stored:**
 ```sql
-SELECT * FROM auth_otp_t 
+SELECT * FROM otp_lst_t 
 WHERE phn_nmbr_tx = 'YOUR_PHONE'
 ORDER BY i_ts DESC 
 LIMIT 1;
@@ -366,7 +366,7 @@ SELECT
     is_vrfd_in,
     attmpts_nbr,
     a_in
-FROM auth_otp_t
+FROM otp_lst_t
 WHERE phn_nmbr_tx = 'YOUR_PHONE'
 ORDER BY i_ts DESC;
 ```
@@ -394,7 +394,7 @@ ORDER BY i_ts DESC;
 
 | Component | Before | After |
 |-----------|--------|-------|
-| **OTP Storage** | In-memory (lost on restart) | Database (`auth_otp_t`) |
+| **OTP Storage** | In-memory (lost on restart) | Database (`otp_lst_t`) |
 | **User Check** | Required for OTP | Optional (supports signup) |
 | **Async/Await** | Missing on DB calls | Properly implemented |
 | **OTP Tracking** | No persistence | Full audit trail |
@@ -421,7 +421,7 @@ Frontend:
 
 Database Models (Already existed):
 ├── server/models/authModel.js
-│   ✅ storeOTP() - Inserts to auth_otp_t
+│   ✅ storeOTP() - Inserts to otp_lst_t
 │   ✅ getValidOTP() - Gets unexpired OTP
 │   ✅ verifyOTP() - Verifies and updates status
 └── server/models/userModel.js
@@ -452,4 +452,4 @@ Test it now:
 4. Verify OTP
 5. Account created!
 
-All OTPs are stored in `auth_otp_t` table! ✅
+All OTPs are stored in `otp_lst_t` table! ✅

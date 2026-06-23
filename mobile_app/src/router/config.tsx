@@ -9,6 +9,10 @@ import Login from "../pages/Login";
 import Signup from "../pages/Signup";
 import Layout from "../components/Layout";
 import RootRedirect from "../components/RootRedirect";
+import OwnerLayout from "../components/OwnerLayout";
+import OwnerDashboardPage from "../pages/owner/dashboard/page";
+import CreateStationPage from "../pages/owner/create-station/page";
+import StationDetailPage from "../pages/owner/station-detail/page";
 
 const routes: RouteObject[] = [
   // Root route - redirect based on auth status
@@ -51,7 +55,26 @@ const routes: RouteObject[] = [
       },
     ],
   },
-  
+
+  // Owner console (EV station owner)
+  {
+    element: <OwnerLayout />,
+    children: [
+      {
+        path: "/owner",
+        element: <OwnerDashboardPage />,
+      },
+      {
+        path: "/owner/stations/new",
+        element: <CreateStationPage />,
+      },
+      {
+        path: "/owner/stations/:stationId",
+        element: <StationDetailPage />,
+      },
+    ],
+  },
+
   // 404 Not Found
   {
     path: "*",

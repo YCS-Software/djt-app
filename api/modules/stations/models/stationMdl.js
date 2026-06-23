@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Station Model
  * Handles station-related database operations
  */
@@ -26,7 +26,7 @@ exports.getNearbyStationsMdl = function(data) {
                 sin(radians(${latitude})) * 
                 sin(radians(ltde_nbr))
             )) AS distance
-        FROM charging_stations_t
+        FROM sttn_lst_t
         WHERE a_in = 1
         HAVING distance < ${radius}
         ORDER BY distance
@@ -43,7 +43,7 @@ exports.getNearbyStationsMdl = function(data) {
 * Arguments     : data object with stationId
 ******************************************************************************/
 exports.getStationByIdMdl = function(data) {
-    const QRY_TO_EXEC = `SELECT * FROM charging_stations_t 
+    const QRY_TO_EXEC = `SELECT * FROM sttn_lst_t 
         WHERE sttn_id = ${data.stationId} 
         AND a_in = 1 
         LIMIT 1`;
@@ -59,7 +59,7 @@ exports.getStationByIdMdl = function(data) {
 ******************************************************************************/
 exports.getStationByCodeMdl = function(data) {
     const stationCode = String(data.stationCode).replace(/'/g, "''");
-    const QRY_TO_EXEC = `SELECT * FROM charging_stations_t 
+    const QRY_TO_EXEC = `SELECT * FROM sttn_lst_t 
         WHERE sttn_cd = '${stationCode}' 
         AND a_in = 1 
         LIMIT 1`;
@@ -77,7 +77,7 @@ exports.getActiveStationsMdl = function(data) {
     const limit = data.limit || 100;
     const offset = data.offset || 0;
     
-    const QRY_TO_EXEC = `SELECT * FROM charging_stations_t 
+    const QRY_TO_EXEC = `SELECT * FROM sttn_lst_t 
         WHERE a_in = 1 
         ORDER BY sttn_nm_tx ASC 
         LIMIT ${limit} OFFSET ${offset}`;
@@ -95,7 +95,7 @@ exports.searchStationsMdl = function(data) {
     const searchTerm = String(data.searchTerm).replace(/'/g, "''").replace(/\\/g, '\\\\');
     
     const QRY_TO_EXEC = `
-        SELECT * FROM charging_stations_t
+        SELECT * FROM sttn_lst_t
         WHERE a_in = 1 
         AND (sttn_nm_tx LIKE '%${searchTerm}%' 
              OR sttn_cd LIKE '%${searchTerm}%'
@@ -116,7 +116,7 @@ exports.searchStationsMdl = function(data) {
 ******************************************************************************/
 exports.updateRatingMdl = function(data) {
     const QRY_TO_EXEC = `
-        UPDATE charging_stations_t
+        UPDATE sttn_lst_t
         SET ttl_rtngs_nbr = ttl_rtngs_nbr + 1,
             rtng_nbr = ((rtng_nbr * ttl_rtngs_nbr) + ${data.newRating}) / (ttl_rtngs_nbr + 1)
         WHERE sttn_id = ${data.stationId}
@@ -132,7 +132,7 @@ exports.updateRatingMdl = function(data) {
 * Arguments     : data object with stationId
 ******************************************************************************/
 exports.getStationConnectorsMdl = function(data) {
-    const QRY_TO_EXEC = `SELECT * FROM station_connectors_t 
+    const QRY_TO_EXEC = `SELECT * FROM cnntr_lst_t 
         WHERE sttn_id = ${data.stationId} 
         AND a_in = 1    
         ORDER BY cnntr_id`;
@@ -147,7 +147,7 @@ exports.getStationConnectorsMdl = function(data) {
 * Arguments     : data object with connectorId
 ******************************************************************************/
 exports.getConnectorByIdMdl = function(data) {
-    const QRY_TO_EXEC = `SELECT * FROM station_connectors_t 
+    const QRY_TO_EXEC = `SELECT * FROM cnntr_lst_t 
         WHERE cnntr_id = ${data.connectorId} 
         AND a_in = 1 
         LIMIT 1`;
@@ -169,7 +169,7 @@ exports.getAvailableConnectorMdl = function(data) {
         whereClause += ` AND cnntr_typ_cd = '${connectorType}'`;
     }
     
-    const QRY_TO_EXEC = `SELECT * FROM station_connectors_t 
+    const QRY_TO_EXEC = `SELECT * FROM cnntr_lst_t 
         WHERE ${whereClause} 
         LIMIT 1`;
     
@@ -185,8 +185,8 @@ exports.getAvailableConnectorMdl = function(data) {
 exports.getUserFavoritesMdl = function(data) {
     const QRY_TO_EXEC = `
         SELECT s.*, f.i_ts as favorited_at
-        FROM user_favorite_stations_t f
-        JOIN charging_stations_t s ON f.sttn_id = s.sttn_id
+        FROM fvrt_lst_t f
+        JOIN sttn_lst_t s ON f.sttn_id = s.sttn_id
         WHERE f.usr_id = ${data.userId} AND f.a_in = 1 AND s.a_in = 1
         ORDER BY f.i_ts DESC
     `;
@@ -201,7 +201,7 @@ exports.getUserFavoritesMdl = function(data) {
 * Arguments     : data object with userId, stationId
 ******************************************************************************/
 exports.addFavoriteMdl = function(data) {
-    const QRY_TO_EXEC = `INSERT INTO user_favorite_stations_t 
+    const QRY_TO_EXEC = `INSERT INTO fvrt_lst_t 
         (usr_id, sttn_id, a_in) 
         VALUES 
         (${data.userId}, ${data.stationId}, 1)`;
@@ -216,7 +216,7 @@ exports.addFavoriteMdl = function(data) {
 * Arguments     : data object with userId, stationId
 ******************************************************************************/
 exports.removeFavoriteMdl = function(data) {
-    const QRY_TO_EXEC = `UPDATE user_favorite_stations_t 
+    const QRY_TO_EXEC = `UPDATE fvrt_lst_t 
         SET a_in = 0 
         WHERE usr_id = ${data.userId} 
         AND sttn_id = ${data.stationId}`;
@@ -231,7 +231,7 @@ exports.removeFavoriteMdl = function(data) {
 * Arguments     : data object with userId, stationId
 ******************************************************************************/
 exports.isFavoriteMdl = function(data) {
-    const QRY_TO_EXEC = `SELECT * FROM user_favorite_stations_t 
+    const QRY_TO_EXEC = `SELECT * FROM fvrt_lst_t 
         WHERE usr_id = ${data.userId} 
         AND sttn_id = ${data.stationId} 
         AND a_in = 1 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * User Statistics Model
  * Handles user statistics and analytics
  */
@@ -7,7 +7,7 @@ const BaseModel = require('./baseModel');
 
 class UserStatisticsModel extends BaseModel {
     constructor() {
-        super('user_statistics_t');
+        super('stt_lst_t');
     }
 
     /**
@@ -52,7 +52,7 @@ class UserStatisticsModel extends BaseModel {
                     COALESCE(SUM(enrgy_cnsmd_kwh * 0.82), 0) as co2_saved,
                     COALESCE(AVG(durn_mnts_nbr), 0) as avg_duration,
                     COALESCE(AVG(ttl_cst_amt), 0) as avg_cost
-                FROM charging_sessions_t
+                FROM sssn_lst_t
                 WHERE usr_id = 1
                   AND sttus_cd = 'completed'
                   AND a_in = 1
@@ -79,7 +79,7 @@ class UserStatisticsModel extends BaseModel {
                     COUNT(sssn_id) as sessions,
                     COALESCE(SUM(enrgy_cnsmd_kwh), 0) as energy,
                     COALESCE(SUM(ttl_cst_amt), 0) as cost
-                FROM charging_sessions_t
+                FROM sssn_lst_t
                 WHERE usr_id = ${userId}
                   AND sttus_cd = 'completed'
                   AND i_ts >= DATE_SUB(NOW(), INTERVAL ${months} MONTH)
@@ -106,7 +106,7 @@ class UserStatisticsModel extends BaseModel {
                 SELECT 
                     DAYNAME(i_ts) as day,
                     COUNT(sssn_id) as sessions
-                FROM charging_sessions_t
+                FROM sssn_lst_t
                 WHERE usr_id = ${userId}
                   AND sttus_cd = 'completed'
                   AND i_ts >= DATE_SUB(NOW(), INTERVAL 7 DAY)
@@ -133,11 +133,11 @@ class UserStatisticsModel extends BaseModel {
                     s.sttn_nm_tx as name,
                     COUNT(cs.sssn_id) as sessions,
                     ROUND((COUNT(cs.sssn_id) * 100.0 / (
-                        SELECT COUNT(*) FROM charging_sessions_t 
+                        SELECT COUNT(*) FROM sssn_lst_t 
                         WHERE usr_id = ${userId} AND sttus_cd = 'completed' AND a_in = 1
                     )), 0) as percentage
-                FROM charging_sessions_t cs
-                JOIN charging_stations_t s ON cs.sttn_id = s.sttn_id
+                FROM sssn_lst_t cs
+                JOIN sttn_lst_t s ON cs.sttn_id = s.sttn_id
                 WHERE cs.usr_id = ${userId}
                   AND cs.sttus_cd = 'completed'
                   AND cs.a_in = 1

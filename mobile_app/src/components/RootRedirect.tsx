@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { authService } from '../services/api';
 
 export default function RootRedirect() {
   const navigate = useNavigate();
@@ -10,8 +11,8 @@ export default function RootRedirect() {
     const user = localStorage.getItem('user');
 
     if (token && user) {
-      // User is logged in, redirect to home
-      navigate('/home', { replace: true });
+      // User is logged in — route to the area for their role
+      navigate(authService.homeRouteForRole(), { replace: true });
     } else {
       // User is not logged in, redirect to login
       navigate('/login', { replace: true });
@@ -25,15 +26,15 @@ export default function RootRedirect() {
       alignItems: 'center',
       justifyContent: 'center',
       minHeight: '100vh',
-      backgroundColor: '#F0FDF4',
-      color: '#14532D'
+      backgroundColor: '#0B1220',
+      color: '#E2E8F0'
     }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{
           width: '3rem',
           height: '3rem',
-          border: '3px solid #E5E7EB',
-          borderTopColor: '#16A34A',
+          border: '3px solid rgba(148,163,184,0.25)',
+          borderTopColor: '#22D3EE',
           borderRadius: '50%',
           animation: 'spin 0.8s linear infinite',
           margin: '0 auto 1rem'

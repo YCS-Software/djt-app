@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/api';
-import { User, Mail, Phone, ArrowRight, ArrowLeft, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import type { UserRole } from '../services/api/authService';
+import { User, Mail, Phone, ArrowRight, ArrowLeft, Loader2, CheckCircle2, AlertCircle, Car, Building2 } from 'lucide-react';
 import djtLogo from '../assets/logos/djt_logo.png';
 import './Signup.css';
+import './signup-role.css';
 
 const Signup = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState<'details' | 'otp'>('details');
+  const [role, setRole] = useState<UserRole>('customer');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -121,21 +124,22 @@ const Signup = () => {
         const registerResponse = await authService.register({
           phone: formData.phone,
           name: formData.name,
-          email: formData.email || null
+          email: formData.email || null,
+          userType: role
         });
 
         if (registerResponse.status === 200) {
           setSuccess('Account created successfully!');
-          
-          // Save token and redirect
+
+          // Save token (consistent key) and redirect based on role
           if (registerResponse.data.token) {
-            localStorage.setItem('token', registerResponse.data.token);
-            localStorage.setItem('user', JSON.stringify(registerResponse.data.user));
+            authService.saveSession(registerResponse.data.token, registerResponse.data.user);
           }
 
+          const dest = registerResponse.data.user?.userType === 'owner' ? '/owner' : '/home';
           setTimeout(() => {
-            navigate('/home');
-          }, 1500);
+            navigate(dest, { replace: true });
+          }, 1200);
         } else {
           setError(registerResponse.message || 'Registration failed');
         }
@@ -183,6 +187,30 @@ const Signup = () => {
                 {error}
               </div>
             )}
+
+            <div className="role-group">
+              <label className="role-label">I am registering as</label>
+              <div className="role-options">
+                <button
+                  type="button"
+                  className={`role-card ${role === 'customer' ? 'active' : ''}`}
+                  onClick={() => setRole('customer')}
+                >
+                  <Car size={22} />
+                  <span className="role-title">EV Customer</span>
+                  <span className="role-desc">Find &amp; charge your vehicle</span>
+                </button>
+                <button
+                  type="button"
+                  className={`role-card ${role === 'owner' ? 'active' : ''}`}
+                  onClick={() => setRole('owner')}
+                >
+                  <Building2 size={22} />
+                  <span className="role-title">Station Owner</span>
+                  <span className="role-desc">List &amp; manage charging stations</span>
+                </button>
+              </div>
+            </div>
 
             <div className="form-group">
               <label htmlFor="name">Full Name *</label>

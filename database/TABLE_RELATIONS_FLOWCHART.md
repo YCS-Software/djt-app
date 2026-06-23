@@ -1,4 +1,4 @@
-# 📊 DATABASE TABLE RELATIONS FLOWCHART
+﻿# 📊 DATABASE TABLE RELATIONS FLOWCHART
 
 Complete visual representation of all table relationships in the EV Charging Station database.
 
@@ -8,38 +8,38 @@ Complete visual representation of all table relationships in the EV Charging Sta
 
 ```mermaid
 erDiagram
-    users_t ||--o{ user_tokens_t : "has"
-    users_t ||--|| wallet_t : "has"
-    users_t ||--o{ wallet_transactions_t : "makes"
-    users_t ||--|| user_statistics_t : "has"
-    users_t ||--|| user_preferences_t : "has"
-    users_t ||--o{ charging_sessions_t : "creates"
-    users_t ||--o{ station_bookings_t : "books"
-    users_t ||--o{ user_vehicles_t : "owns"
-    users_t ||--o{ notifications_t : "receives"
-    users_t ||--o{ station_reviews_t : "writes"
-    users_t ||--o{ user_favorite_stations_t : "favorites"
-    users_t ||--o{ user_offer_usage_t : "uses"
+    usr_lst_t ||--o{ tkn_lst_t : "has"
+    usr_lst_t ||--|| wllt_lst_t : "has"
+    usr_lst_t ||--o{ trxn_lst_t : "makes"
+    usr_lst_t ||--|| stt_lst_t : "has"
+    usr_lst_t ||--|| prf_lst_t : "has"
+    usr_lst_t ||--o{ sssn_lst_t : "creates"
+    usr_lst_t ||--o{ bkng_lst_t : "books"
+    usr_lst_t ||--o{ vhcl_lst_t : "owns"
+    usr_lst_t ||--o{ ntfctn_lst_t : "receives"
+    usr_lst_t ||--o{ rvw_lst_t : "writes"
+    usr_lst_t ||--o{ fvrt_lst_t : "favorites"
+    usr_lst_t ||--o{ usg_lst_t : "uses"
     
-    wallet_t ||--o{ wallet_transactions_t : "contains"
+    wllt_lst_t ||--o{ trxn_lst_t : "contains"
     
-    charging_stations_t ||--o{ station_connectors_t : "has"
-    charging_stations_t ||--o{ charging_sessions_t : "hosts"
-    charging_stations_t ||--o{ station_bookings_t : "receives"
-    charging_stations_t ||--o{ station_reviews_t : "receives"
-    charging_stations_t ||--o{ user_favorite_stations_t : "favorited_by"
+    sttn_lst_t ||--o{ cnntr_lst_t : "has"
+    sttn_lst_t ||--o{ sssn_lst_t : "hosts"
+    sttn_lst_t ||--o{ bkng_lst_t : "receives"
+    sttn_lst_t ||--o{ rvw_lst_t : "receives"
+    sttn_lst_t ||--o{ fvrt_lst_t : "favorited_by"
     
-    station_connectors_t ||--o{ charging_sessions_t : "used_in"
-    station_connectors_t ||--o{ station_bookings_t : "booked_for"
+    cnntr_lst_t ||--o{ sssn_lst_t : "used_in"
+    cnntr_lst_t ||--o{ bkng_lst_t : "booked_for"
     
-    charging_sessions_t ||--o{ charging_session_logs_t : "generates"
-    charging_sessions_t ||--o| wallet_transactions_t : "paid_via"
-    charging_sessions_t ||--o{ station_reviews_t : "reviewed_in"
-    charging_sessions_t ||--o{ user_offer_usage_t : "applies"
+    sssn_lst_t ||--o{ sssn_log_lst_t : "generates"
+    sssn_lst_t ||--o| trxn_lst_t : "paid_via"
+    sssn_lst_t ||--o{ rvw_lst_t : "reviewed_in"
+    sssn_lst_t ||--o{ usg_lst_t : "applies"
     
-    offers_t ||--o{ user_offer_usage_t : "applied_in"
+    offr_lst_t ||--o{ usg_lst_t : "applied_in"
     
-    users_t {
+    usr_lst_t {
         int usr_id PK
         varchar phn_nmbr_tx UK
         varchar eml_tx UK
@@ -48,13 +48,13 @@ erDiagram
         varchar usr_typ_cd
     }
     
-    wallet_t {
+    wllt_lst_t {
         int wllt_id PK
         int usr_id FK
         decimal blnce_amt
     }
     
-    wallet_transactions_t {
+    trxn_lst_t {
         int trxn_id PK
         int wllt_id FK
         int usr_id FK
@@ -62,7 +62,7 @@ erDiagram
         decimal amt
     }
     
-    charging_stations_t {
+    sttn_lst_t {
         int sttn_id PK
         varchar sttn_cd UK
         varchar sttn_nm_tx
@@ -71,7 +71,7 @@ erDiagram
         decimal prce_per_kwh_amt
     }
     
-    charging_sessions_t {
+    sssn_lst_t {
         int sssn_id PK
         varchar sssn_cd UK
         int usr_id FK
@@ -88,31 +88,31 @@ erDiagram
 
 | Parent Table | Child Table | Relationship Type | Foreign Key | Cascade |
 |--------------|-------------|-------------------|-------------|---------|
-| **users_t** | user_tokens_t | One-to-Many | usr_id | CASCADE |
-| **users_t** | wallet_t | One-to-One | usr_id | CASCADE |
-| **users_t** | wallet_transactions_t | One-to-Many | usr_id | CASCADE |
-| **users_t** | user_statistics_t | One-to-One | usr_id | CASCADE |
-| **users_t** | user_preferences_t | One-to-One | usr_id | CASCADE |
-| **users_t** | charging_sessions_t | One-to-Many | usr_id | CASCADE |
-| **users_t** | station_bookings_t | One-to-Many | usr_id | CASCADE |
-| **users_t** | user_vehicles_t | One-to-Many | usr_id | CASCADE |
-| **users_t** | notifications_t | One-to-Many | usr_id | CASCADE |
-| **users_t** | station_reviews_t | One-to-Many | usr_id | CASCADE |
-| **users_t** | user_favorite_stations_t | Many-to-Many | usr_id | CASCADE |
-| **users_t** | user_offer_usage_t | One-to-Many | usr_id | CASCADE |
-| **wallet_t** | wallet_transactions_t | One-to-Many | wllt_id | CASCADE |
-| **charging_stations_t** | station_connectors_t | One-to-Many | sttn_id | CASCADE |
-| **charging_stations_t** | charging_sessions_t | One-to-Many | sttn_id | CASCADE |
-| **charging_stations_t** | station_bookings_t | One-to-Many | sttn_id | CASCADE |
-| **charging_stations_t** | station_reviews_t | One-to-Many | sttn_id | CASCADE |
-| **charging_stations_t** | user_favorite_stations_t | Many-to-Many | sttn_id | CASCADE |
-| **station_connectors_t** | charging_sessions_t | One-to-Many | cnntr_id | - |
-| **station_connectors_t** | station_bookings_t | One-to-Many | cnntr_id | - |
-| **charging_sessions_t** | charging_session_logs_t | One-to-Many | sssn_id | CASCADE |
-| **charging_sessions_t** | wallet_transactions_t | One-to-One | wllt_trxn_id | - |
-| **charging_sessions_t** | station_reviews_t | One-to-Many | sssn_id | SET NULL |
-| **charging_sessions_t** | user_offer_usage_t | One-to-Many | sssn_id | - |
-| **offers_t** | user_offer_usage_t | One-to-Many | offr_id | CASCADE |
+| **usr_lst_t** | tkn_lst_t | One-to-Many | usr_id | CASCADE |
+| **usr_lst_t** | wllt_lst_t | One-to-One | usr_id | CASCADE |
+| **usr_lst_t** | trxn_lst_t | One-to-Many | usr_id | CASCADE |
+| **usr_lst_t** | stt_lst_t | One-to-One | usr_id | CASCADE |
+| **usr_lst_t** | prf_lst_t | One-to-One | usr_id | CASCADE |
+| **usr_lst_t** | sssn_lst_t | One-to-Many | usr_id | CASCADE |
+| **usr_lst_t** | bkng_lst_t | One-to-Many | usr_id | CASCADE |
+| **usr_lst_t** | vhcl_lst_t | One-to-Many | usr_id | CASCADE |
+| **usr_lst_t** | ntfctn_lst_t | One-to-Many | usr_id | CASCADE |
+| **usr_lst_t** | rvw_lst_t | One-to-Many | usr_id | CASCADE |
+| **usr_lst_t** | fvrt_lst_t | Many-to-Many | usr_id | CASCADE |
+| **usr_lst_t** | usg_lst_t | One-to-Many | usr_id | CASCADE |
+| **wllt_lst_t** | trxn_lst_t | One-to-Many | wllt_id | CASCADE |
+| **sttn_lst_t** | cnntr_lst_t | One-to-Many | sttn_id | CASCADE |
+| **sttn_lst_t** | sssn_lst_t | One-to-Many | sttn_id | CASCADE |
+| **sttn_lst_t** | bkng_lst_t | One-to-Many | sttn_id | CASCADE |
+| **sttn_lst_t** | rvw_lst_t | One-to-Many | sttn_id | CASCADE |
+| **sttn_lst_t** | fvrt_lst_t | Many-to-Many | sttn_id | CASCADE |
+| **cnntr_lst_t** | sssn_lst_t | One-to-Many | cnntr_id | - |
+| **cnntr_lst_t** | bkng_lst_t | One-to-Many | cnntr_id | - |
+| **sssn_lst_t** | sssn_log_lst_t | One-to-Many | sssn_id | CASCADE |
+| **sssn_lst_t** | trxn_lst_t | One-to-One | wllt_trxn_id | - |
+| **sssn_lst_t** | rvw_lst_t | One-to-Many | sssn_id | SET NULL |
+| **sssn_lst_t** | usg_lst_t | One-to-Many | sssn_id | - |
+| **offr_lst_t** | usg_lst_t | One-to-Many | offr_id | CASCADE |
 
 ---
 
@@ -124,7 +124,7 @@ erDiagram
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────┐
-│  users_t    │ ◄─── Central Hub Table
+│  usr_lst_t    │ ◄─── Central Hub Table
 │  (usr_id)   │
 └──────┬──────┘
        │
@@ -132,53 +132,53 @@ erDiagram
        │                                                           │
        │  ONE-TO-ONE RELATIONSHIPS                                 │
        │                                                           │
-       ├──► wallet_t (usr_id) ──┐                                 │
+       ├──► wllt_lst_t (usr_id) ──┐                                 │
        │                         │                                 │
-       ├──► user_statistics_t (usr_id)                            │
+       ├──► stt_lst_t (usr_id)                            │
        │                                                           │
-       ├──► user_preferences_t (usr_id)                           │
+       ├──► prf_lst_t (usr_id)                           │
        │                                                           │
        │  ONE-TO-MANY RELATIONSHIPS                                │
        │                                                           │
-       ├──► user_tokens_t (usr_id)                                │
+       ├──► tkn_lst_t (usr_id)                                │
        │                                                           │
-       ├──► wallet_transactions_t (usr_id)                        │
-       │    └──► wallet_t (wllt_id)                               │
+       ├──► trxn_lst_t (usr_id)                        │
+       │    └──► wllt_lst_t (wllt_id)                               │
        │                                                           │
-       ├──► charging_sessions_t (usr_id)                          │
-       │    ├──► charging_stations_t (sttn_id)                    │
-       │    ├──► station_connectors_t (cnntr_id)                  │
-       │    ├──► wallet_transactions_t (wllt_trxn_id)             │
-       │    └──► charging_session_logs_t (sssn_id)                │
+       ├──► sssn_lst_t (usr_id)                          │
+       │    ├──► sttn_lst_t (sttn_id)                    │
+       │    ├──► cnntr_lst_t (cnntr_id)                  │
+       │    ├──► trxn_lst_t (wllt_trxn_id)             │
+       │    └──► sssn_log_lst_t (sssn_id)                │
        │                                                           │
-       ├──► station_bookings_t (usr_id)                           │
-       │    ├──► charging_stations_t (sttn_id)                    │
-       │    └──► station_connectors_t (cnntr_id)                  │
+       ├──► bkng_lst_t (usr_id)                           │
+       │    ├──► sttn_lst_t (sttn_id)                    │
+       │    └──► cnntr_lst_t (cnntr_id)                  │
        │                                                           │
-       ├──► user_vehicles_t (usr_id)                              │
+       ├──► vhcl_lst_t (usr_id)                              │
        │                                                           │
-       ├──► notifications_t (usr_id)                              │
+       ├──► ntfctn_lst_t (usr_id)                              │
        │                                                           │
-       ├──► station_reviews_t (usr_id)                             │
-       │    ├──► charging_stations_t (sttn_id)                    │
-       │    └──► charging_sessions_t (sssn_id)                     │
+       ├──► rvw_lst_t (usr_id)                             │
+       │    ├──► sttn_lst_t (sttn_id)                    │
+       │    └──► sssn_lst_t (sssn_id)                     │
        │                                                           │
-       ├──► user_offer_usage_t (usr_id)                            │
-       │    ├──► offers_t (offr_id)                                │
-       │    └──► charging_sessions_t (sssn_id)                     │
+       ├──► usg_lst_t (usr_id)                            │
+       │    ├──► offr_lst_t (offr_id)                                │
+       │    └──► sssn_lst_t (sssn_id)                     │
        │                                                           │
        │  MANY-TO-MANY RELATIONSHIPS                                │
        │                                                           │
-       └──► user_favorite_stations_t (usr_id)                      │
-            └──► charging_stations_t (sttn_id)                    │
+       └──► fvrt_lst_t (usr_id)                      │
+            └──► sttn_lst_t (sttn_id)                    │
                                                                    │
 ┌──────────────────────────────────────────────────────────────────┘
 │
 │  STANDALONE TABLES
 │
-├──► auth_otp_t (no FK, linked by phn_nmbr_tx)
-├──► audit_logs_t (usr_id nullable, no FK constraint)
-└──► app_settings_t (no relationships)
+├──► otp_lst_t (no FK, linked by phn_nmbr_tx)
+├──► audt_lst_t (usr_id nullable, no FK constraint)
+└──► sttng_lst_t (no relationships)
 ```
 
 ---
@@ -188,24 +188,24 @@ erDiagram
 ### **Level 1: User Core**
 ```
                     ┌──────────────┐
-                    │   users_t     │
+                    │   usr_lst_t     │
                     │  (usr_id)     │
                     └───────┬───────┘
                             │
         ┌───────────────────┼───────────────────┐
         │                   │                   │
    ┌────▼────┐        ┌─────▼─────┐      ┌─────▼─────┐
-   │ wallet_t│        │user_stats_t│      │user_prefs_t│
+   │ wllt_lst_t│        │user_stats_t│      │user_prefs_t│
    │(wllt_id)│        │  (stt_id)  │      │  (prf_id)  │
    └────┬────┘        └────────────┘      └────────────┘
         │
-        └──► wallet_transactions_t
+        └──► trxn_lst_t
 ```
 
 ### **Level 2: Charging Infrastructure**
 ```
 ┌──────────────────────┐
-│ charging_stations_t  │
+│ sttn_lst_t  │
 │     (sttn_id)        │
 └──────────┬───────────┘
            │
@@ -226,31 +226,31 @@ erDiagram
 
 ### **Level 3: User Activities**
 ```
-users_t
+usr_lst_t
    │
-   ├──► charging_sessions_t ──► charging_session_logs_t
+   ├──► sssn_lst_t ──► sssn_log_lst_t
    │         │
-   │         └──► wallet_transactions_t
+   │         └──► trxn_lst_t
    │
-   ├──► station_bookings_t
+   ├──► bkng_lst_t
    │
-   ├──► user_vehicles_t
+   ├──► vhcl_lst_t
    │
-   ├──► station_reviews_t
+   ├──► rvw_lst_t
    │
-   ├──► notifications_t
+   ├──► ntfctn_lst_t
    │
-   └──► user_favorite_stations_t ──► charging_stations_t
+   └──► fvrt_lst_t ──► sttn_lst_t
 ```
 
 ### **Level 4: Offers & Rewards**
 ```
-offers_t (offr_id)
+offr_lst_t (offr_id)
    │
-   └──► user_offer_usage_t
+   └──► usg_lst_t
             │
-            ├──► users_t (usr_id)
-            └──► charging_sessions_t (sssn_id)
+            ├──► usr_lst_t (usr_id)
+            └──► sssn_lst_t (sssn_id)
 ```
 
 ---
@@ -258,34 +258,34 @@ offers_t (offr_id)
 ## 📊 RELATIONSHIP TYPES BREAKDOWN
 
 ### **1. One-to-One (1:1)**
-- `users_t` → `wallet_t` (Each user has exactly one wallet)
-- `users_t` → `user_statistics_t` (Each user has one statistics record)
-- `users_t` → `user_preferences_t` (Each user has one preferences record)
-- `charging_sessions_t` → `wallet_transactions_t` (Each session has one payment transaction)
+- `usr_lst_t` → `wllt_lst_t` (Each user has exactly one wallet)
+- `usr_lst_t` → `stt_lst_t` (Each user has one statistics record)
+- `usr_lst_t` → `prf_lst_t` (Each user has one preferences record)
+- `sssn_lst_t` → `trxn_lst_t` (Each session has one payment transaction)
 
 ### **2. One-to-Many (1:N)**
-- `users_t` → `user_tokens_t` (User can have multiple tokens)
-- `users_t` → `wallet_transactions_t` (User can have multiple transactions)
-- `users_t` → `charging_sessions_t` (User can have multiple sessions)
-- `users_t` → `station_bookings_t` (User can have multiple bookings)
-- `users_t` → `user_vehicles_t` (User can have multiple vehicles)
-- `users_t` → `notifications_t` (User can have multiple notifications)
-- `users_t` → `station_reviews_t` (User can write multiple reviews)
-- `users_t` → `user_offer_usage_t` (User can use multiple offers)
-- `wallet_t` → `wallet_transactions_t` (Wallet can have multiple transactions)
-- `charging_stations_t` → `station_connectors_t` (Station can have multiple connectors)
-- `charging_stations_t` → `charging_sessions_t` (Station can host multiple sessions)
-- `charging_stations_t` → `station_bookings_t` (Station can receive multiple bookings)
-- `charging_stations_t` → `station_reviews_t` (Station can receive multiple reviews)
-- `station_connectors_t` → `charging_sessions_t` (Connector can be used in multiple sessions)
-- `station_connectors_t` → `station_bookings_t` (Connector can be booked multiple times)
-- `charging_sessions_t` → `charging_session_logs_t` (Session can have multiple logs)
-- `charging_sessions_t` → `station_reviews_t` (Session can have multiple reviews)
-- `charging_sessions_t` → `user_offer_usage_t` (Session can apply multiple offers)
-- `offers_t` → `user_offer_usage_t` (Offer can be used multiple times)
+- `usr_lst_t` → `tkn_lst_t` (User can have multiple tokens)
+- `usr_lst_t` → `trxn_lst_t` (User can have multiple transactions)
+- `usr_lst_t` → `sssn_lst_t` (User can have multiple sessions)
+- `usr_lst_t` → `bkng_lst_t` (User can have multiple bookings)
+- `usr_lst_t` → `vhcl_lst_t` (User can have multiple vehicles)
+- `usr_lst_t` → `ntfctn_lst_t` (User can have multiple notifications)
+- `usr_lst_t` → `rvw_lst_t` (User can write multiple reviews)
+- `usr_lst_t` → `usg_lst_t` (User can use multiple offers)
+- `wllt_lst_t` → `trxn_lst_t` (Wallet can have multiple transactions)
+- `sttn_lst_t` → `cnntr_lst_t` (Station can have multiple connectors)
+- `sttn_lst_t` → `sssn_lst_t` (Station can host multiple sessions)
+- `sttn_lst_t` → `bkng_lst_t` (Station can receive multiple bookings)
+- `sttn_lst_t` → `rvw_lst_t` (Station can receive multiple reviews)
+- `cnntr_lst_t` → `sssn_lst_t` (Connector can be used in multiple sessions)
+- `cnntr_lst_t` → `bkng_lst_t` (Connector can be booked multiple times)
+- `sssn_lst_t` → `sssn_log_lst_t` (Session can have multiple logs)
+- `sssn_lst_t` → `rvw_lst_t` (Session can have multiple reviews)
+- `sssn_lst_t` → `usg_lst_t` (Session can apply multiple offers)
+- `offr_lst_t` → `usg_lst_t` (Offer can be used multiple times)
 
 ### **3. Many-to-Many (M:N)**
-- `users_t` ↔ `charging_stations_t` via `user_favorite_stations_t`
+- `usr_lst_t` ↔ `sttn_lst_t` via `fvrt_lst_t`
   - A user can favorite multiple stations
   - A station can be favorited by multiple users
 
@@ -298,8 +298,8 @@ offers_t (offr_id)
 User creates → Wallet (auto-created) → Transactions (credit/debit)
 ```
 - When a user is created, a wallet is automatically created
-- All financial transactions are recorded in `wallet_transactions_t`
-- Transactions reference both `wallet_t` and `users_t`
+- All financial transactions are recorded in `trxn_lst_t`
+- Transactions reference both `wllt_lst_t` and `usr_lst_t`
 
 ### **User → Session → Payment**
 ```
@@ -339,41 +339,41 @@ Session completes → User reviews → Updates → Station rating & User stats
 
 ### **Example 1: User Registration & Wallet Setup**
 ```
-1. users_t (new user created)
+1. usr_lst_t (new user created)
    ↓
-2. wallet_t (auto-created with balance 0)
+2. wllt_lst_t (auto-created with balance 0)
    ↓
-3. user_preferences_t (default preferences set)
+3. prf_lst_t (default preferences set)
    ↓
-4. user_statistics_t (initialized with zeros)
+4. stt_lst_t (initialized with zeros)
 ```
 
 ### **Example 2: Charging Session Flow**
 ```
-1. users_t → charging_sessions_t (session initiated)
+1. usr_lst_t → sssn_lst_t (session initiated)
    ↓
-2. charging_sessions_t → station_connectors_t (connector reserved)
+2. sssn_lst_t → cnntr_lst_t (connector reserved)
    ↓
-3. charging_sessions_t → charging_session_logs_t (real-time updates)
+3. sssn_lst_t → sssn_log_lst_t (real-time updates)
    ↓
-4. charging_sessions_t → wallet_transactions_t (payment on completion)
+4. sssn_lst_t → trxn_lst_t (payment on completion)
    ↓
-5. wallet_transactions_t → wallet_t (balance updated)
+5. trxn_lst_t → wllt_lst_t (balance updated)
    ↓
-6. charging_sessions_t → user_statistics_t (stats updated via trigger)
+6. sssn_lst_t → stt_lst_t (stats updated via trigger)
    ↓
-7. charging_sessions_t → station_reviews_t (optional review)
+7. sssn_lst_t → rvw_lst_t (optional review)
 ```
 
 ### **Example 3: Offer Application**
 ```
-1. offers_t (active offer exists)
+1. offr_lst_t (active offer exists)
    ↓
-2. charging_sessions_t (session created)
+2. sssn_lst_t (session created)
    ↓
-3. user_offer_usage_t (offer applied to session)
+3. usg_lst_t (offer applied to session)
    ↓
-4. wallet_transactions_t (discount applied)
+4. trxn_lst_t (discount applied)
 ```
 
 ---
@@ -387,9 +387,9 @@ Session completes → User reviews → Updates → Station rating & User stats
    - User statistics aggregation
 4. **Indexes**: Foreign keys are indexed for performance
 5. **Standalone Tables**: 
-   - `auth_otp_t` - No FK, linked by phone number
-   - `audit_logs_t` - No FK constraint (usr_id nullable)
-   - `app_settings_t` - No relationships
+   - `otp_lst_t` - No FK, linked by phone number
+   - `audt_lst_t` - No FK constraint (usr_id nullable)
+   - `sttng_lst_t` - No relationships
 
 ---
 
@@ -397,28 +397,28 @@ Session completes → User reviews → Updates → Station rating & User stats
 
 ### **Get User with All Related Data**
 ```sql
-SELECT * FROM users_t u
-LEFT JOIN wallet_t w ON u.usr_id = w.usr_id
-LEFT JOIN user_statistics_t s ON u.usr_id = s.usr_id
-LEFT JOIN user_preferences_t p ON u.usr_id = p.usr_id
+SELECT * FROM usr_lst_t u
+LEFT JOIN wllt_lst_t w ON u.usr_id = w.usr_id
+LEFT JOIN stt_lst_t s ON u.usr_id = s.usr_id
+LEFT JOIN prf_lst_t p ON u.usr_id = p.usr_id
 WHERE u.usr_id = ?
 ```
 
 ### **Get Session with Full Details**
 ```sql
-SELECT * FROM charging_sessions_t s
-JOIN users_t u ON s.usr_id = u.usr_id
-JOIN charging_stations_t st ON s.sttn_id = st.sttn_id
-JOIN station_connectors_t c ON s.cnntr_id = c.cnntr_id
-LEFT JOIN wallet_transactions_t t ON s.wllt_trxn_id = t.trxn_id
+SELECT * FROM sssn_lst_t s
+JOIN usr_lst_t u ON s.usr_id = u.usr_id
+JOIN sttn_lst_t st ON s.sttn_id = st.sttn_id
+JOIN cnntr_lst_t c ON s.cnntr_id = c.cnntr_id
+LEFT JOIN trxn_lst_t t ON s.wllt_trxn_id = t.trxn_id
 WHERE s.sssn_id = ?
 ```
 
 ### **Get Station with All Related Data**
 ```sql
-SELECT * FROM charging_stations_t st
-LEFT JOIN station_connectors_t c ON st.sttn_id = c.sttn_id
-LEFT JOIN station_reviews_t r ON st.sttn_id = r.sttn_id
+SELECT * FROM sttn_lst_t st
+LEFT JOIN cnntr_lst_t c ON st.sttn_id = c.sttn_id
+LEFT JOIN rvw_lst_t r ON st.sttn_id = r.sttn_id
 WHERE st.sttn_id = ?
 ```
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * User Model
  * Handles user-related database operations
  */
@@ -7,7 +7,7 @@ const BaseModel = require('./baseModel');
 
 class UserModel extends BaseModel {
     constructor() {
-        super('users_t'); // Table name
+        super('usr_lst_t'); // Table name
     }
 
     /**

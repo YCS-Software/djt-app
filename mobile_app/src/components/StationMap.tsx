@@ -3,7 +3,8 @@ import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap, CircleMarker 
 import { Icon, DivIcon } from 'leaflet';
 import type { LatLngExpression } from 'leaflet';
 import L from 'leaflet';
-import { Navigation, X, Clock, Route, Play, Square, RotateCcw, AlertCircle, CheckCircle } from 'lucide-react';
+import { Navigation, X, Clock, Route, Play, Square, RotateCcw, AlertCircle, CheckCircle, Volume2, VolumeX, ExternalLink } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import 'leaflet/dist/leaflet.css';
 import './StationMap.css';
 import {
@@ -171,6 +172,45 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
   const locationWatchId = useRef<number | null>(null);
   const routeCheckInterval = useRef<NodeJS.Timeout | null>(null);
   const mapRef = useRef<L.Map | null>(null);
+
+  // Voice turn-by-turn
+  const [voiceOn, setVoiceOn] = useState(true);
+  const lastSpokenRef = useRef<string>('');
+
+  const speak = useCallback((text: string) => {
+    if (!voiceOn || !text) return;
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 1;
+      u.lang = 'en-IN';
+      window.speechSynthesis.speak(u);
+    } catch {
+      /* ignore speech errors */
+    }
+  }, [voiceOn]);
+
+  // Open the route in Google Maps (native app turn-by-turn when available)
+  const openInGoogleMaps = useCallback(() => {
+    const dLat = station.latitude;
+    const dLng = station.longitude;
+    const o = currentLocation
+      ? `&origin=${currentLocation.latitude},${currentLocation.longitude}`
+      : '';
+    try {
+      if (Capacitor.isNativePlatform()) {
+        window.open(`google.navigation:q=${dLat},${dLng}&mode=d`, '_system');
+        return;
+      }
+    } catch {
+      /* fall through to web */
+    }
+    window.open(
+      `https://www.google.com/maps/dir/?api=1${o}&destination=${dLat},${dLng}&travelmode=driving`,
+      '_blank'
+    );
+  }, [station.latitude, station.longitude, currentLocation]);
   
   const handleMapReady = useCallback((map: L.Map) => {
     mapRef.current = map;
@@ -364,23 +404,40 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
   const startNavigation = useCallback(() => {
     setIsNavigating(true);
     startLocationTracking();
+    // Announce the first instruction immediately
+    const first = selectedRoute?.steps?.[0]?.instruction || 'Starting navigation';
+    lastSpokenRef.current = first;
+    speak(first);
 
     routeCheckInterval.current = setInterval(() => {
       if (currentLocation && selectedRoute) {
         updateNavigationState(currentLocation);
       }
     }, 5000);
-  }, [currentLocation, selectedRoute, startLocationTracking, updateNavigationState]);
+  }, [currentLocation, selectedRoute, startLocationTracking, updateNavigationState, speak]);
 
   // Stop navigation
   const stopNavigation = useCallback(() => {
     setIsNavigating(false);
     stopLocationTracking();
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
     if (routeCheckInterval.current) {
       clearInterval(routeCheckInterval.current);
       routeCheckInterval.current = null;
     }
   }, [stopLocationTracking]);
+
+  // Speak each new turn instruction as it changes during navigation
+  useEffect(() => {
+    if (!isNavigating) return;
+    const instr = navState.currentInstruction;
+    if (instr && instr !== lastSpokenRef.current && instr !== 'Calculating route...') {
+      lastSpokenRef.current = instr;
+      speak(instr);
+    }
+  }, [isNavigating, navState.currentStepIndex, navState.currentInstruction, speak]);
 
   // Re-center map
   const recenterMap = useCallback(() => {
@@ -449,9 +506,12 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
             scrollWheelZoom={!isNavigating}
             zoomControl={!isNavigating}
           >
+            {/* Google Maps roadmap tiles (lyrs=m) — matches the reference app layer */}
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; Google Maps'
+              url="https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+              subdomains={['mt0', 'mt1', 'mt2', 'mt3']}
+              maxZoom={20}
             />
 
             {/* Start location marker (red pin) */}
@@ -617,6 +677,10 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
               <Play size={18} />
               <span>Start Navigation</span>
             </button>
+            <button className="gmaps-btn" onClick={openInGoogleMaps}>
+              <ExternalLink size={16} />
+              <span>Open in Google Maps</span>
+            </button>
           </div>
         ) : (
           <div className="navigation-panel">
@@ -666,6 +730,23 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
               <button className="nav-action-btn secondary" onClick={handleReroute}>
                 <RotateCcw size={18} />
                 <span>Reroute</span>
+              </button>
+              <button
+                className={`nav-action-btn secondary ${voiceOn ? 'voice-on' : ''}`}
+                onClick={() => {
+                  if (voiceOn && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                  }
+                  setVoiceOn((v) => !v);
+                }}
+                title={voiceOn ? 'Mute voice' : 'Unmute voice'}
+              >
+                {voiceOn ? <Volume2 size={18} /> : <VolumeX size={18} />}
+                <span>{voiceOn ? 'Voice' : 'Muted'}</span>
+              </button>
+              <button className="nav-action-btn secondary" onClick={openInGoogleMaps} title="Open in Google Maps">
+                <ExternalLink size={18} />
+                <span>Maps</span>
               </button>
             </div>
           </div>

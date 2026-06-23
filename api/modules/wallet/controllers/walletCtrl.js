@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Wallet Controller
  * Handles wallet and transaction operations
  */
@@ -158,7 +158,7 @@ function processAddMoney(wallet, userId, amount, currentBalance, payment_method,
                 throw new Error(`Balance mismatch: expected ${balanceAfter}, got ${actualBalance}`);
             }
             
-            // Create transaction record in wallet_transactions_t
+            // Create transaction record in trxn_lst_t
             return walletMdl.createTransactionMdl({
                 walletId: wallet.wllt_id,
                 userId: userId,
@@ -235,7 +235,7 @@ function processAddMoneyForNewWallet(wallet, userId, amount, payment_method, pay
     const balanceAfter = parseFloat(amount);
     let transactionInsertId = null;
     
-    // Create transaction record in wallet_transactions_t (wallet balance already set during creation)
+    // Create transaction record in trxn_lst_t (wallet balance already set during creation)
     return walletMdl.createTransactionMdl({
         walletId: wallet.wllt_id,
         userId: userId,

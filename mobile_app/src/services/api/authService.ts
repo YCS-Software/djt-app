@@ -39,10 +39,13 @@ export interface VerifyOTPResponse {
   };
 }
 
+export type UserRole = 'customer' | 'owner';
+
 export interface RegisterRequest {
   phone: string;
   name: string;
   email?: string | null;
+  userType?: UserRole;
 }
 
 export interface RegisterResponse {
@@ -95,10 +98,21 @@ export const authService = {
   },
 
   /**
+   * Persist auth session (single source of truth for the token key)
+   */
+  saveSession: (token: string, user: any) => {
+    localStorage.setItem('x-access-token', token);
+    localStorage.setItem('user', JSON.stringify(user));
+    // clean up the legacy key that an older signup flow used
+    localStorage.removeItem('token');
+  },
+
+  /**
    * Logout user
    */
   logout: () => {
     localStorage.removeItem('x-access-token');
+    localStorage.removeItem('token');
     localStorage.removeItem('user');
   },
 
@@ -115,5 +129,25 @@ export const authService = {
   getCurrentUser: () => {
     const userStr = localStorage.getItem('user');
     return userStr ? JSON.parse(userStr) : null;
+  },
+
+  /**
+   * Get the current user's role ('customer' | 'owner'), defaulting to 'customer'
+   */
+  getRole: (): UserRole => {
+    try {
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      return user?.userType === 'owner' ? 'owner' : 'customer';
+    } catch {
+      return 'customer';
+    }
+  },
+
+  /**
+   * Landing route for the current role
+   */
+  homeRouteForRole: (): string => {
+    return authService.getRole() === 'owner' ? '/owner' : '/home';
   },
 };

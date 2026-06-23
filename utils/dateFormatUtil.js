@@ -119,6 +119,18 @@ exports.formatErrorRes = function(res, error, cntxtDtls, fnm, options) {
 };
 
 /**
+ * Format a date to an ISO-8601 string (used for API timestamps like last_updated)
+ * @param {Date|String} date - Date value
+ * @returns {String|null} - ISO string, or null if invalid/empty
+ */
+exports.formatDate = function(date) {
+    if (!date) return null;
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString();
+};
+
+/**
  * Format date to MySQL datetime format
  * @param {Date} date - Date object
  * @returns {String} - Formatted date string

@@ -1,4 +1,4 @@
-# Code Pattern Refactoring - Complete ✅
+﻿# Code Pattern Refactoring - Complete ✅
 
 ## 🎯 Objective
 
@@ -19,22 +19,22 @@ Following your pattern with individual exports for each database operation:
 
 ```javascript
 exports.storeOTPMdl = function(data) {
-    const QRY_TO_EXEC = `INSERT INTO auth_otp_t ...`;
+    const QRY_TO_EXEC = `INSERT INTO otp_lst_t ...`;
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
 };
 
 exports.verifyOTPMdl = function(data) {
-    const QRY_TO_EXEC = `SELECT * FROM auth_otp_t ...`;
+    const QRY_TO_EXEC = `SELECT * FROM otp_lst_t ...`;
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
 };
 
 exports.findUserByPhoneMdl = function(data) {
-    const QRY_TO_EXEC = `SELECT * FROM users_t ...`;
+    const QRY_TO_EXEC = `SELECT * FROM usr_lst_t ...`;
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
 };
 
 exports.createUserMdl = function(data) {
-    const QRY_TO_EXEC = `INSERT INTO users_t ...`;
+    const QRY_TO_EXEC = `INSERT INTO usr_lst_t ...`;
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
 };
 ```
@@ -300,11 +300,11 @@ authAppMdl.updateUserProfileMdl({ userId, name, email, profileImage })
 
 3. Check if user exists
    └── authAppMdl.findUserByPhoneMdl({ phoneNumber })
-       └── SELECT * FROM users_t WHERE phn_nmbr_tx = '...'
+       └── SELECT * FROM usr_lst_t WHERE phn_nmbr_tx = '...'
 
 4. Store OTP
    └── authAppMdl.storeOTPMdl({ phoneNumber, otp, expiryMinutes })
-       └── INSERT INTO auth_otp_t (...)
+       └── INSERT INTO otp_lst_t (...)
 
 5. Return success
    └── df.formatSucessRes(req, res, { otpID, usr_id, ... })
@@ -326,7 +326,7 @@ authAppMdl.updateUserProfileMdl({ userId, name, email, profileImage })
 
 5. Create user
    └── authAppMdl.createUserMdl({ phone, name, email })
-       └── INSERT INTO users_t (...)
+       └── INSERT INTO usr_lst_t (...)
 
 6. Generate JWT token
    └── jwt.sign({ userId, phone, userType })

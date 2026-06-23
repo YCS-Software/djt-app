@@ -34,6 +34,12 @@ router.use('/wallet', require('./wallet/walletRtr'));
 // Charging station routes
 router.use('/stations', require('./stations/stationRtr'));
 
+// Owner routes (EV station owner: create stations, machines, connectors)
+router.use('/owner', require('./owner/ownerRtr'));
+
+// OCPP control routes (owner monitoring + remote start/stop of chargers)
+router.use('/ocpp', require('./ocpp/ocppRtr'));
+
 // Charging session routes
 router.use('/sessions', require('./sessions/sessionRtr'));
 

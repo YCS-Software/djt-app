@@ -106,9 +106,10 @@ const Login = () => {
         setSuccess('Login successful!');
         localStorage.setItem('x-access-token', response.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
-        
+
+        const dest = (response.data.user as any)?.userType === 'owner' ? '/owner' : '/home';
         setTimeout(() => {
-          navigate('/home');
+          navigate(dest, { replace: true });
         }, 500);
       } else {
         setError(response.message || 'Invalid OTP');

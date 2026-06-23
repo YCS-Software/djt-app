@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Charging Session Model
  * Handles charging session operations
  */
@@ -7,7 +7,7 @@ const BaseModel = require('./baseModel');
 
 class ChargingSessionModel extends BaseModel {
     constructor() {
-        super('charging_sessions_t');
+        super('sssn_lst_t');
     }
 
     /**
@@ -142,8 +142,8 @@ class ChargingSessionModel extends BaseModel {
                        st.addr_tx,
                        c.cnntr_typ_cd
                 FROM ${this.tableName} s
-                LEFT JOIN charging_stations_t st ON s.sttn_id = st.sttn_id
-                LEFT JOIN station_connectors_t c ON s.cnntr_id = c.cnntr_id
+                LEFT JOIN sttn_lst_t st ON s.sttn_id = st.sttn_id
+                LEFT JOIN cnntr_lst_t c ON s.cnntr_id = c.cnntr_id
                 WHERE ${whereClause}
                 ORDER BY s.i_ts DESC
                 LIMIT ${limit} OFFSET ${offset}
@@ -183,8 +183,8 @@ class ChargingSessionModel extends BaseModel {
                        c.cnntr_typ_cd,
                        c.pwr_tx
                 FROM ${this.tableName} s
-                LEFT JOIN charging_stations_t st ON s.sttn_id = st.sttn_id
-                LEFT JOIN station_connectors_t c ON s.cnntr_id = c.cnntr_id
+                LEFT JOIN sttn_lst_t st ON s.sttn_id = st.sttn_id
+                LEFT JOIN cnntr_lst_t c ON s.cnntr_id = c.cnntr_id
                 WHERE s.usr_id = ${userId} 
                   AND s.sttus_cd = 'active'
                   AND s.a_in = 1
@@ -222,7 +222,7 @@ class ChargingSessionModel extends BaseModel {
 
 class ChargingSessionLogModel extends BaseModel {
     constructor() {
-        super('charging_session_logs_t');
+        super('sssn_log_lst_t');
     }
 
     /**

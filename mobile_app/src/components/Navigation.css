@@ -9,9 +9,10 @@
   left: 0;
   right: 0;
   z-index: 50;
-  background: white;
-  border-top: 1px solid var(--ev-border-light);
-  box-shadow: 0 -4px 20px rgba(20, 83, 45, 0.08);
+  background: rgba(17, 27, 46, 0.92);
+  backdrop-filter: blur(14px);
+  border-top: 1px solid var(--ev-border);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
   padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
@@ -71,20 +72,20 @@
 .charging-icon-wrap {
   width: 3.5rem;
   height: 3.5rem;
-  background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
+  background: linear-gradient(135deg, #22D3EE 0%, #14B8A6 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4);
+  color: #06121A;
+  box-shadow: 0 4px 15px rgba(34, 211, 238, 0.4);
   transition: all 0.2s ease;
 }
 
 .nav-item.charging-tab:hover .charging-icon-wrap,
 .nav-item.charging-tab.active .charging-icon-wrap {
   transform: scale(1.05);
-  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.5);
+  box-shadow: 0 6px 20px rgba(34, 211, 238, 0.55);
 }
 
 .nav-item.charging-tab .nav-label {

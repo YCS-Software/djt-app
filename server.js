@@ -1,4 +1,5 @@
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const dotenv = require('dotenv');
@@ -48,11 +49,18 @@ async function startServer() {
     console.log('\n📊 Initializing database connection...');
     await sqldb.connect();
     
-    // Start Express server
-    app.listen(PORT, () => {
+    // Create an explicit HTTP server so the OCPP WebSocket server can attach to it
+    const server = http.createServer(app);
+
+    // Attach the OCPP 2.0.1 WebSocket server (charge points connect at /ocpp/<id>)
+    const { attachOcpp } = require('./api/ocpp/ocppServer');
+    attachOcpp(server);
+
+    server.listen(PORT, () => {
       console.log(`\n🚀 Server running on port ${PORT}`);
       console.log(`📱 Auth API available at http://localhost:${PORT}/api/auth`);
       console.log(`🏥 Health check at http://localhost:${PORT}/api/health`);
+      console.log(`🔌 OCPP WebSocket at ws://localhost:${PORT}/ocpp/<chargePointId>`);
       console.log(`💾 Database: ${process.env.DB_NAME} @ ${process.env.DB_HOST}\n`);
     });
   } catch (error) {

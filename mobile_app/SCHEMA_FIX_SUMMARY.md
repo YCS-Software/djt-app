@@ -1,4 +1,4 @@
-# Database Schema Fix - Complete Summary
+﻿# Database Schema Fix - Complete Summary
 
 ## ✅ Issue Analysis Complete
 
@@ -33,26 +33,26 @@ I checked all 20 tables in your schema against all model files and API controlle
 
 | Table | Columns Checked | Status |
 |-------|----------------|--------|
-| `users_t` | 12 columns | ✅ All Present |
-| `auth_otp_t` | 9 columns | ✅ All Present |
-| `user_tokens_t` | 8 columns | ✅ All Present |
-| `wallet_t` | 7 columns | ✅ All Present |
-| `wallet_transactions_t` | 14 columns | ✅ All Present |
-| `charging_stations_t` | 23 columns | ✅ All Present |
-| `station_connectors_t` | 8 columns | ✅ All Present |
-| `user_favorite_stations_t` | 5 columns | ✅ All Present |
-| `charging_sessions_t` | 18 columns | ✅ All Present |
-| `charging_session_logs_t` | 7 columns | ✅ All Present |
-| `station_bookings_t` | 13 columns | ✅ All Present |
-| `user_vehicles_t` | 12 columns | ✅ All Present |
-| `station_reviews_t` | 9 columns | ✅ All Present |
-| `notifications_t` | 10 columns | ✅ All Present |
-| `offers_t` | 12 columns | ✅ All Present |
-| `user_offer_usage_t` | 6 columns | ✅ All Present |
-| `user_statistics_t` | 9 columns | ✅ All Present |
-| `audit_logs_t` | 10 columns | ✅ All Present |
-| `app_settings_t` | 6 columns | ✅ All Present |
-| `user_preferences_t` | 7 columns | ✅ All Present |
+| `usr_lst_t` | 12 columns | ✅ All Present |
+| `otp_lst_t` | 9 columns | ✅ All Present |
+| `tkn_lst_t` | 8 columns | ✅ All Present |
+| `wllt_lst_t` | 7 columns | ✅ All Present |
+| `trxn_lst_t` | 14 columns | ✅ All Present |
+| `sttn_lst_t` | 23 columns | ✅ All Present |
+| `cnntr_lst_t` | 8 columns | ✅ All Present |
+| `fvrt_lst_t` | 5 columns | ✅ All Present |
+| `sssn_lst_t` | 18 columns | ✅ All Present |
+| `sssn_log_lst_t` | 7 columns | ✅ All Present |
+| `bkng_lst_t` | 13 columns | ✅ All Present |
+| `vhcl_lst_t` | 12 columns | ✅ All Present |
+| `rvw_lst_t` | 9 columns | ✅ All Present |
+| `ntfctn_lst_t` | 10 columns | ✅ All Present |
+| `offr_lst_t` | 12 columns | ✅ All Present |
+| `usg_lst_t` | 6 columns | ✅ All Present |
+| `stt_lst_t` | 9 columns | ✅ All Present |
+| `audt_lst_t` | 10 columns | ✅ All Present |
+| `sttng_lst_t` | 6 columns | ✅ All Present |
+| `prf_lst_t` | 7 columns | ✅ All Present |
 
 **Result:** ✅ **NO MISSING COLUMNS FOUND**
 
@@ -116,14 +116,14 @@ const query = `
 
 | Model File | Table Used | Status |
 |-----------|-----------|--------|
-| `authModel.js` | auth_otp_t | ✅ FIXED |
-| `userModel.js` | users_t | ✅ Verified |
-| `walletModel.js` | wallet_t, wallet_transactions_t | ✅ Verified |
-| `stationModel.js` | charging_stations_t, station_connectors_t, user_favorite_stations_t | ✅ Verified |
-| `sessionModel.js` | charging_sessions_t, charging_session_logs_t | ✅ Verified |
-| `bookingModel.js` | station_bookings_t | ✅ Verified |
-| `vehicleModel.js` | user_vehicles_t | ✅ Verified |
-| `statisticsModel.js` | user_statistics_t | ✅ Verified |
+| `authModel.js` | otp_lst_t | ✅ FIXED |
+| `userModel.js` | usr_lst_t | ✅ Verified |
+| `walletModel.js` | wllt_lst_t, trxn_lst_t | ✅ Verified |
+| `stationModel.js` | sttn_lst_t, cnntr_lst_t, fvrt_lst_t | ✅ Verified |
+| `sessionModel.js` | sssn_lst_t, sssn_log_lst_t | ✅ Verified |
+| `bookingModel.js` | bkng_lst_t | ✅ Verified |
+| `vehicleModel.js` | vhcl_lst_t | ✅ Verified |
+| `statisticsModel.js` | stt_lst_t | ✅ Verified |
 
 ---
 

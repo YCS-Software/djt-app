@@ -49,12 +49,27 @@ module.exports = {
    * Check if user has admin role
    */
   isAdmin: (req, res, next) => {
-    if (req.user && req.user.role === 'admin') {
+    if (req.user && req.user.userType === 'admin') {
       next();
     } else {
       return res.status(std.message["FORBIDDEN"].code).json({
         status: std.message["FORBIDDEN"].code,
         message: 'Admin access required',
+        data: null
+      });
+    }
+  },
+
+  /**
+   * Check if user is an EV station owner (or admin)
+   */
+  isOwner: (req, res, next) => {
+    if (req.user && (req.user.userType === 'owner' || req.user.userType === 'admin')) {
+      next();
+    } else {
+      return res.status(std.message["FORBIDDEN"].code).json({
+        status: std.message["FORBIDDEN"].code,
+        message: 'Station owner access required',
         data: null
       });
     }

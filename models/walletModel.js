@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Wallet Model
  * Handles wallet and transaction operations
  */
@@ -7,7 +7,7 @@ const BaseModel = require('./baseModel');
 
 class WalletModel extends BaseModel {
     constructor() {
-        super('wallet_t');
+        super('wllt_lst_t');
     }
 
     /**
@@ -107,7 +107,7 @@ class WalletModel extends BaseModel {
 
 class WalletTransactionModel extends BaseModel {
     constructor() {
-        super('wallet_transactions_t');
+        super('trxn_lst_t');
     }
 
     /**
