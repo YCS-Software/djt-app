@@ -10,6 +10,9 @@ const accessCtrl = require('../../modules/auth/validators/accessCtrl');
 // All routes require authentication
 router.use(accessCtrl.verifyToken);
 
+// POST /api/sessions/scan - Resolve a scanned machine QR → station + connector
+router.post('/scan', sessionCtrl.scanQr);
+
 // POST /api/sessions/start - Start charging session
 router.post('/start', sessionCtrl.startSession);
 

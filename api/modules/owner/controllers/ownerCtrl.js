@@ -8,6 +8,7 @@ const ownerMdl = require('../models/ownerMdl');
 const std = require(appRoot + '/utils/standardMessages');
 const df = require(appRoot + '/utils/dateFormatUtil');
 const config = require(appRoot + '/config/config');
+const qrUtil = require(appRoot + '/utils/qrUtil');
 const cntxtDtls = "ownerCtrl";
 
 // Generate a reasonably-unique station code, e.g. DJT-LZ4F9K2
@@ -120,6 +121,367 @@ exports.getDashboard = function(req, res) {
         })
         .catch(function(error) {
             console.error('[ownerCtrl] getDashboard error:', error);
+            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+        });
+};
+
+/*****************************************************************************
+* Function      : getAnalytics
+* Description   : Rich owner dashboard analytics — today vs yesterday revenue &
+*                 consumption (+ hourly series), this-month totals, station
+*                 status breakdown, and recent transactions.
+******************************************************************************/
+exports.getAnalytics = function(req, res) {
+    const fnm = "getAnalytics";
+    const ownerId = req.user.userId;
+
+    // Day-over-day % change, with sane handling of a zero baseline
+    function trend(curr, prev) {
+        curr = Number(curr) || 0; prev = Number(prev) || 0;
+        if (prev === 0) return curr > 0 ? 100 : 0;
+        return Math.round(((curr - prev) / prev) * 1000) / 10;
+    }
+
+    Promise.all([
+        ownerMdl.getOwnerTodayTotalsMdl({ ownerId }),
+        ownerMdl.getOwnerMonthTotalsMdl({ ownerId }),
+        ownerMdl.getOwnerHourlySeriesMdl({ ownerId }),
+        ownerMdl.getOwnerStationStatusMdl({ ownerId }),
+        ownerMdl.getOwnerRecentTxnsMdl({ ownerId, limit: 8 }),
+        ownerMdl.getOwnerCountTrendsMdl({ ownerId }),
+        ownerMdl.getOwnerDashboardMdl({ ownerId })
+    ]).then(function(results) {
+        const t = (results[0] && results[0][0]) || {};
+        const mo = (results[1] && results[1][0]) || {};
+        const hourlyRows = results[2] || [];
+        const statusRows = results[3] || [];
+        const recentRows = results[4] || [];
+        const tr = (results[5] && results[5][0]) || {};
+        const counts = (results[6] && results[6][0]) || {};
+
+        const todayRevenue = Number(t.today_revenue) || 0;
+        const todayEnergy = Number(t.today_energy) || 0;
+        const monthRevenue = Number(mo.month_revenue) || 0;
+        const monthEnergy = Number(mo.month_energy) || 0;
+
+        // Fill 24 hourly buckets (00:00 .. 23:00) from the sparse query result
+        const byHour = {};
+        hourlyRows.forEach(function(r) { byHour[Number(r.hr)] = r; });
+        const hourly = [];
+        for (let h = 0; h < 24; h++) {
+            const row = byHour[h];
+            hourly.push({
+                hour: (h < 10 ? '0' + h : '' + h) + ':00',
+                revenue: row ? Number(row.revenue) || 0 : 0,
+                consumption: row ? Number(row.energy) || 0 : 0
+            });
+        }
+
+        // Classify each station's operational status from its machine rollup
+        const stationStatus = { active: 0, offline: 0, faulted: 0, maintenance: 0, total: statusRows.length };
+        statusRows.forEach(function(s) {
+            if (Number(s.faulted) > 0) stationStatus.faulted++;
+            else if (Number(s.maintenance) > 0) stationStatus.maintenance++;
+            else if (Number(s.active) > 0 && s.aprvl_sttus_cd === 'active') stationStatus.active++;
+            else stationStatus.offline++;
+        });
+
+        const totalStations = Number(counts.total_stations) || 0;
+        const totalMachines = Number(counts.total_machines) || 0;
+        const totalConnectors = Number(counts.total_connectors) || 0;
+        const availableMachines = Number(counts.available_machines) || 0;
+
+        const recent_transactions = recentRows.map(function(r) {
+            return {
+                code: r.sssn_cd,
+                station: r.sttn_nm_tx,
+                connector: r.cnntr_nm_tx || null,
+                energy_kwh: Number(r.enrgy_cnsmd_kwh) || 0,
+                duration_min: r.durn_mnts_nbr != null ? Number(r.durn_mnts_nbr) : null,
+                cost: Number(r.ttl_cst_amt) || 0,
+                status: r.sttus_cd
+            };
+        });
+
+        return df.formatSucessRes(req, res, {
+            cards: {
+                stations: { value: totalStations, trend_pct: trend(totalStations, tr.stations_prev) },
+                machines: { value: totalMachines, trend_pct: trend(totalMachines, tr.machines_prev) },
+                connectors: { value: totalConnectors, trend_pct: trend(totalConnectors, tr.connectors_prev) },
+                available: { value: availableMachines, trend_pct: totalMachines > 0 ? Math.round((availableMachines / totalMachines) * 100) : 0 }
+            },
+            today: {
+                revenue: todayRevenue,
+                consumption: todayEnergy,
+                transactions: Number(t.today_txns) || 0,
+                revenue_trend_pct: trend(todayRevenue, t.yest_revenue),
+                consumption_trend_pct: trend(todayEnergy, t.yest_energy)
+            },
+            month: {
+                revenue: monthRevenue,
+                consumption: monthEnergy,
+                avg_revenue_per_kwh: monthEnergy > 0 ? Math.round((monthRevenue / monthEnergy) * 100) / 100 : 0,
+                transactions_today: Number(t.today_txns) || 0
+            },
+            charts: { hourly: hourly },
+            station_status: stationStatus,
+            recent_transactions: recent_transactions
+        }, cntxtDtls, fnm, {});
+    }).catch(function(error) {
+        console.error('[ownerCtrl] getAnalytics error:', error);
+        return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+    });
+};
+
+/*****************************************************************************
+* Function      : getStationAnalytics
+* Description   : Per-station summary cards (no charts): today vs yesterday,
+*                 this-month totals, lifetime totals, and inventory. Ownership
+*                 is enforced before any metric is returned.
+******************************************************************************/
+exports.getStationAnalytics = function(req, res) {
+    const fnm = "getStationAnalytics";
+    const ownerId = req.user.userId;
+    const stationId = parseInt(req.params.stationId);
+    if (!stationId) return badRequest(res, 'Station ID is required');
+
+    function trend(curr, prev) {
+        curr = Number(curr) || 0; prev = Number(prev) || 0;
+        if (prev === 0) return curr > 0 ? 100 : 0;
+        return Math.round(((curr - prev) / prev) * 1000) / 10;
+    }
+
+    ownerMdl.getOwnedStationMdl({ ownerId, stationId })
+        .then(function(rows) {
+            if (!rows || rows.length === 0) return notFound(res, 'Station not found');
+
+            return Promise.all([
+                ownerMdl.getStationTodayTotalsMdl({ stationId }),
+                ownerMdl.getStationMonthTotalsMdl({ stationId }),
+                ownerMdl.getStationLifetimeMdl({ stationId }),
+                ownerMdl.getStationInventoryMdl({ stationId })
+            ]).then(function(results) {
+                const t = (results[0] && results[0][0]) || {};
+                const mo = (results[1] && results[1][0]) || {};
+                const lt = (results[2] && results[2][0]) || {};
+                const inv = (results[3] && results[3][0]) || {};
+
+                const todayRevenue = Number(t.today_revenue) || 0;
+                const todayEnergy = Number(t.today_energy) || 0;
+                const monthRevenue = Number(mo.month_revenue) || 0;
+                const monthEnergy = Number(mo.month_energy) || 0;
+
+                return df.formatSucessRes(req, res, {
+                    today: {
+                        revenue: todayRevenue,
+                        consumption: todayEnergy,
+                        sessions: Number(t.today_sessions) || 0,
+                        revenue_trend_pct: trend(todayRevenue, t.yest_revenue),
+                        consumption_trend_pct: trend(todayEnergy, t.yest_energy)
+                    },
+                    month: {
+                        revenue: monthRevenue,
+                        consumption: monthEnergy,
+                        sessions: Number(mo.month_sessions) || 0,
+                        avg_revenue_per_kwh: monthEnergy > 0 ? Math.round((monthRevenue / monthEnergy) * 100) / 100 : 0
+                    },
+                    lifetime: {
+                        revenue: Number(lt.total_revenue) || 0,
+                        consumption: Number(lt.total_energy) || 0,
+                        sessions: Number(lt.total_sessions) || 0,
+                        avg_duration_min: Math.round(Number(lt.avg_duration) || 0)
+                    },
+                    inventory: {
+                        machines: Number(inv.machines) || 0,
+                        available_machines: Number(inv.available_machines) || 0,
+                        connectors: Number(inv.connectors) || 0
+                    }
+                }, cntxtDtls, fnm, {});
+            });
+        })
+        .catch(function(error) {
+            console.error('[ownerCtrl] getStationAnalytics error:', error);
+            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+        });
+};
+
+/*****************************************************************************
+* Function      : getMachineProfile
+* Description   : One machine's full profile — details, connectors, and summary
+*                 cards (today vs yesterday, this-month, lifetime). Metrics are
+*                 scoped to the machine via its connectors. Ownership enforced.
+******************************************************************************/
+exports.getMachineProfile = function(req, res) {
+    const fnm = "getMachineProfile";
+    const ownerId = req.user.userId;
+    const machineId = parseInt(req.params.machineId);
+    if (!machineId) return badRequest(res, 'Machine ID is required');
+
+    function trend(curr, prev) {
+        curr = Number(curr) || 0; prev = Number(prev) || 0;
+        if (prev === 0) return curr > 0 ? 100 : 0;
+        return Math.round(((curr - prev) / prev) * 1000) / 10;
+    }
+
+    ownerMdl.getOwnedMachineMdl({ ownerId, machineId })
+        .then(function(rows) {
+            const m = rows && rows[0];
+            if (!m) return notFound(res, 'Machine not found');
+
+            return Promise.all([
+                ownerMdl.getConnectorsByMachineMdl({ machineId }),
+                ownerMdl.getMachineTodayTotalsMdl({ machineId }),
+                ownerMdl.getMachineMonthTotalsMdl({ machineId }),
+                ownerMdl.getMachineLifetimeMdl({ machineId })
+            ]).then(function(results) {
+                const connectors = (results[0] || []).map(mapConnector);
+                const t = (results[1] && results[1][0]) || {};
+                const mo = (results[2] && results[2][0]) || {};
+                const lt = (results[3] && results[3][0]) || {};
+
+                const todayRevenue = Number(t.today_revenue) || 0;
+                const todayEnergy = Number(t.today_energy) || 0;
+                const monthRevenue = Number(mo.month_revenue) || 0;
+                const monthEnergy = Number(mo.month_energy) || 0;
+
+                return df.formatSucessRes(req, res, {
+                    machine: {
+                        machine_id: m.mchn_id,
+                        station_id: m.sttn_id,
+                        station_name: m.sttn_nm_tx,
+                        name: m.mchn_nm_tx,
+                        serial_no: m.mchn_srl_no_tx,
+                        ocpp_id: m.ocpp_id_tx,
+                        ws_url: m.ocpp_id_tx ? ocppWsUrl(m.ocpp_id_tx) : null,
+                        machine_type: m.mchn_typ_cd,
+                        power_code: m.pwr_cd || null,
+                        power_label: m.pwr_lbl_tx || (m.max_pwr_tx ? `${m.mchn_typ_cd} ${m.max_pwr_tx}` : null),
+                        kw: m.kw_nbr != null ? parseFloat(m.kw_nbr) : null,
+                        max_power: m.max_pwr_tx,
+                        total_connectors: m.ttl_cnntrs_nbr,
+                        status: m.sttus_cd,
+                        last_heartbeat: m.lst_hb_ts || null,
+                        created_at: m.i_ts
+                    },
+                    connectors: connectors,
+                    analytics: {
+                        today: {
+                            revenue: todayRevenue,
+                            consumption: todayEnergy,
+                            sessions: Number(t.today_sessions) || 0,
+                            revenue_trend_pct: trend(todayRevenue, t.yest_revenue),
+                            consumption_trend_pct: trend(todayEnergy, t.yest_energy)
+                        },
+                        month: {
+                            revenue: monthRevenue,
+                            consumption: monthEnergy,
+                            sessions: Number(mo.month_sessions) || 0,
+                            avg_revenue_per_kwh: monthEnergy > 0 ? Math.round((monthRevenue / monthEnergy) * 100) / 100 : 0
+                        },
+                        lifetime: {
+                            revenue: Number(lt.total_revenue) || 0,
+                            consumption: Number(lt.total_energy) || 0,
+                            sessions: Number(lt.total_sessions) || 0,
+                            avg_duration_min: Math.round(Number(lt.avg_duration) || 0),
+                            last_session: lt.last_session_ts || null
+                        }
+                    }
+                }, cntxtDtls, fnm, {});
+            });
+        })
+        .catch(function(error) {
+            console.error('[ownerCtrl] getMachineProfile error:', error);
+            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+        });
+};
+
+/*****************************************************************************
+* Function      : getMachineQr
+* Description   : Build the signed, app-only QR token for a machine. The token
+*                 embeds OCPP id, WebSocket URL, price and station/machine
+*                 details; the app renders & downloads the QR from it. Ownership
+*                 is enforced.
+******************************************************************************/
+exports.getMachineQr = function(req, res) {
+    const fnm = "getMachineQr";
+    const ownerId = req.user.userId;
+    const machineId = parseInt(req.params.machineId);
+    if (!machineId) return badRequest(res, 'Machine ID is required');
+
+    ownerMdl.getOwnedMachineMdl({ ownerId, machineId })
+        .then(function(rows) {
+            const m = rows && rows[0];
+            if (!m) return notFound(res, 'Machine not found');
+
+            const wsUrl = m.ocpp_id_tx ? ocppWsUrl(m.ocpp_id_tx) : null;
+            const powerLabel = m.pwr_lbl_tx || (m.max_pwr_tx ? `${m.mchn_typ_cd} ${m.max_pwr_tx}` : null);
+            const price = parseFloat(m.prce_per_kwh_amt) || 0;
+
+            // Payload encoded inside the QR (verified server-side on scan)
+            const payload = {
+                v: 1,
+                t: 'machine',
+                mid: m.mchn_id,
+                sid: m.sttn_id,
+                ocpp: m.ocpp_id_tx || null,
+                ws: wsUrl,
+                price: price,
+                st: m.sttn_nm_tx,
+                mn: m.mchn_nm_tx,
+                typ: m.mchn_typ_cd,
+                pwr: powerLabel
+            };
+
+            return df.formatSucessRes(req, res, {
+                token: qrUtil.encode(payload),
+                machine: {
+                    machine_id: m.mchn_id,
+                    name: m.mchn_nm_tx,
+                    station_name: m.sttn_nm_tx,
+                    ocpp_id: m.ocpp_id_tx || null,
+                    ws_url: wsUrl,
+                    machine_type: m.mchn_typ_cd,
+                    power_label: powerLabel,
+                    price_per_kwh: price,
+                    configured: !!m.ocpp_id_tx
+                }
+            }, cntxtDtls, fnm, {});
+        })
+        .catch(function(error) {
+            console.error('[ownerCtrl] getMachineQr error:', error);
+            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+        });
+};
+
+/*****************************************************************************
+* Function      : getTransactions
+* Description   : Full transaction (session) list across the owner's stations.
+******************************************************************************/
+exports.getTransactions = function(req, res) {
+    const fnm = "getTransactions";
+    const ownerId = req.user.userId;
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 200);
+
+    ownerMdl.getOwnerTransactionsMdl({ ownerId, limit })
+        .then(function(rows) {
+            const transactions = (rows || []).map(function(r) {
+                return {
+                    code: r.sssn_cd,
+                    station: r.sttn_nm_tx,
+                    connector: r.cnntr_nm_tx || null,
+                    customer: r.usr_nm || null,
+                    energy_kwh: Number(r.enrgy_cnsmd_kwh) || 0,
+                    duration_min: r.durn_mnts_nbr != null ? Number(r.durn_mnts_nbr) : null,
+                    cost: Number(r.ttl_cst_amt) || 0,
+                    status: r.sttus_cd,
+                    payment_status: r.pymnt_sttus_cd,
+                    date: r.strt_ts || r.i_ts
+                };
+            });
+            return df.formatSucessRes(req, res, { transactions: transactions }, cntxtDtls, fnm, {});
+        })
+        .catch(function(error) {
+            console.error('[ownerCtrl] getTransactions error:', error);
             return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
         });
 };

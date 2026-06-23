@@ -31,6 +31,121 @@ export interface PowerOption {
   default_connector_type: string;
 }
 
+export interface OwnerAnalytics {
+  cards: {
+    stations: { value: number; trend_pct: number };
+    machines: { value: number; trend_pct: number };
+    connectors: { value: number; trend_pct: number };
+    available: { value: number; trend_pct: number };
+  };
+  today: {
+    revenue: number;
+    consumption: number;
+    transactions: number;
+    revenue_trend_pct: number;
+    consumption_trend_pct: number;
+  };
+  month: {
+    revenue: number;
+    consumption: number;
+    avg_revenue_per_kwh: number;
+    transactions_today: number;
+  };
+  charts: { hourly: { hour: string; revenue: number; consumption: number }[] };
+  station_status: { active: number; offline: number; faulted: number; maintenance: number; total: number };
+  recent_transactions: {
+    code: string;
+    station: string;
+    connector: string | null;
+    energy_kwh: number;
+    duration_min: number | null;
+    cost: number;
+    status: string;
+  }[];
+}
+
+export interface MachineQr {
+  token: string;
+  machine: {
+    machine_id: number;
+    name: string;
+    station_name: string;
+    ocpp_id: string | null;
+    ws_url: string | null;
+    machine_type: string;
+    power_label: string | null;
+    price_per_kwh: number;
+    configured: boolean;
+  };
+}
+
+export interface MachineProfile {
+  machine: {
+    machine_id: number;
+    station_id: number;
+    station_name: string;
+    name: string;
+    serial_no: string | null;
+    ocpp_id: string | null;
+    ws_url: string | null;
+    machine_type: string;
+    power_code: string | null;
+    power_label: string | null;
+    kw: number | null;
+    max_power: string | null;
+    total_connectors: number;
+    status: string;
+    last_heartbeat: string | null;
+    created_at: string;
+  };
+  connectors: OwnerConnector[];
+  analytics: {
+    today: { revenue: number; consumption: number; sessions: number; revenue_trend_pct: number; consumption_trend_pct: number };
+    month: { revenue: number; consumption: number; sessions: number; avg_revenue_per_kwh: number };
+    lifetime: { revenue: number; consumption: number; sessions: number; avg_duration_min: number; last_session: string | null };
+  };
+}
+
+export interface StationAnalytics {
+  today: {
+    revenue: number;
+    consumption: number;
+    sessions: number;
+    revenue_trend_pct: number;
+    consumption_trend_pct: number;
+  };
+  month: {
+    revenue: number;
+    consumption: number;
+    sessions: number;
+    avg_revenue_per_kwh: number;
+  };
+  lifetime: {
+    revenue: number;
+    consumption: number;
+    sessions: number;
+    avg_duration_min: number;
+  };
+  inventory: {
+    machines: number;
+    available_machines: number;
+    connectors: number;
+  };
+}
+
+export interface OwnerTransaction {
+  code: string;
+  station: string;
+  connector: string | null;
+  customer: string | null;
+  energy_kwh: number;
+  duration_min: number | null;
+  cost: number;
+  status: string;
+  payment_status: string;
+  date: string | null;
+}
+
 export interface OcppConnection {
   ocpp_id: string;
   machine_id: number | null;
@@ -132,14 +247,29 @@ export const ownerService = {
     return res.data;
   },
 
+  getAnalytics: async (): Promise<OwnerAnalytics> => {
+    const res = await apiClient.get<{ data: OwnerAnalytics }>('/owner/analytics', AUTH);
+    return res.data;
+  },
+
   getMyStations: async (): Promise<OwnerStation[]> => {
     const res = await apiClient.get<{ data: { stations: OwnerStation[] } }>('/owner/stations', AUTH);
     return res.data?.stations || [];
   },
 
+  getTransactions: async (limit = 50): Promise<OwnerTransaction[]> => {
+    const res = await apiClient.get<{ data: { transactions: OwnerTransaction[] } }>(`/owner/transactions?limit=${limit}`, AUTH);
+    return res.data?.transactions || [];
+  },
+
   getStationDetail: async (stationId: number): Promise<OwnerStation> => {
     const res = await apiClient.get<{ data: { station: OwnerStation } }>(`/owner/stations/${stationId}`, AUTH);
     return res.data.station;
+  },
+
+  getStationAnalytics: async (stationId: number): Promise<StationAnalytics> => {
+    const res = await apiClient.get<{ data: StationAnalytics }>(`/owner/stations/${stationId}/analytics`, AUTH);
+    return res.data;
   },
 
   createStation: async (data: CreateStationRequest): Promise<OwnerStation> => {
@@ -166,6 +296,16 @@ export const ownerService = {
   getOcppConnections: async (): Promise<OcppConnection[]> => {
     const res = await apiClient.get<{ data: { connections: OcppConnection[] } }>('/ocpp/connections', AUTH);
     return res.data?.connections || [];
+  },
+
+  getMachineProfile: async (machineId: number): Promise<MachineProfile> => {
+    const res = await apiClient.get<{ data: MachineProfile }>(`/owner/machines/${machineId}`, AUTH);
+    return res.data;
+  },
+
+  getMachineQr: async (machineId: number): Promise<MachineQr> => {
+    const res = await apiClient.get<{ data: MachineQr }>(`/owner/machines/${machineId}/qr`, AUTH);
+    return res.data;
   },
 
   addMachine: async (stationId: number, data: CreateMachineRequest): Promise<AddMachineResult> => {

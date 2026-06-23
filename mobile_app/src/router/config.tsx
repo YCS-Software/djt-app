@@ -11,8 +11,12 @@ import Layout from "../components/Layout";
 import RootRedirect from "../components/RootRedirect";
 import OwnerLayout from "../components/OwnerLayout";
 import OwnerDashboardPage from "../pages/owner/dashboard/page";
+import OwnerStationsPage from "../pages/owner/stations/page";
+import OwnerTransactionsPage from "../pages/owner/transactions/page";
+import OwnerProfilePage from "../pages/owner/profile/page";
 import CreateStationPage from "../pages/owner/create-station/page";
 import StationDetailPage from "../pages/owner/station-detail/page";
+import MachineProfilePage from "../pages/owner/machine-profile/page";
 
 const routes: RouteObject[] = [
   // Root route - redirect based on auth status
@@ -65,12 +69,32 @@ const routes: RouteObject[] = [
         element: <OwnerDashboardPage />,
       },
       {
+        path: "/owner/stations",
+        element: <OwnerStationsPage />,
+      },
+      {
+        path: "/owner/transactions",
+        element: <OwnerTransactionsPage />,
+      },
+      {
+        path: "/owner/profile",
+        element: <OwnerProfilePage />,
+      },
+      {
         path: "/owner/stations/new",
         element: <CreateStationPage />,
       },
       {
         path: "/owner/stations/:stationId",
-        element: <StationDetailPage />,
+        element: <StationDetailPage mode="profile" />,
+      },
+      {
+        path: "/owner/stations/:stationId/manage",
+        element: <StationDetailPage mode="manage" />,
+      },
+      {
+        path: "/owner/machines/:machineId",
+        element: <MachineProfilePage />,
       },
     ],
   },

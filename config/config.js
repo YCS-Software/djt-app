@@ -21,6 +21,11 @@ module.exports = {
     maxAttempts: 3
   },
 
+  // QR signing (machine QR codes — app-only, HMAC-signed)
+  qr: {
+    secret: process.env.QR_SECRET || process.env.JWT_SECRET || 'djt_qr_signing_secret_change_me'
+  },
+
   // OCPP settings
   ocpp: {
     // Public base a charge point uses to reach the OCPP WebSocket server.

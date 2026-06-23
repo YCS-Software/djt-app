@@ -25,6 +25,7 @@ import { walletService } from '../../services/api/walletService';
 import type { ChargingStation } from '../../services/api/stationService';
 import type { ChargingSession } from '../../services/api/sessionService';
 import StationMap from '../../components/StationMap';
+import QrScanModal from '../../components/QrScanModal';
 import './charging.css';
 
 type ChargingState = 'idle' | 'scanning' | 'station-details' | 'charging' | 'completed';
@@ -69,6 +70,9 @@ export default function Charging() {
   
   // Expanded session state
   const [expandedSessionId, setExpandedSessionId] = useState<number | null>(null);
+
+  // QR scanner
+  const [showScanner, setShowScanner] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('x-access-token');
@@ -233,90 +237,42 @@ export default function Charging() {
     return () => clearInterval(interval);
   }, [isCharging, unitsConsumed, unitsPurchased, handleStopCharging]);
 
-  const handleScanQR = async () => {
+  // Open the live camera scanner
+  const handleScanQR = () => {
+    setShowScanner(true);
+  };
+
+  // Called with the validated DJTEV1 token from the scanner — resolve it server-side
+  const handleScanToken = async (token: string) => {
+    setShowScanner(false);
     setState('scanning');
-    
     try {
-      // Simulate QR scanning - In real app, this would use camera API
-      // QR code would contain station_id and connector_id
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // For testing: Check if scanned code is DJT001
-      // In real app, this would come from QR scanner
-      const scannedCode = 'DJT001'; // Test code - replace with actual QR scanner result
-      
-      // Fetch nearby stations if not already loaded
-      if (stations.length === 0) {
-        const lat = userLocation?.latitude || 17.0000;
-        const lng = userLocation?.longitude || 81.7833;
-        const nearbyStations = await stationService.getNearbyStations(lat, lng, 50);
-        setStations(nearbyStations);
-      }
-      
-      let targetStation: ChargingStation | null = null;
-      
-      // If scanned code is DJT001 (for testing), find that station
-      if (scannedCode === 'DJT001') {
-        // Search for station with code DJT001
-        targetStation = stations.find(s => s.code === 'DJT001') || null;
-        
-        // If not found in nearby stations, try searching
-        if (!targetStation) {
-          try {
-            const searchResults = await stationService.searchStations('DJT001');
-            targetStation = searchResults.find((s: ChargingStation) => s.code === 'DJT001') || null;
-          } catch (searchError) {
-            console.log('Search failed, trying nearby stations');
-          }
-        }
-        
-        // If still not found, use first station from nearby
-        if (!targetStation && stations.length > 0) {
-          targetStation = stations[0];
-        }
-      } else {
-        // For other codes or normal flow, use first available station
-        targetStation = stations.length > 0 ? stations[0] : null;
-      }
-      
-      if (!targetStation || !targetStation.station_id) {
-        alert('Station not found. Please ensure the QR code is valid or try again.');
+      const result = await sessionService.resolveScan(token);
+
+      if (!result.connector || !result.connector.connector_id) {
+        alert('This charger has no connectors configured. Please try another.');
         setState('idle');
         return;
       }
-      
-      // Fetch station details with connectors from API
-      const stationDetails = await stationService.getStationDetails(targetStation.station_id);
-      
-      if (!stationDetails || !stationDetails.connectors || stationDetails.connectors.length === 0) {
-        alert('No available connectors at this station. Please try another station.');
+      if (!result.machine.configured) {
+        alert('This charger is not yet connected (no OCPP ID). Please contact the operator.');
         setState('idle');
         return;
       }
-      
-      // Get first available connector
-      const availableConnector = stationDetails.connectors.find((c: any) => c.is_available) || stationDetails.connectors[0];
-      
-      if (!availableConnector || !availableConnector.connector_id) {
-        alert('No available connectors. Please try another station.');
-        setState('idle');
-        return;
-      }
-      
-      // Set station info with real data from API
+
       setStationInfo({
-        station_id: stationDetails.station_id,
-        name: stationDetails.name,
-        chargerId: stationDetails.code || `CHG-${stationDetails.station_id}`,
-        connector_id: availableConnector.connector_id,
-        pricePerUnit: stationDetails.price_per_kwh,
-        address: stationDetails.address,
-        power: stationDetails.power || availableConnector.power || '150kW'
+        station_id: result.station.station_id,
+        name: result.station.name,
+        chargerId: result.machine.ocpp_id || result.station.code || `CHG-${result.station.station_id}`,
+        connector_id: result.connector.connector_id,
+        pricePerUnit: result.station.price_per_kwh,
+        address: result.station.address,
+        power: result.machine.power || result.connector.power || '—',
       });
       setState('station-details');
     } catch (error: any) {
-      console.error('Error scanning QR:', error);
-      alert(error.message || 'Failed to scan QR code. Please try again.');
+      console.error('Error resolving QR:', error);
+      alert(error?.message || 'Could not read this charger QR. Please try again.');
       setState('idle');
     }
   };
@@ -873,6 +829,10 @@ export default function Charging() {
             setSelectedStation(null);
           }}
         />
+      )}
+
+      {showScanner && (
+        <QrScanModal onResult={handleScanToken} onClose={() => setShowScanner(false)} />
       )}
     </div>
   );

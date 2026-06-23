@@ -8,7 +8,81 @@ const walletMdl = require('../../wallet/models/walletMdl');
 const stationMdl = require('../../stations/models/stationMdl');
 const std = require(appRoot + '/utils/standardMessages');
 const df = require(appRoot + '/utils/dateFormatUtil');
+const qrUtil = require(appRoot + '/utils/qrUtil');
 const cntxtDtls = "sessionCtrl";
+
+/**
+ * Resolve a scanned machine QR (signed, app-only token) → station + connector.
+ * Generic scanners can't use the opaque token; only this endpoint, which holds
+ * the secret, verifies the signature and returns the charge target.
+ */
+exports.scanQr = function(req, res) {
+    const fnm = "scanQr";
+    const data = req.body && req.body.data ? req.body.data : (req.body || {});
+    const token = data.token || data.qr || data.qr_code || '';
+
+    const payload = qrUtil.decode(token);
+    if (!payload || payload.t !== 'machine' || !payload.mid) {
+        return res.status(std.message["BAD_REQUEST"].code).json({
+            status: std.message["BAD_REQUEST"].code,
+            message: 'This QR code is not a valid DJT charger code',
+            data: null
+        });
+    }
+
+    sessionMdl.getMachineScanInfoMdl({ machineId: payload.mid })
+        .then(function(rows) {
+            if (!rows || rows.length === 0) {
+                return res.status(std.message["NOT_FOUND"].code).json({
+                    status: std.message["NOT_FOUND"].code, message: 'Charger not found', data: null
+                });
+            }
+            const head = rows[0];
+            const connectors = rows
+                .filter(function(r) { return r.cnntr_id; })
+                .map(function(r) {
+                    return {
+                        connector_id: r.cnntr_id,
+                        type: r.cnntr_typ_cd,
+                        name: r.cnntr_nm_tx,
+                        power: r.pwr_tx,
+                        is_available: r.is_avlbl_in === 1
+                    };
+                });
+
+            const available = connectors.find(function(c) { return c.is_available; }) || connectors[0] || null;
+            if (!available) {
+                return res.status(std.message["BAD_REQUEST"].code).json({
+                    status: std.message["BAD_REQUEST"].code, message: 'This charger has no connectors configured', data: null
+                });
+            }
+
+            return df.formatSucessRes(req, res, {
+                machine: {
+                    machine_id: head.mchn_id,
+                    name: head.mchn_nm_tx,
+                    ocpp_id: head.ocpp_id_tx || null,
+                    machine_type: head.mchn_typ_cd,
+                    power: head.max_pwr_tx,
+                    status: head.mchn_sttus_cd,
+                    configured: !!head.ocpp_id_tx
+                },
+                station: {
+                    station_id: head.sttn_id,
+                    name: head.sttn_nm_tx,
+                    code: head.sttn_cd,
+                    address: head.addr_tx,
+                    price_per_kwh: parseFloat(head.prce_per_kwh_amt) || 0
+                },
+                connector: available,
+                connectors: connectors
+            }, cntxtDtls, fnm, {});
+        })
+        .catch(function(error) {
+            console.error('[sessionCtrl] scanQr error:', error);
+            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+        });
+};
 
 /**
  * Generate unique session code

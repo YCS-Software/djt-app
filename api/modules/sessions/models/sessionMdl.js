@@ -164,6 +164,28 @@ exports.getUserSessionsMdl = function(data) {
 };
 
 /*****************************************************************************
+* Function      : getMachineScanInfoMdl
+* Description   : Resolve a scanned machine to its station + active connectors
+* Arguments     : data object with machineId
+******************************************************************************/
+exports.getMachineScanInfoMdl = function(data) {
+    const machineId = parseInt(data.machineId) || 0;
+    const QRY_TO_EXEC = `
+        SELECT m.mchn_id, m.mchn_nm_tx, m.ocpp_id_tx, m.mchn_typ_cd, m.max_pwr_tx, m.sttus_cd AS mchn_sttus_cd,
+               st.sttn_id, st.sttn_nm_tx, st.addr_tx, st.prce_per_kwh_amt, st.sttn_cd,
+               c.cnntr_id, c.cnntr_typ_cd, c.cnntr_nm_tx, c.pwr_tx, c.is_avlbl_in
+        FROM mchn_lst_t m
+        INNER JOIN sttn_lst_t st ON m.sttn_id = st.sttn_id
+        LEFT JOIN cnntr_lst_t c ON c.mchn_id = m.mchn_id AND c.a_in = 1
+        WHERE m.mchn_id = ${machineId} AND m.a_in = 1
+        ORDER BY c.cnntr_id ASC
+    `;
+
+    console.log('[getMachineScanInfoMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};
+
+/*****************************************************************************
 * Function      : updatePaymentStatusMdl
 * Description   : Update session payment status
 * Arguments     : data object with sessionId, status, transactionId (optional)

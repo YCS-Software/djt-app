@@ -147,11 +147,13 @@ exports.getMachinesByStationMdl = function(data) {
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
 };
 
-// Get a machine joined with its station so we can verify the owner owns it
+// Get a machine joined with its station (ownership guard) + power tier + station name
 exports.getOwnedMachineMdl = function(data) {
-    const QRY_TO_EXEC = `SELECT m.*, s.ownr_usr_id
+    const QRY_TO_EXEC = `SELECT m.*, s.ownr_usr_id, s.sttn_nm_tx, s.prce_per_kwh_amt,
+            p.pwr_cd, p.pwr_lbl_tx, p.kw_nbr
         FROM mchn_lst_t m
         JOIN sttn_lst_t s ON m.sttn_id = s.sttn_id
+        LEFT JOIN mchn_pwr_lst_t p ON m.mchn_pwr_id = p.mchn_pwr_id
         WHERE m.mchn_id = ${num(data.machineId)}
         AND s.ownr_usr_id = ${num(data.ownerId)}
         AND m.a_in = 1
@@ -219,5 +221,220 @@ exports.getOwnerDashboardMdl = function(data) {
                 WHERE s.ownr_usr_id = ${ownerId} AND m.a_in = 1 AND m.sttus_cd = 'available') AS available_machines`;
 
     console.log('[getOwnerDashboardMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};
+
+/*****************************************************************************
+* ANALYTICS (owner dashboard)
+* All metrics are scoped to the owner's stations via sttn_lst_t.ownr_usr_id.
+******************************************************************************/
+
+// Today vs yesterday: revenue (₹), consumption (kWh), today's completed txns
+exports.getOwnerTodayTotalsMdl = function(data) {
+    const ownerId = num(data.ownerId);
+    const QRY_TO_EXEC = `
+        SELECT
+            COALESCE(SUM(CASE WHEN DATE(s.strt_ts) = CURDATE() THEN s.ttl_cst_amt END), 0) AS today_revenue,
+            COALESCE(SUM(CASE WHEN DATE(s.strt_ts) = CURDATE() THEN s.enrgy_cnsmd_kwh END), 0) AS today_energy,
+            COUNT(CASE WHEN DATE(s.strt_ts) = CURDATE() THEN 1 END) AS today_txns,
+            COALESCE(SUM(CASE WHEN DATE(s.strt_ts) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) THEN s.ttl_cst_amt END), 0) AS yest_revenue,
+            COALESCE(SUM(CASE WHEN DATE(s.strt_ts) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) THEN s.enrgy_cnsmd_kwh END), 0) AS yest_energy
+        FROM sssn_lst_t s
+        INNER JOIN sttn_lst_t st ON s.sttn_id = st.sttn_id
+        WHERE st.ownr_usr_id = ${ownerId} AND s.a_in = 1 AND s.sttus_cd = 'completed'`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};
+
+// This-month totals (from the 1st of the current month)
+exports.getOwnerMonthTotalsMdl = function(data) {
+    const ownerId = num(data.ownerId);
+    const QRY_TO_EXEC = `
+        SELECT
+            COALESCE(SUM(s.ttl_cst_amt), 0) AS month_revenue,
+            COALESCE(SUM(s.enrgy_cnsmd_kwh), 0) AS month_energy,
+            COUNT(*) AS month_txns
+        FROM sssn_lst_t s
+        INNER JOIN sttn_lst_t st ON s.sttn_id = st.sttn_id
+        WHERE st.ownr_usr_id = ${ownerId} AND s.a_in = 1 AND s.sttus_cd = 'completed'
+            AND s.strt_ts >= DATE_FORMAT(CURDATE(), '%Y-%m-01')`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};
+
+// Hourly series for today's revenue/consumption charts
+exports.getOwnerHourlySeriesMdl = function(data) {
+    const ownerId = num(data.ownerId);
+    const QRY_TO_EXEC = `
+        SELECT HOUR(s.strt_ts) AS hr,
+            COALESCE(SUM(s.ttl_cst_amt), 0) AS revenue,
+            COALESCE(SUM(s.enrgy_cnsmd_kwh), 0) AS energy
+        FROM sssn_lst_t s
+        INNER JOIN sttn_lst_t st ON s.sttn_id = st.sttn_id
+        WHERE st.ownr_usr_id = ${ownerId} AND s.a_in = 1 AND s.sttus_cd = 'completed'
+            AND DATE(s.strt_ts) = CURDATE()
+        GROUP BY HOUR(s.strt_ts)
+        ORDER BY hr`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};
+
+// Per-station machine-status rollup (drives the Station Status donut)
+exports.getOwnerStationStatusMdl = function(data) {
+    const ownerId = num(data.ownerId);
+    const QRY_TO_EXEC = `
+        SELECT st.sttn_id, st.aprvl_sttus_cd,
+            COALESCE(SUM(m.sttus_cd = 'faulted'), 0) AS faulted,
+            COALESCE(SUM(m.sttus_cd = 'maintenance'), 0) AS maintenance,
+            COALESCE(SUM(m.sttus_cd = 'offline'), 0) AS offline,
+            COALESCE(SUM(m.sttus_cd IN ('available', 'in_use')), 0) AS active,
+            COUNT(m.mchn_id) AS total_machines
+        FROM sttn_lst_t st
+        LEFT JOIN mchn_lst_t m ON m.sttn_id = st.sttn_id AND m.a_in = 1
+        WHERE st.ownr_usr_id = ${ownerId} AND st.a_in = 1
+        GROUP BY st.sttn_id, st.aprvl_sttus_cd`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};
+
+// Recent sessions across the owner's stations (any status)
+exports.getOwnerRecentTxnsMdl = function(data) {
+    const ownerId = num(data.ownerId);
+    const limit = num(data.limit, 8);
+    const QRY_TO_EXEC = `
+        SELECT s.sssn_cd, s.enrgy_cnsmd_kwh, s.durn_mnts_nbr, s.ttl_cst_amt,
+            s.sttus_cd, s.strt_ts, s.i_ts,
+            st.sttn_nm_tx, c.cnntr_nm_tx
+        FROM sssn_lst_t s
+        INNER JOIN sttn_lst_t st ON s.sttn_id = st.sttn_id
+        LEFT JOIN cnntr_lst_t c ON s.cnntr_id = c.cnntr_id
+        WHERE st.ownr_usr_id = ${ownerId} AND s.a_in = 1
+        ORDER BY s.i_ts DESC
+        LIMIT ${limit}`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};
+
+// --- Per-station summary (station profile cards) ---
+exports.getStationTodayTotalsMdl = function(data) {
+    const stationId = num(data.stationId);
+    const QRY_TO_EXEC = `
+        SELECT
+            COALESCE(SUM(CASE WHEN DATE(strt_ts) = CURDATE() THEN ttl_cst_amt END), 0) AS today_revenue,
+            COALESCE(SUM(CASE WHEN DATE(strt_ts) = CURDATE() THEN enrgy_cnsmd_kwh END), 0) AS today_energy,
+            COUNT(CASE WHEN DATE(strt_ts) = CURDATE() THEN 1 END) AS today_sessions,
+            COALESCE(SUM(CASE WHEN DATE(strt_ts) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) THEN ttl_cst_amt END), 0) AS yest_revenue,
+            COALESCE(SUM(CASE WHEN DATE(strt_ts) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) THEN enrgy_cnsmd_kwh END), 0) AS yest_energy
+        FROM sssn_lst_t
+        WHERE sttn_id = ${stationId} AND a_in = 1 AND sttus_cd = 'completed'`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};
+
+exports.getStationMonthTotalsMdl = function(data) {
+    const stationId = num(data.stationId);
+    const QRY_TO_EXEC = `
+        SELECT
+            COALESCE(SUM(ttl_cst_amt), 0) AS month_revenue,
+            COALESCE(SUM(enrgy_cnsmd_kwh), 0) AS month_energy,
+            COUNT(*) AS month_sessions
+        FROM sssn_lst_t
+        WHERE sttn_id = ${stationId} AND a_in = 1 AND sttus_cd = 'completed'
+            AND strt_ts >= DATE_FORMAT(CURDATE(), '%Y-%m-01')`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};
+
+exports.getStationLifetimeMdl = function(data) {
+    const stationId = num(data.stationId);
+    const QRY_TO_EXEC = `
+        SELECT
+            COALESCE(SUM(ttl_cst_amt), 0) AS total_revenue,
+            COALESCE(SUM(enrgy_cnsmd_kwh), 0) AS total_energy,
+            COUNT(*) AS total_sessions,
+            COALESCE(AVG(durn_mnts_nbr), 0) AS avg_duration
+        FROM sssn_lst_t
+        WHERE sttn_id = ${stationId} AND a_in = 1 AND sttus_cd = 'completed'`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};
+
+// Machine/connector inventory + availability for one station
+exports.getStationInventoryMdl = function(data) {
+    const stationId = num(data.stationId);
+    const QRY_TO_EXEC = `
+        SELECT
+            (SELECT COUNT(*) FROM mchn_lst_t WHERE sttn_id = ${stationId} AND a_in = 1) AS machines,
+            (SELECT COUNT(*) FROM mchn_lst_t WHERE sttn_id = ${stationId} AND a_in = 1 AND sttus_cd = 'available') AS available_machines,
+            (SELECT COUNT(*) FROM cnntr_lst_t WHERE sttn_id = ${stationId} AND a_in = 1) AS connectors`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};
+
+// --- Per-machine summary (machine profile cards) ---
+// Sessions link to a machine through their connector (cnntr_lst_t.mchn_id).
+exports.getMachineTodayTotalsMdl = function(data) {
+    const machineId = num(data.machineId);
+    const QRY_TO_EXEC = `
+        SELECT
+            COALESCE(SUM(CASE WHEN DATE(s.strt_ts) = CURDATE() THEN s.ttl_cst_amt END), 0) AS today_revenue,
+            COALESCE(SUM(CASE WHEN DATE(s.strt_ts) = CURDATE() THEN s.enrgy_cnsmd_kwh END), 0) AS today_energy,
+            COUNT(CASE WHEN DATE(s.strt_ts) = CURDATE() THEN 1 END) AS today_sessions,
+            COALESCE(SUM(CASE WHEN DATE(s.strt_ts) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) THEN s.ttl_cst_amt END), 0) AS yest_revenue,
+            COALESCE(SUM(CASE WHEN DATE(s.strt_ts) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) THEN s.enrgy_cnsmd_kwh END), 0) AS yest_energy
+        FROM sssn_lst_t s
+        INNER JOIN cnntr_lst_t c ON s.cnntr_id = c.cnntr_id
+        WHERE c.mchn_id = ${machineId} AND s.a_in = 1 AND s.sttus_cd = 'completed'`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};
+
+exports.getMachineMonthTotalsMdl = function(data) {
+    const machineId = num(data.machineId);
+    const QRY_TO_EXEC = `
+        SELECT
+            COALESCE(SUM(s.ttl_cst_amt), 0) AS month_revenue,
+            COALESCE(SUM(s.enrgy_cnsmd_kwh), 0) AS month_energy,
+            COUNT(*) AS month_sessions
+        FROM sssn_lst_t s
+        INNER JOIN cnntr_lst_t c ON s.cnntr_id = c.cnntr_id
+        WHERE c.mchn_id = ${machineId} AND s.a_in = 1 AND s.sttus_cd = 'completed'
+            AND s.strt_ts >= DATE_FORMAT(CURDATE(), '%Y-%m-01')`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};
+
+exports.getMachineLifetimeMdl = function(data) {
+    const machineId = num(data.machineId);
+    const QRY_TO_EXEC = `
+        SELECT
+            COALESCE(SUM(s.ttl_cst_amt), 0) AS total_revenue,
+            COALESCE(SUM(s.enrgy_cnsmd_kwh), 0) AS total_energy,
+            COUNT(*) AS total_sessions,
+            COALESCE(AVG(s.durn_mnts_nbr), 0) AS avg_duration,
+            MAX(s.strt_ts) AS last_session_ts
+        FROM sssn_lst_t s
+        INNER JOIN cnntr_lst_t c ON s.cnntr_id = c.cnntr_id
+        WHERE c.mchn_id = ${machineId} AND s.a_in = 1 AND s.sttus_cd = 'completed'`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};
+
+// Full transactions list across the owner's stations (for the Transactions page)
+exports.getOwnerTransactionsMdl = function(data) {
+    const ownerId = num(data.ownerId);
+    const limit = num(data.limit, 50);
+    const QRY_TO_EXEC = `
+        SELECT s.sssn_cd, s.enrgy_cnsmd_kwh, s.durn_mnts_nbr, s.ttl_cst_amt,
+            s.sttus_cd, s.pymnt_sttus_cd, s.strt_ts, s.i_ts,
+            st.sttn_nm_tx, c.cnntr_nm_tx, u.nm_tx AS usr_nm
+        FROM sssn_lst_t s
+        INNER JOIN sttn_lst_t st ON s.sttn_id = st.sttn_id
+        LEFT JOIN cnntr_lst_t c ON s.cnntr_id = c.cnntr_id
+        LEFT JOIN usr_lst_t u ON s.usr_id = u.usr_id
+        WHERE st.ownr_usr_id = ${ownerId} AND s.a_in = 1
+        ORDER BY s.i_ts DESC
+        LIMIT ${limit}`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};
+
+// Day-over-day growth for the top stat cards (counts now vs counts existing before today)
+exports.getOwnerCountTrendsMdl = function(data) {
+    const ownerId = num(data.ownerId);
+    const QRY_TO_EXEC = `
+        SELECT
+            (SELECT COUNT(*) FROM sttn_lst_t WHERE ownr_usr_id = ${ownerId} AND a_in = 1 AND DATE(i_ts) < CURDATE()) AS stations_prev,
+            (SELECT COUNT(*) FROM mchn_lst_t m JOIN sttn_lst_t s ON m.sttn_id = s.sttn_id
+                WHERE s.ownr_usr_id = ${ownerId} AND m.a_in = 1 AND DATE(m.i_ts) < CURDATE()) AS machines_prev,
+            (SELECT COUNT(*) FROM cnntr_lst_t c JOIN sttn_lst_t s ON c.sttn_id = s.sttn_id
+                WHERE s.ownr_usr_id = ${ownerId} AND c.a_in = 1 AND DATE(c.i_ts) < CURDATE()) AS connectors_prev`;
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
 };

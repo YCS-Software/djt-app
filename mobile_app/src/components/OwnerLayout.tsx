@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, LogOut, Zap } from 'lucide-react';
+import { LayoutGrid, MapPin, Plus, Receipt, User, LogOut, Zap } from 'lucide-react';
 import { authService } from '../services/api';
 import '../pages/owner/owner.css';
 
@@ -7,14 +7,22 @@ export default function OwnerLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const user = authService.getCurrentUser();
-
-  const isActive = (path: string) =>
-    path === '/owner' ? location.pathname === '/owner' : location.pathname.startsWith(path);
+  const path = location.pathname;
 
   const logout = () => {
     authService.logout();
     navigate('/login', { replace: true });
   };
+
+  const tabs = [
+    { label: 'Dashboard', icon: LayoutGrid, to: '/owner', active: path === '/owner' },
+    {
+      label: 'Stations', icon: MapPin, to: '/owner/stations',
+      active: path.startsWith('/owner/stations') && path !== '/owner/stations/new',
+    },
+    { label: 'Transactions', icon: Receipt, to: '/owner/transactions', active: path.startsWith('/owner/transactions') },
+    { label: 'Profile', icon: User, to: '/owner/profile', active: path.startsWith('/owner/profile') },
+  ];
 
   return (
     <div className="owner-shell">
@@ -39,21 +47,27 @@ export default function OwnerLayout() {
       </main>
 
       <nav className="owner-bottom-nav">
-        <button className={`owner-nav-item ${isActive('/owner') ? 'active' : ''}`} onClick={() => navigate('/owner')}>
-          <LayoutDashboard size={20} />
-          <span>Dashboard</span>
+        {/* Dashboard + Stations */}
+        {tabs.slice(0, 2).map((t) => (
+          <button key={t.label} className={`owner-nav-item ${t.active ? 'active' : ''}`} onClick={() => navigate(t.to)}>
+            <t.icon size={20} />
+            <span>{t.label}</span>
+          </button>
+        ))}
+
+        {/* Elevated center Add */}
+        <button className="owner-nav-add-wrap" onClick={() => navigate('/owner/stations/new')} aria-label="Add station">
+          <span className={`owner-nav-add ${path === '/owner/stations/new' ? 'active' : ''}`}><Plus size={24} /></span>
+          <span className="owner-nav-add-label">Add</span>
         </button>
-        <button
-          className={`owner-nav-item ${isActive('/owner/stations/new') ? 'active' : ''}`}
-          onClick={() => navigate('/owner/stations/new')}
-        >
-          <PlusCircle size={20} />
-          <span>Add Station</span>
-        </button>
-        <button className="owner-nav-item" onClick={logout}>
-          <LogOut size={20} />
-          <span>Logout</span>
-        </button>
+
+        {/* Transactions + Profile */}
+        {tabs.slice(2).map((t) => (
+          <button key={t.label} className={`owner-nav-item ${t.active ? 'active' : ''}`} onClick={() => navigate(t.to)}>
+            <t.icon size={20} />
+            <span>{t.label}</span>
+          </button>
+        ))}
       </nav>
     </div>
   );

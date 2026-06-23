@@ -1,12 +1,35 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ownerService } from '../../../services/api';
-import type { OwnerStation, OwnerMachine, PowerOption, AddMachineResult } from '../../../services/api/ownerService';
+import type { OwnerStation, OwnerMachine, PowerOption, AddMachineResult, StationAnalytics } from '../../../services/api/ownerService';
 import Dropdown from '../../../components/Dropdown';
+import MachineQrModal from '../../../components/MachineQrModal';
 import {
   ArrowLeft, Cpu, Plug, PlusCircle, MapPin, Zap, Loader2, X, IndianRupee, Star, Power,
   Copy, Check, Wifi, WifiOff, CheckCircle2, Hash, RefreshCw,
+  TrendingUp, TrendingDown, Receipt, Clock, BarChart3, Tag, Activity,
+  Settings, Building2, Phone, User, Navigation, CalendarDays, Gauge, ChevronRight, QrCode,
 } from 'lucide-react';
+
+const inr = (n: number, dp = 2) =>
+  n.toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+
+function fmtDate(d?: string | null) {
+  if (!d) return '—';
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function Trend({ pct }: { pct: number }) {
+  const dir = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat';
+  const Icon = pct >= 0 ? TrendingUp : TrendingDown;
+  return (
+    <span className={`owner-trend owner-trend-${dir}`}>
+      <Icon size={11} /> {Math.abs(pct)}% <span className="owner-trend-sub">vs yesterday</span>
+    </span>
+  );
+}
 
 const CONNECTOR_TYPES = ['CCS2', 'CHAdeMO', 'Type2', 'GB/T', 'Bharat AC', 'Bharat DC'];
 const MACHINE_STATUS: Record<string, string> = {
@@ -19,13 +42,14 @@ const MACHINE_TYPE_LABELS: Record<string, string> = {
   DCS: 'DCS — DC Super (high power)',
 };
 
-export default function StationDetailPage() {
+export default function StationDetailPage({ mode = 'manage' }: { mode?: 'profile' | 'manage' }) {
   const navigate = useNavigate();
   const { stationId } = useParams();
   const sid = Number(stationId);
 
   const [station, setStation] = useState<OwnerStation | null>(null);
   const [machines, setMachines] = useState<OwnerMachine[]>([]);
+  const [analytics, setAnalytics] = useState<StationAnalytics | null>(null);
   const [powerOptions, setPowerOptions] = useState<PowerOption[]>([]);
   const [powerLoading, setPowerLoading] = useState(false);
   const [powerError, setPowerError] = useState('');
@@ -35,6 +59,7 @@ export default function StationDetailPage() {
 
   // modals
   const [machineModal, setMachineModal] = useState(false);
+  const [qrMachineId, setQrMachineId] = useState<number | null>(null);
   const [connectorFor, setConnectorFor] = useState<OwnerMachine | null>(null);
   const [addedMachine, setAddedMachine] = useState<AddMachineResult | null>(null);
   const [saving, setSaving] = useState(false);
@@ -47,9 +72,13 @@ export default function StationDetailPage() {
     setLoading(true);
     setError('');
     try {
-      const st = await ownerService.getStationDetail(sid);
+      const [st, an] = await Promise.all([
+        ownerService.getStationDetail(sid),
+        ownerService.getStationAnalytics(sid).catch(() => null),
+      ]);
       setStation(st);
       setMachines(st.machines || []);
+      if (an) setAnalytics(an);
     } catch (e: any) {
       setError(e?.message || 'Failed to load station');
     } finally {
@@ -171,11 +200,20 @@ export default function StationDetailPage() {
   return (
     <div className="owner-page owner-animate-in">
       <div className="owner-page-head">
-        <button className="owner-back" onClick={() => navigate('/owner')}><ArrowLeft size={18} /></button>
+        <button className="owner-back" onClick={() => navigate('/owner/stations')}><ArrowLeft size={18} /></button>
         <div className="owner-head-grow">
           <h1 className="owner-h1 owner-ellipsis">{station?.name}</h1>
-          <p className="owner-sub owner-ellipsis"><MapPin size={12} /> {station?.address}</p>
+          <p className="owner-sub owner-ellipsis">{mode === 'profile' ? 'Station profile' : 'Infrastructure'}</p>
         </div>
+        {mode === 'profile' ? (
+          <button className="owner-btn owner-btn-primary owner-btn-sm" onClick={() => navigate(`/owner/stations/${sid}/manage`)}>
+            <Settings size={15} /> Manage
+          </button>
+        ) : (
+          <button className="owner-btn owner-btn-ghost owner-btn-sm" onClick={() => navigate(`/owner/stations/${sid}`)}>
+            <Building2 size={15} /> Profile
+          </button>
+        )}
       </div>
 
       {error && !machineModal && <div className="owner-alert owner-alert-error">{error}</div>}
@@ -194,7 +232,199 @@ export default function StationDetailPage() {
         </div>
       </div>
 
-      {/* Infrastructure */}
+      {/* Performance summary (cards only — no charts) */}
+      {mode === 'profile' && analytics && (
+        <>
+          <div className="owner-section-head"><h2 className="owner-h2">Today</h2></div>
+          <div className="owner-stats-grid owner-stats-3">
+            <div className="owner-stat-card tone-green">
+              <div className="owner-stat-icon"><IndianRupee size={18} /></div>
+              <div className="owner-stat-value">₹{inr(analytics.today.revenue)}</div>
+              <div className="owner-stat-label">Revenue</div>
+              <Trend pct={analytics.today.revenue_trend_pct} />
+            </div>
+            <div className="owner-stat-card tone-cyan">
+              <div className="owner-stat-icon"><Zap size={18} /></div>
+              <div className="owner-stat-value">{inr(analytics.today.consumption)}<small> kWh</small></div>
+              <div className="owner-stat-label">Consumption</div>
+              <Trend pct={analytics.today.consumption_trend_pct} />
+            </div>
+            <div className="owner-stat-card tone-violet">
+              <div className="owner-stat-icon"><Receipt size={18} /></div>
+              <div className="owner-stat-value">{analytics.today.sessions}</div>
+              <div className="owner-stat-label">Sessions</div>
+            </div>
+          </div>
+
+          <div className="owner-section-head"><h2 className="owner-h2">This Month</h2></div>
+          <div className="owner-card owner-summary-tiles">
+            <div className="owner-tile">
+              <span className="owner-tile-icon tone-green"><IndianRupee size={15} /></span>
+              <div className="owner-tile-label">Revenue</div>
+              <div className="owner-tile-value">₹{inr(analytics.month.revenue)}</div>
+              <div className="owner-tile-sub">{analytics.month.sessions} sessions</div>
+            </div>
+            <div className="owner-tile">
+              <span className="owner-tile-icon tone-cyan"><BarChart3 size={15} /></span>
+              <div className="owner-tile-label">Consumption</div>
+              <div className="owner-tile-value">{inr(analytics.month.consumption)} <small>kWh</small></div>
+              <div className="owner-tile-sub">This month</div>
+            </div>
+            <div className="owner-tile">
+              <span className="owner-tile-icon tone-amber"><Tag size={15} /></span>
+              <div className="owner-tile-label">Avg. ₹ / kWh</div>
+              <div className="owner-tile-value">₹{inr(analytics.month.avg_revenue_per_kwh)}</div>
+              <div className="owner-tile-sub">This month</div>
+            </div>
+            <div className="owner-tile">
+              <span className="owner-tile-icon tone-violet"><Plug size={15} /></span>
+              <div className="owner-tile-label">Connectors</div>
+              <div className="owner-tile-value">{analytics.inventory.connectors}</div>
+              <div className="owner-tile-sub">{analytics.inventory.available_machines}/{analytics.inventory.machines} available</div>
+            </div>
+          </div>
+
+          <div className="owner-section-head"><h2 className="owner-h2">All Time</h2></div>
+          <div className="owner-card owner-summary-tiles">
+            <div className="owner-tile">
+              <span className="owner-tile-icon tone-green"><IndianRupee size={15} /></span>
+              <div className="owner-tile-label">Total Revenue</div>
+              <div className="owner-tile-value">₹{inr(analytics.lifetime.revenue)}</div>
+              <div className="owner-tile-sub">All time</div>
+            </div>
+            <div className="owner-tile">
+              <span className="owner-tile-icon tone-cyan"><BarChart3 size={15} /></span>
+              <div className="owner-tile-label">Total Energy</div>
+              <div className="owner-tile-value">{inr(analytics.lifetime.consumption)} <small>kWh</small></div>
+              <div className="owner-tile-sub">All time</div>
+            </div>
+            <div className="owner-tile">
+              <span className="owner-tile-icon tone-violet"><Activity size={15} /></span>
+              <div className="owner-tile-label">Sessions</div>
+              <div className="owner-tile-value">{analytics.lifetime.sessions}</div>
+              <div className="owner-tile-sub">Completed</div>
+            </div>
+            <div className="owner-tile">
+              <span className="owner-tile-icon tone-amber"><Clock size={15} /></span>
+              <div className="owner-tile-label">Avg. Duration</div>
+              <div className="owner-tile-value">{analytics.lifetime.avg_duration_min} <small>min</small></div>
+              <div className="owner-tile-sub">Per session</div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ---------------- PROFILE: station details + machines summary ---------------- */}
+      {mode === 'profile' && (
+        <>
+          <div className="owner-section-head"><h2 className="owner-h2">Station Details</h2></div>
+          <div className="owner-card owner-info-list">
+            <div className="owner-info-row">
+              <span className="owner-info-icon"><MapPin size={15} /></span>
+              <div className="owner-info-main">
+                <div className="owner-info-label">Address</div>
+                <div className="owner-info-value owner-info-wrap">{station?.address || '—'}</div>
+              </div>
+            </div>
+            <div className="owner-info-row">
+              <span className="owner-info-icon"><Building2 size={15} /></span>
+              <div className="owner-info-main">
+                <div className="owner-info-label">City / State</div>
+                <div className="owner-info-value">{[station?.city, station?.state].filter(Boolean).join(', ') || '—'}{station?.postal_code ? ` · ${station.postal_code}` : ''}</div>
+              </div>
+            </div>
+            <div className="owner-info-row">
+              <span className="owner-info-icon"><Navigation size={15} /></span>
+              <div className="owner-info-main">
+                <div className="owner-info-label">Coordinates</div>
+                <div className="owner-info-value">
+                  {station?.latitude != null && station?.longitude != null
+                    ? `${station.latitude.toFixed(5)}, ${station.longitude.toFixed(5)}` : '—'}
+                </div>
+              </div>
+            </div>
+            <div className="owner-info-row">
+              <span className="owner-info-icon"><IndianRupee size={15} /></span>
+              <div className="owner-info-main">
+                <div className="owner-info-label">Price / kWh</div>
+                <div className="owner-info-value">₹{station?.price_per_kwh}</div>
+              </div>
+            </div>
+            <div className="owner-info-row">
+              <span className="owner-info-icon"><Gauge size={15} /></span>
+              <div className="owner-info-main">
+                <div className="owner-info-label">Peak power</div>
+                <div className="owner-info-value">{station?.power || '—'}</div>
+              </div>
+            </div>
+            <div className="owner-info-row">
+              <span className="owner-info-icon"><Zap size={15} /></span>
+              <div className="owner-info-main">
+                <div className="owner-info-label">Fast charging</div>
+                <div className="owner-info-value">{station?.is_fast_charging ? 'Yes' : 'No'}</div>
+              </div>
+            </div>
+            <div className="owner-info-row">
+              <span className="owner-info-icon"><User size={15} /></span>
+              <div className="owner-info-main">
+                <div className="owner-info-label">Operator</div>
+                <div className="owner-info-value">{station?.operator_name || '—'}</div>
+              </div>
+            </div>
+            <div className="owner-info-row">
+              <span className="owner-info-icon"><Phone size={15} /></span>
+              <div className="owner-info-main">
+                <div className="owner-info-label">Contact</div>
+                <div className="owner-info-value">{station?.contact_number || '—'}</div>
+              </div>
+            </div>
+            <div className="owner-info-row">
+              <span className="owner-info-icon"><CalendarDays size={15} /></span>
+              <div className="owner-info-main">
+                <div className="owner-info-label">Created</div>
+                <div className="owner-info-value">{fmtDate(station?.created_at)}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="owner-section-head">
+            <h2 className="owner-h2">Machines</h2>
+            <span className="owner-count-pill">{machines.length}</span>
+          </div>
+          {machines.length === 0 ? (
+            <div className="owner-empty">
+              <div className="owner-empty-icon"><Cpu size={28} /></div>
+              <h3>No machines yet</h3>
+              <p>Switch to Manage to add chargers — OCPP ID, WebSocket URL and connectors are generated automatically.</p>
+              <button className="owner-btn owner-btn-primary" onClick={() => navigate(`/owner/stations/${sid}/manage`)}>
+                <Settings size={18} /> Manage infrastructure
+              </button>
+            </div>
+          ) : (
+            <div className="owner-card owner-info-list">
+              {machines.map((m) => (
+                <button key={m.machine_id} className="owner-info-row owner-info-action" onClick={() => navigate(`/owner/machines/${m.machine_id}`)}>
+                  <span className="owner-info-icon"><Power size={15} /></span>
+                  <div className="owner-info-main">
+                    <div className="owner-info-value">{m.name}</div>
+                    <div className="owner-machine-meta">
+                      <span className={`owner-type-badge type-${(m.machine_type || '').toLowerCase()}`}>{m.machine_type}</span>
+                      {(m.power_label || m.max_power) && <span className="owner-power-chip"><Zap size={11} /> {m.power_label || m.max_power}</span>}
+                      <span className="owner-info-label">{(m.connectors?.length ?? m.total_connectors ?? 0)} connectors</span>
+                    </div>
+                  </div>
+                  <span className={`owner-mstatus owner-status-${m.status}`}>{MACHINE_STATUS[m.status] || m.status}</span>
+                  <ChevronRight size={16} className="owner-info-arrow" />
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ---------------- MANAGE: infrastructure ---------------- */}
+      {mode === 'manage' && (
+      <>
       <div className="owner-section-head">
         <h2 className="owner-h2">Infrastructure</h2>
         <button className="owner-btn owner-btn-primary owner-btn-sm" onClick={openMachineModal}>
@@ -231,6 +461,9 @@ export default function StationDetailPage() {
                   </div>
                 </div>
                 <span className={`owner-mstatus owner-status-${m.status}`}>{MACHINE_STATUS[m.status] || m.status}</span>
+                <button className="owner-machine-profile-btn" onClick={() => navigate(`/owner/machines/${m.machine_id}`)} title="Machine profile">
+                  <ChevronRight size={16} />
+                </button>
               </div>
 
               {/* OCPP connectivity */}
@@ -272,11 +505,16 @@ export default function StationDetailPage() {
                 <button className="owner-add-connector" onClick={() => setConnectorFor(m)}>
                   <PlusCircle size={13} /> Connector
                 </button>
+                <button className="owner-qr-mini" onClick={() => setQrMachineId(m.machine_id)}>
+                  <QrCode size={13} /> QR
+                </button>
               </div>
             </div>
             );
           })}
         </div>
+      )}
+      </>
       )}
       <div className="owner-bottom-space" />
 
@@ -372,6 +610,9 @@ export default function StationDetailPage() {
               </button>
             </div>
 
+            <button className="owner-btn owner-btn-ghost owner-btn-block" onClick={() => { const id = addedMachine.machine_id; setAddedMachine(null); setQrMachineId(id); }}>
+              <QrCode size={16} /> Download QR code
+            </button>
             <button className="owner-btn owner-btn-primary owner-btn-block" onClick={() => setAddedMachine(null)}>Done</button>
           </div>
         </div>
@@ -411,6 +652,9 @@ export default function StationDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Machine QR download modal */}
+      {qrMachineId != null && <MachineQrModal machineId={qrMachineId} onClose={() => setQrMachineId(null)} />}
     </div>
   );
 }

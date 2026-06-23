@@ -89,4 +89,46 @@ export const sessionService = {
     });
     return response.data.session;
   },
+
+  /**
+   * Resolve a scanned machine QR token → station + connector to charge.
+   * The token is the app-only signed string embedded in the machine QR.
+   */
+  resolveScan: async (token: string): Promise<ScanResult> => {
+    const response = await apiClient.post<{ data: ScanResult }>(
+      '/sessions/scan',
+      { token },
+      { requiresAuth: true },
+    );
+    return response.data;
+  },
 };
+
+export interface ScanConnector {
+  connector_id: number;
+  type: string;
+  name: string;
+  power: string | null;
+  is_available: boolean;
+}
+
+export interface ScanResult {
+  machine: {
+    machine_id: number;
+    name: string;
+    ocpp_id: string | null;
+    machine_type: string;
+    power: string | null;
+    status: string;
+    configured: boolean;
+  };
+  station: {
+    station_id: number;
+    name: string;
+    code: string;
+    address: string;
+    price_per_kwh: number;
+  };
+  connector: ScanConnector;
+  connectors: ScanConnector[];
+}
