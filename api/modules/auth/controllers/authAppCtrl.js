@@ -1,9 +1,24 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const std = require(appRoot + '/utils/standardMessages');
 const config = require(appRoot + '/config/config');
 const df = require(appRoot + '/utils/dateFormatUtil');
 const authAppMdl = require('../models/authAppMdl');
 const cntxtDtls = "authAppCtrl";
+
+// JWT secret/expiry used for the web admin email+password flow.
+// Must match accessCtrl.verifyToken (process.env.JWT_SECRET).
+const JWT_SECRET = process.env.JWT_SECRET || config.jwt.secret;
+const ACCESS_EXPIRES_IN = config.jwt.expiresIn || '7d';
+const REFRESH_EXPIRES_IN = '60d';
+
+// Shape the user object the way the admin web console (authSlice) expects.
+const toAdminUser = (u) => ({
+  id: u.usr_id,
+  email: u.eml_tx,
+  name: u.nm_tx,
+  role: u.usr_typ_cd
+});
 
 // Generate random OTP
 const generateOTP = () => {
@@ -267,4 +282,174 @@ exports.getUserInfo = function(req, res) {
             console.error('[getUserInfo] Error:', error);
             return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
         });
+};
+
+/*****************************************************************************
+* Function      : login
+* Description   : Admin web console login (email + password, no OTP).
+*                 Verifies SHA1(password) against usr_lst_t.pswd_hash_tx and
+*                 returns a JWT pair in the shape the frontend expects:
+*                 { user, accessToken, refreshToken }.
+* Arguments     : req, res
+******************************************************************************/
+exports.login = function(req, res) {
+    let data = req.body.data ? req.body.data : req.body;
+    var fnm = "login";
+
+    const { email, password } = data;
+
+    if (!email || !password) {
+        return res.status(std.message["BAD_REQUEST"].code).json({
+            status: std.message["BAD_REQUEST"].code,
+            error: 'Email and password are required',
+            data: null
+        });
+    }
+
+    authAppMdl.findAdminByEmailMdl({ email: email })
+        .then(function(results) {
+            const user = results && results.length > 0 ? results[0] : null;
+
+            if (!user || !user.pswd_hash_tx) {
+                return res.status(std.message["UNAUTHORIZED"].code).json({
+                    status: std.message["UNAUTHORIZED"].code,
+                    error: 'Invalid email or password',
+                    data: null
+                });
+            }
+
+            // SHA1 (hex) comparison — matches pswd_hash_tx storage.
+            const hash = crypto.createHash('sha1').update(password).digest('hex');
+            if (hash !== user.pswd_hash_tx) {
+                return res.status(std.message["UNAUTHORIZED"].code).json({
+                    status: std.message["UNAUTHORIZED"].code,
+                    error: 'Invalid email or password',
+                    data: null
+                });
+            }
+
+            // Restrict the admin console to admin accounts only.
+            if (user.usr_typ_cd !== 'admin') {
+                return res.status(std.message["FORBIDDEN"].code).json({
+                    status: std.message["FORBIDDEN"].code,
+                    error: 'Admin access only',
+                    data: null
+                });
+            }
+
+            const payload = {
+                userId: user.usr_id,
+                email: user.eml_tx,
+                userType: user.usr_typ_cd
+            };
+
+            const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_EXPIRES_IN });
+            const refreshToken = jwt.sign(payload, JWT_SECRET, { expiresIn: REFRESH_EXPIRES_IN });
+
+            return res.status(std.message["SUCCESS"].code).json({
+                status: std.message["SUCCESS"].code,
+                message: 'Login successful',
+                user: toAdminUser(user),
+                accessToken: accessToken,
+                refreshToken: refreshToken
+            });
+        })
+        .catch(function(error) {
+            console.error('[login] Error:', error);
+            return res.status(std.message["INTERNAL_ERROR"].code).json({
+                status: std.message["INTERNAL_ERROR"].code,
+                error: 'Login failed',
+                data: null
+            });
+        });
+};
+
+/*****************************************************************************
+* Function      : getMe
+* Description   : Return the currently authenticated admin's profile.
+*                 Protected by accessCtrl.verifyToken (sets req.user).
+* Arguments     : req, res
+******************************************************************************/
+exports.getMe = function(req, res) {
+    var fnm = "getMe";
+
+    authAppMdl.getAdminByIdMdl({ userId: req.user.userId })
+        .then(function(results) {
+            const user = results && results.length > 0 ? results[0] : null;
+
+            if (!user) {
+                return res.status(std.message["NOT_FOUND"].code).json({
+                    status: std.message["NOT_FOUND"].code,
+                    error: 'User not found',
+                    data: null
+                });
+            }
+
+            return res.status(std.message["SUCCESS"].code).json({
+                status: std.message["SUCCESS"].code,
+                user: toAdminUser(user)
+            });
+        })
+        .catch(function(error) {
+            console.error('[getMe] Error:', error);
+            return res.status(std.message["INTERNAL_ERROR"].code).json({
+                status: std.message["INTERNAL_ERROR"].code,
+                error: 'Failed to fetch profile',
+                data: null
+            });
+        });
+};
+
+/*****************************************************************************
+* Function      : refresh
+* Description   : Issue a new access token from a valid refresh token.
+* Arguments     : req, res
+******************************************************************************/
+exports.refresh = function(req, res) {
+    let data = req.body.data ? req.body.data : req.body;
+
+    const { refreshToken } = data;
+
+    if (!refreshToken) {
+        return res.status(std.message["UNAUTHORIZED"].code).json({
+            status: std.message["UNAUTHORIZED"].code,
+            error: 'No refresh token provided',
+            data: null
+        });
+    }
+
+    jwt.verify(refreshToken, JWT_SECRET, function(err, decoded) {
+        if (err) {
+            return res.status(std.message["UNAUTHORIZED"].code).json({
+                status: std.message["UNAUTHORIZED"].code,
+                error: 'Invalid or expired refresh token',
+                data: null
+            });
+        }
+
+        const payload = {
+            userId: decoded.userId,
+            email: decoded.email,
+            userType: decoded.userType
+        };
+
+        const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_EXPIRES_IN });
+
+        return res.status(std.message["SUCCESS"].code).json({
+            status: std.message["SUCCESS"].code,
+            accessToken: accessToken
+        });
+    });
+};
+
+/*****************************************************************************
+* Function      : logout
+* Description   : Stateless logout (token discarded client-side).
+* Arguments     : req, res
+******************************************************************************/
+exports.logout = function(req, res) {
+    return res.status(std.message["SUCCESS"].code).json({
+        status: std.message["SUCCESS"].code,
+        message: 'Logged out successfully'
+    });
 };

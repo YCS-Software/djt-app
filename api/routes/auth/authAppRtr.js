@@ -5,8 +5,15 @@ var registerCtrl = require('../../modules/auth/controllers/registerCtrl');
 var checkUser = require('../../modules/auth/validators/accessCtrl');
 
 /**
- * Mobile App Authentication Routes
+ * Authentication Routes
  */
+
+// ── Admin web console (email + password, no OTP) ──────────────────────────
+// Consumed by djt-web (frontend/src/services/api.ts -> authApi).
+router.post('/login', authAppCtrl.login);
+router.post('/refresh', authAppCtrl.refresh);
+router.post('/logout', authAppCtrl.logout);
+router.get('/me', checkUser.verifyToken, authAppCtrl.getMe);
 
 // Send OTP to mobile number (login)
 router.post('/app/otp', authAppCtrl.sendOTP);

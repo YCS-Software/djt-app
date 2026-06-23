@@ -176,3 +176,41 @@ exports.updateUserProfileMdl = function(data) {
     console.log('[updateUserProfileMdl] Query:', QRY_TO_EXEC);
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
 };
+
+/*****************************************************************************
+* Function      : findAdminByEmailMdl
+* Description   : Find an active user by email (web console email/password
+*                 login). Uses the live schema table `usr_lst_t` and the
+*                 `pswd_hash_tx` (SHA1 hex) column.
+* Arguments     : data object with email
+******************************************************************************/
+exports.findAdminByEmailMdl = function(data) {
+    const email = String(data.email).replace(/'/g, "''");
+
+    const QRY_TO_EXEC = `SELECT usr_id, eml_tx, nm_tx, pswd_hash_tx, usr_typ_cd, a_in
+        FROM usr_lst_t
+        WHERE eml_tx = '${email}'
+        AND a_in = 1
+        LIMIT 1`;
+
+    console.log('[findAdminByEmailMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};
+
+/*****************************************************************************
+* Function      : getAdminByIdMdl
+* Description   : Get an active user by id from `usr_lst_t` (profile / me).
+* Arguments     : data object with userId
+******************************************************************************/
+exports.getAdminByIdMdl = function(data) {
+    const userId = parseInt(data.userId, 10);
+
+    const QRY_TO_EXEC = `SELECT usr_id, eml_tx, nm_tx, prfl_img_tx, usr_typ_cd, a_in
+        FROM usr_lst_t
+        WHERE usr_id = ${userId}
+        AND a_in = 1
+        LIMIT 1`;
+
+    console.log('[getAdminByIdMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+};

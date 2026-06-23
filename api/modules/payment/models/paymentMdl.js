@@ -40,13 +40,14 @@ exports.getOrderByRzpIdMdl = function(data) {
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
 };
 
-// Mark an order paid + link to wallet transaction
+// Mark an order paid + link to wallet transaction / ledger journal
 exports.markOrderPaidMdl = function(data) {
     const QRY_TO_EXEC = `UPDATE pay_ordr_lst_t SET
         sttus_cd = 'paid',
         rzrpy_pymnt_id_tx = ${esc(data.paymentId)},
         rzrpy_sgntr_tx = ${esc(data.signature)},
         trxn_id = ${num(data.transactionId, 'NULL')},
+        jrnl_id = ${num(data.jrnlId, 'NULL')},
         u_ts = NOW()
         WHERE pay_ordr_id = ${num(data.orderAuditId)}`;
 

@@ -18,7 +18,10 @@ const app = express();
 
 // Middleware
 app.use(cors());
-app.use(bodyParser.json());
+// Capture the raw body bytes so gateway webhook signatures can be verified exactly.
+app.use(bodyParser.json({
+  verify: (req, res, buf) => { req.rawBody = buf; }
+}));
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // Request logging middleware
