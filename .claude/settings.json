@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node _inspect_schema.js)",
+      "Bash(node -e ' *)",
+      "Bash(rm -f /tmp/djt_server.log)",
+      "Bash(RAZORPAY_WEBHOOK_SECRET=whsec_test node server.js)",
+      "Bash(echo \"started pid $!\")",
+      "Read(//tmp/**)",
+      "Bash(RAZORPAY_WEBHOOK_SECRET=whsec_test node tests/payment/playwright/payment.sim.js)",
+      "Bash(echo \"EXIT=$?\")",
+      "PowerShell($c = Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $pid5000 = $c[0].OwningProcess; Stop-Process -Id $pid5000 -Force; Start-Sleep -Milliseconds 600; $c2 = Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue; if \\($c2\\) { \"still listening\" } else { \"stopped pid $pid5000; port free\" } } else { \"no listener \\(already stopped\\)\" })",
+      "PowerShell(Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue | Select-Object Id, ProcessName, StartTime })",
+      "Bash(git add *)",
+      "Bash(git restore *)"
+    ]
+  }
+}

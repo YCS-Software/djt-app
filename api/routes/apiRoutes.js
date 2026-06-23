@@ -49,8 +49,14 @@ router.use('/dashboard', require('./dashboard/dashboardRtr'));
 // Payment routes
 router.use('/payment', require('./payment/paymentRtr'));
 
+// Ledger routes (double-entry accounts, statements, Razorpay webhook)
+router.use('/ledger', require('./ledger/ledgerRtr'));
+
 // Profile routes
 router.use('/profile', require('./profile/profileRtr'));
+
+// SMS routes (templated messaging + audit log)
+router.use('/sms', require('./sms/smsRtr'));
 
 // Catch-all for invalid routes
 router.all('**', (req, res) => {

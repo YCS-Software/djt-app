@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "migrate:ledger": "node database/run_payment_ledger_migration.js",
+    "test:payment": "node tests/payment/ledger.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -16,6 +18,7 @@
     "jsonwebtoken": "^9.0.2",
     "mssql": "^9.1.1",
     "mysql2": "^3.6.0",
+    "playwright": "^1.61.0",
     "razorpay": "^2.9.6",
     "uuid": "^9.0.1",
     "ws": "^8.21.0"

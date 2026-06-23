@@ -16,7 +16,6 @@ export interface CreateOrderResponse {
   amount: number;
   currency: string;
   key_id: string;
-  mock?: boolean;
 }
 
 export interface VerifyPaymentRequest {
@@ -29,11 +28,10 @@ export interface VerifyPaymentResponse {
   verified: boolean;
   order_id: string;
   payment_id: string | null;
-  transaction_id?: number;
+  journal_id?: number;
   amount?: number;
   new_balance?: number;
   already_processed?: boolean;
-  mock?: boolean;
 }
 
 export const paymentService = {

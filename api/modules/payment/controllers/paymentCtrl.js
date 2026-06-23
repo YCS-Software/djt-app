@@ -1,220 +1,221 @@
 /**
  * Payment Gateway Controller
- * Razorpay wallet top-up. Currently runs in MOCK mode unless live keys are set.
+ * Razorpay wallet top-up, wired to the double-entry ledger. LIVE gateway only —
+ * there is no mock mode; payments always go through Razorpay.
  *
  * Flow:
- *   1. POST /payment/create-order  -> creates a (mock or live) order + audit row
- *   2. App completes payment (mock = instant, live = Razorpay checkout)
- *   3. POST /payment/verify        -> verifies, then CREDITS the wallet server-side
- *                                     (single source of truth, idempotent) + marks audit paid
+ *   1. POST /payment/create-order  -> create a real Razorpay order + audit row.
+ *                                     Returns the PUBLISHABLE key id only.
+ *   2. App completes payment via the Razorpay checkout.
+ *   3. POST /payment/verify        -> verify the signature, then credit the wallet via
+ *                                     ledgerService.walletTopup (single source of truth,
+ *                                     idempotent, double-entry + audit trail).
+ *
+ * All Razorpay credentials are read server-side from config/razorpay.config.js
+ * (environment variables only); only the publishable key id is ever sent to the client.
  */
 
-const crypto = require('crypto');
-const std = require(appRoot + '/utils/standardMessages');
-const df = require(appRoot + '/utils/dateFormatUtil');
-const paymentMdl = require('../models/paymentMdl');
-const walletMdl = require('../../wallet/models/walletMdl');
+const std = require(appRoot + "/utils/standardMessages");
+const df = require(appRoot + "/utils/dateFormatUtil");
+const rzp = require(appRoot + "/config/razorpay.config");
+const paymentMdl = require("../models/paymentMdl");
+const ledger = require(appRoot + "/api/modules/ledger/services/ledgerService");
 const cntxtDtls = "paymentCtrl";
 
-const KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_live_T50sL9YFAg8I9t';
-const KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'KOJBf0KsXqA3e32JkywmR62L';
-
-// We are in mock mode unless a real (non-placeholder) secret is configured.
-function isMockMode() {
-    return !KEY_SECRET || KEY_SECRET === 'test_secret_key';
-}
-
 function badRequest(res, message) {
-    return res.status(std.message["BAD_REQUEST"].code).json({
-        status: std.message["BAD_REQUEST"].code, message, data: null
+  return res.status(std.message["BAD_REQUEST"].code).json({
+    status: std.message["BAD_REQUEST"].code,
+    message,
+    data: null,
+  });
+}
+
+/*****************************************************************************
+ * Function      : createOrder
+ * Description   : Create a real Razorpay order and record an audit row.
+ *                 Fails (no mock fallback) if the gateway is unavailable.
+ ******************************************************************************/
+exports.createOrder = function (req, res) {
+  const fnm = "createOrder";
+  const userId = req.user.userId;
+  const body = req.body.data || req.body;
+  const amount = Number(body.amount);
+  const currency = body.currency || "INR";
+  const paymentMethod = body.payment_method || "upi";
+
+  if (!amount || amount <= 0 || isNaN(amount)) {
+    return badRequest(res, "Invalid amount");
+  }
+
+  let razorpay;
+  try {
+    razorpay = rzp.getInstance();
+  } catch (e) {
+    console.error("[createOrder] gateway not configured:", e);
+    return df.formatErrorRes(res, e, cntxtDtls, fnm, {});
+  }
+
+  razorpay.orders.create(
+    {
+      amount: Math.round(amount * 100),
+      currency,
+      receipt: `wallet_${userId}_${Date.now()}`,
+      notes: {
+        userId: String(userId),
+        payment_method: paymentMethod,
+        description: "Wallet Top-up",
+      },
+    },
+    function (err, order) {
+      if (err) {
+        console.error("[createOrder] Razorpay order creation failed:", err);
+        return df.formatErrorRes(
+          res,
+          { err_status: 502, err_message: "Failed to create payment order" },
+          cntxtDtls,
+          fnm,
+          {},
+        );
+      }
+
+      // Record the order so verify can trust the amount (not the client).
+      paymentMdl
+        .createOrderAuditMdl({
+          userId,
+          orderId: order.id,
+          amount,
+          currency,
+          purpose: "wallet_topup",
+          paymentMethod,
+        })
+        .catch((e) => console.error("[createOrder] audit insert failed:", e));
+
+      return df.formatSucessRes(
+        req,
+        res,
+        {
+          order_id: order.id,
+          amount: amount,
+          currency: currency,
+          key_id: rzp.getPublicKeyId(), // publishable key only
+        },
+        cntxtDtls,
+        fnm,
+        { message: "Payment order created" },
+      );
+    },
+  );
+};
+
+/*****************************************************************************
+ * Function      : verifyPayment
+ * Description   : Verify the Razorpay signature, then credit the wallet via the
+ *                 ledger. Idempotent: re-verifying a paid order returns the same result.
+ ******************************************************************************/
+exports.verifyPayment = function (req, res) {
+  const fnm = "verifyPayment";
+  const userId = req.user.userId;
+  const body = req.body.data || req.body;
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
+
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    return badRequest(
+      res,
+      "Missing razorpay_order_id, razorpay_payment_id or razorpay_signature",
+    );
+  }
+
+  paymentMdl
+    .getOrderByRzpIdMdl({ orderId: razorpay_order_id, userId })
+    .then(async function (rows) {
+      const order = rows && rows[0];
+      if (!order) {
+        return badRequest(res, "Unknown payment order");
+      }
+
+      // Idempotency: already credited -> return current balance, do NOT double credit.
+      if (order.sttus_cd === "paid") {
+        const bal = await ledger.getWalletBalance(userId);
+        return df.formatSucessRes(
+          req,
+          res,
+          {
+            verified: true,
+            already_processed: true,
+            order_id: razorpay_order_id,
+            payment_id: order.rzrpy_pymnt_id_tx,
+            journal_id: order.jrnl_id,
+            new_balance: bal,
+          },
+          cntxtDtls,
+          fnm,
+          { message: "Payment already processed" },
+        );
+      }
+
+      // Verify the Razorpay checkout signature (always).
+      const ok = rzp.verifyPaymentSignature(
+        razorpay_order_id,
+        razorpay_payment_id,
+        razorpay_signature,
+      );
+      if (!ok) {
+        await paymentMdl
+          .markOrderFailedMdl({ orderAuditId: order.pay_ordr_id })
+          .catch(() => {});
+        return badRequest(res, "Payment verification failed: invalid signature");
+      }
+
+      // ---- Credit the wallet through the ledger (trusted amount from the audit row) ----
+      const amount = parseFloat(order.amt) || 0;
+      const paymentMethod = order.pymnt_mthd_cd || "upi";
+
+      const jr = await ledger.walletTopup({
+        userId,
+        amount,
+        paymentMethod,
+        paymentDetails: {
+          order_id: razorpay_order_id,
+          payment_id: razorpay_payment_id,
+        },
+        idempotencyKey: `topup:order:${order.pay_ordr_id}`,
+        refType: "pay_order",
+        refId: order.pay_ordr_id,
+        audit: {
+          actnCd: "wallet_topup",
+          userId,
+          ip: req.ip,
+          userAgent: req.headers["user-agent"],
+        },
+      });
+
+      const newBalance = await ledger.getWalletBalance(userId);
+
+      await paymentMdl.markOrderPaidMdl({
+        orderAuditId: order.pay_ordr_id,
+        paymentId: razorpay_payment_id,
+        signature: razorpay_signature,
+        jrnlId: jr.jrnlId,
+      });
+
+      return df.formatSucessRes(
+        req,
+        res,
+        {
+          verified: true,
+          order_id: razorpay_order_id,
+          payment_id: razorpay_payment_id,
+          journal_id: jr.jrnlId,
+          amount: amount,
+          new_balance: newBalance,
+        },
+        cntxtDtls,
+        fnm,
+        { message: "Payment verified & wallet credited" },
+      );
+    })
+    .catch(function (error) {
+      console.error("[verifyPayment] Error:", error);
+      return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
     });
-}
-
-/*****************************************************************************
-* Function      : createOrder
-* Description   : Create a payment order (mock or live) and record an audit row
-******************************************************************************/
-exports.createOrder = function(req, res) {
-    const fnm = "createOrder";
-    const userId = req.user.userId;
-    const body = req.body.data || req.body;
-    const amount = Number(body.amount);
-    const currency = body.currency || 'INR';
-    const paymentMethod = body.payment_method || 'wallet_topup';
-
-    if (!amount || amount <= 0 || isNaN(amount)) {
-        return badRequest(res, 'Invalid amount');
-    }
-
-    const respond = (orderId, mock) => {
-        // Record the order so verify can trust the amount (not the client)
-        paymentMdl.createOrderAuditMdl({
-            userId, orderId, amount, currency, purpose: 'wallet_topup',
-            paymentMethod, isMock: mock
-        }).catch((e) => console.error('[createOrder] audit insert failed:', e));
-
-        return df.formatSucessRes(req, res, {
-            order_id: orderId,
-            amount: amount,
-            currency: currency,
-            key_id: KEY_ID,
-            mock: mock
-        }, cntxtDtls, fnm, { message: mock ? 'Payment order created (mock mode)' : 'Payment order created' });
-    };
-
-    if (isMockMode()) {
-        // Mock order id is explicitly tagged so verify can recognise it.
-        return respond(`order_mock_${userId}_${Date.now()}`, true);
-    }
-
-    // Live mode
-    try {
-        const Razorpay = require('razorpay');
-        const razorpay = new Razorpay({ key_id: KEY_ID, key_secret: KEY_SECRET });
-        razorpay.orders.create({
-            amount: Math.round(amount * 100),
-            currency,
-            receipt: `wallet_${userId}_${Date.now()}`,
-            notes: { userId: String(userId), payment_method: paymentMethod, description: 'Wallet Top-up' }
-        }, function(err, order) {
-            if (err) {
-                console.error('[createOrder] Razorpay error, falling back to mock:', err);
-                return respond(`order_mock_${userId}_${Date.now()}`, true);
-            }
-            return respond(order.id, false);
-        });
-    } catch (error) {
-        console.error('[createOrder] error, falling back to mock:', error);
-        return respond(`order_mock_${userId}_${Date.now()}`, true);
-    }
 };
-
-/*****************************************************************************
-* Function      : verifyPayment
-* Description   : Verify the payment, then credit the wallet server-side.
-*                 Idempotent: a re-verify of a paid order returns the same result.
-******************************************************************************/
-exports.verifyPayment = function(req, res) {
-    const fnm = "verifyPayment";
-    const userId = req.user.userId;
-    const body = req.body.data || req.body;
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
-
-    if (!razorpay_order_id) {
-        return badRequest(res, 'Missing order id');
-    }
-
-    const isMockOrder = String(razorpay_order_id).indexOf('mock') !== -1;
-
-    // Look up the order we recorded at create-time — this is the trusted amount source.
-    paymentMdl.getOrderByRzpIdMdl({ orderId: razorpay_order_id, userId })
-        .then(function(rows) {
-            const order = rows && rows[0];
-            if (!order) {
-                return badRequest(res, 'Unknown payment order');
-            }
-
-            // Idempotency: already credited -> return existing result, do NOT double credit.
-            if (order.sttus_cd === 'paid') {
-                return walletMdl.getUserWalletMdl({ userId }).then(function(w) {
-                    const bal = w && w[0] ? parseFloat(w[0].blnce_amt) || 0 : 0;
-                    return df.formatSucessRes(req, res, {
-                        verified: true, already_processed: true,
-                        order_id: razorpay_order_id, payment_id: order.rzrpy_pymnt_id_tx,
-                        transaction_id: order.trxn_id, new_balance: bal, mock: order.is_mock_in === 1
-                    }, cntxtDtls, fnm, { message: 'Payment already processed' });
-                });
-            }
-
-            // Signature check for LIVE orders only.
-            if (!isMockOrder && !isMockMode()) {
-                const expected = crypto.createHmac('sha256', KEY_SECRET)
-                    .update(`${razorpay_order_id}|${razorpay_payment_id}`).digest('hex');
-                if (expected !== razorpay_signature) {
-                    paymentMdl.markOrderFailedMdl({ orderAuditId: order.pay_ordr_id })
-                        .catch(() => {});
-                    return badRequest(res, 'Payment verification failed: invalid signature');
-                }
-            }
-
-            // ---- Credit the wallet (trusted amount from the audit row) ----
-            const amount = parseFloat(order.amt) || 0;
-            const paymentMethod = order.pymnt_mthd_cd || 'razorpay';
-
-            return creditWallet(userId, amount, paymentMethod, {
-                order_id: razorpay_order_id,
-                payment_id: razorpay_payment_id || `pay_mock_${Date.now()}`,
-                mock: isMockOrder
-            }).then(function(result) {
-                // Mark the audit row paid + link the wallet transaction
-                return paymentMdl.markOrderPaidMdl({
-                    orderAuditId: order.pay_ordr_id,
-                    paymentId: razorpay_payment_id || `pay_mock_${Date.now()}`,
-                    signature: razorpay_signature || null,
-                    transactionId: result.transactionId
-                }).then(function() {
-                    return df.formatSucessRes(req, res, {
-                        verified: true,
-                        order_id: razorpay_order_id,
-                        payment_id: razorpay_payment_id || null,
-                        transaction_id: result.transactionId,
-                        amount: amount,
-                        new_balance: result.newBalance,
-                        mock: isMockOrder
-                    }, cntxtDtls, fnm, { message: 'Payment verified & wallet credited' });
-                });
-            });
-        })
-        .catch(function(error) {
-            console.error('[verifyPayment] Error:', error);
-            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
-        });
-};
-
-/**
- * Credit a user's wallet by `amount`, creating the wallet if needed, and writing
- * a credit/topup transaction. Returns { transactionId, newBalance }.
- */
-function creditWallet(userId, amount, paymentMethod, paymentDetails) {
-    return walletMdl.getUserWalletMdl({ userId })
-        .then(function(walletResults) {
-            if (walletResults && walletResults.length > 0) {
-                return walletResults[0];
-            }
-            // create empty wallet, then re-fetch
-            return walletMdl.createWalletMdl({ userId, initialAmount: 0.0 })
-                .then(function() { return walletMdl.getUserWalletMdl({ userId }); })
-                .then(function(rows) {
-                    if (!rows || rows.length === 0) throw new Error('Failed to create wallet');
-                    return rows[0];
-                });
-        })
-        .then(function(wallet) {
-            const balanceBefore = parseFloat(wallet.blnce_amt) || 0;
-            const balanceAfter = balanceBefore + parseFloat(amount);
-
-            return walletMdl.addMoneyMdl({ walletId: wallet.wllt_id, amount, userId })
-                .then(function(upd) {
-                    if (!upd || upd.affectedRows !== 1) throw new Error('Failed to update wallet balance');
-                    return walletMdl.createTransactionMdl({
-                        walletId: wallet.wllt_id,
-                        userId,
-                        type: 'credit',
-                        category: 'topup',
-                        amount,
-                        balanceBefore,
-                        balanceAfter,
-                        description: `Wallet Top-up via ${paymentMethod || 'payment gateway'}`,
-                        paymentMethod,
-                        paymentDetails,
-                        status: 'completed',
-                        referenceId: paymentDetails.payment_id || paymentDetails.order_id,
-                        referenceType: 'payment'
-                    });
-                })
-                .then(function(txn) {
-                    if (!txn || !txn.insertId) throw new Error('Failed to create transaction record');
-                    return { transactionId: txn.insertId, newBalance: balanceAfter };
-                });
-        });
-}

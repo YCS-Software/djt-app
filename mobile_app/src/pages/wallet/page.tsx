@@ -161,30 +161,6 @@ export default function Wallet() {
         }
       };
 
-      // For mock payments (when Razorpay is not configured)
-      if (orderData.mock) {
-        // Simulate the gateway, then verify — the server credits the wallet
-        setTimeout(async () => {
-          try {
-            await paymentService.verifyPayment({
-              razorpay_order_id: orderData.order_id,
-              razorpay_payment_id: `pay_mock_${Date.now()}`
-            });
-
-            await fetchWalletData();
-            setShowAddMoney(false);
-            setAddAmount('');
-            alert('Money added successfully! (Mock payment)');
-          } catch (error) {
-            console.error('Error adding money:', error);
-            alert('Failed to add money. Please try again.');
-          } finally {
-            setIsLoading(false);
-          }
-        }, 1500);
-        return;
-      }
-
       // Open Razorpay checkout
       const razorpay = new window.Razorpay(options);
       razorpay.open();
