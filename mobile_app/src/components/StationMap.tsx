@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap, CircleMarker } from 'react-leaflet';
 import { Icon, DivIcon } from 'leaflet';
 import type { LatLngExpression } from 'leaflet';
@@ -464,7 +465,7 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
     return polyline[midIndex];
   };
 
-  return (
+  return createPortal(
     <div className="station-map-overlay">
       <div className="station-map-container">
         {/* Header */}
@@ -772,6 +773,7 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -9,7 +9,9 @@ import {
   Building2,
   Zap,
   ArrowDownLeft,
-  ArrowUpRight
+  ArrowUpRight,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { walletService, type Transaction } from '../../services/api/walletService';
 import { paymentService } from '../../services/api/paymentService';
@@ -36,6 +38,12 @@ export default function Wallet() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+
+  const showToast = (type: 'success' | 'error', msg: string) => {
+    setToast({ type, msg });
+    window.setTimeout(() => setToast(null), 3200);
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('x-access-token');
@@ -143,11 +151,11 @@ export default function Wallet() {
           });
           const resp = (result && result.response) || result || {};
           await finishTopup(resp);
-          alert('Money added successfully!');
+          showToast('success', 'Money added successfully!');
         } catch (e: any) {
           // Don't show a scary error when the user simply cancels/dismisses
           if (!(e?.code === '0' || /cancel|dismiss/i.test(e?.message || ''))) {
-            alert(e?.message || 'Payment failed');
+            showToast('error', e?.message || 'Payment failed');
           }
         } finally {
           setIsLoading(false);
@@ -169,10 +177,10 @@ export default function Wallet() {
         handler: async function(response: any) {
           try {
             await finishTopup(response);
-            alert('Money added successfully!');
+            showToast('success', 'Money added successfully!');
           } catch (error) {
             console.error('Payment verification error:', error);
-            alert('Payment verification failed. Please contact support.');
+            showToast('error', 'Payment verification failed. Please contact support.');
           } finally {
             setIsLoading(false);
           }
@@ -186,7 +194,7 @@ export default function Wallet() {
       
     } catch (error) {
       console.error('Error processing payment:', error);
-      alert('Payment failed. Please try again.');
+      showToast('error', 'Payment failed. Please try again.');
       setIsLoading(false);
     }
   };
@@ -253,6 +261,14 @@ export default function Wallet() {
 
   return (
     <div className="wallet-page">
+      {toast && (
+        <div className={`wallet-toast wallet-toast-${toast.type}`} role="status">
+          <span className="wallet-toast-icon">
+            {toast.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
+          </span>
+          <span className="wallet-toast-msg">{toast.msg}</span>
+        </div>
+      )}
       {/* Header */}
       <header className="wallet-header">
         <div className="header-content">

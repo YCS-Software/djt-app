@@ -4,3 +4,8 @@ mobile_app/out/
 
 # Local Claude settings (machine-specific)
 .claude/settings.local.json
+
+# Transient test artifacts (logs + screenshots)
+tests/ui/results/
+tests/payment/results/
+tests/payment/playwright/results/

@@ -12,7 +12,10 @@
       "PowerShell($c = Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $pid5000 = $c[0].OwningProcess; Stop-Process -Id $pid5000 -Force; Start-Sleep -Milliseconds 600; $c2 = Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue; if \\($c2\\) { \"still listening\" } else { \"stopped pid $pid5000; port free\" } } else { \"no listener \\(already stopped\\)\" })",
       "PowerShell(Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue | Select-Object Id, ProcessName, StartTime })",
       "Bash(git add *)",
-      "Bash(git restore *)"
+      "Bash(git restore *)",
+      "Bash(node -e \"global.appRoot=require\\('path'\\).resolve\\('.'\\);require\\('dotenv'\\).config\\(\\);require\\('./api/modules/wallet/controllers/walletCtrl'\\);require\\('./api/modules/wallet/models/walletMdl'\\);console.log\\('✓ wallet controller+model load OK'\\);\")",
+      "Bash(node database/reconcile_wallet_balances.js)",
+      "Bash(node tests/ui/ui-review.js)"
     ]
   }
 }

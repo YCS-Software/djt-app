@@ -287,16 +287,14 @@
   border-color: rgba(56, 189, 248, 0.45);
 }
 
-/* Navigation Status Bar */
+/* Navigation Status Bar — flows below the navigation panel (no longer floats over it) */
 .navigation-status {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  position: relative;
+  flex-shrink: 0;
   background: linear-gradient(135deg, rgba(9, 24, 42, 0.5) 0%, #22D3EE 100%);
   padding: 1rem 1.5rem;
   color: white;
-  z-index: 1000;
+  z-index: 2;
   animation: slideUpNav 0.3s ease-out;
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
 }
@@ -405,5 +403,268 @@
     justify-content: center;
     margin-top: 0.5rem;
   }
+}
+
+/* ════════════════════════════════════════════
+   Turn-by-turn navigation panel (enhanced)
+   ════════════════════════════════════════════ */
+.navigation-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.9rem 1.1rem 1rem;
+  background: linear-gradient(180deg, rgba(9, 24, 42, 0.75) 0%, rgba(6, 16, 31, 0.9) 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Current instruction — the hero row */
+.nav-instruction {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.8rem 0.9rem;
+  background: rgba(56, 189, 248, 0.09);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 0.95rem;
+}
+
+.nav-instruction-icon {
+  width: 2.85rem;
+  height: 2.85rem;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(135deg, #22D3EE 0%, #2563EB 100%);
+  box-shadow: 0 6px 16px rgba(34, 211, 238, 0.35);
+}
+
+.nav-instruction-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nav-instruction-main {
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #EAF4FB;
+}
+
+.nav-instruction-distance {
+  margin-top: 0.15rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #38BDF8;
+}
+
+/* Remaining / ETA stat cards */
+.nav-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.nav-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.7rem;
+  background: rgba(16, 34, 58, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.85rem;
+}
+
+.nav-stat-icon {
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 0.6rem;
+  color: #38BDF8;
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.nav-stat-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nav-stat-label {
+  font-size: 0.68rem;
+  color: #9FBBD4;
+}
+
+.nav-stat-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #EAF4FB;
+  white-space: nowrap;
+}
+
+/* Action buttons — even 4-up grid */
+.nav-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.nav-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.6rem 0.25rem;
+  background: rgba(16, 34, 58, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.85rem;
+  color: #C7D8E8;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.nav-action-btn span {
+  line-height: 1;
+}
+
+.nav-action-btn:hover {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #EAF4FB;
+  transform: translateY(-1px);
+}
+
+.nav-action-btn:active {
+  transform: translateY(0);
+}
+
+/* Stop = danger accent */
+.nav-actions .nav-action-btn:first-child {
+  color: #F87171;
+  border-color: rgba(239, 68, 68, 0.28);
+  background: rgba(239, 68, 68, 0.08);
+}
+.nav-actions .nav-action-btn:first-child:hover {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #FCA5A5;
+}
+
+/* Voice active */
+.nav-action-btn.voice-on {
+  color: #38BDF8;
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.nav-status-indicator {
+  flex: none;
+  color: #fff;
+  display: flex;
+  opacity: 0.95;
+}
+
+/* Floating map controls */
+.recenter-btn {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  width: 2.85rem;
+  height: 2.85rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(9, 24, 42, 0.88);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  color: #38BDF8;
+  cursor: pointer;
+  z-index: 500;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  transition: all 0.18s ease;
+}
+.recenter-btn:hover {
+  background: rgba(56, 189, 248, 0.2);
+  transform: scale(1.06);
+}
+
+.off-route-alert {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.85rem;
+  background: rgba(220, 38, 38, 0.94);
+  color: #fff;
+  border-radius: 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  z-index: 600;
+  box-shadow: 0 8px 22px rgba(220, 38, 38, 0.4);
+}
+.off-route-alert .reroute-btn {
+  padding: 0.3rem 0.65rem;
+  background: #fff;
+  color: #DC2626;
+  border: none;
+  border-radius: 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Route chooser (multiple routes) */
+.route-selection-panel {
+  padding: 0.85rem 1.1rem;
+  background: rgba(9, 24, 42, 0.7);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.route-selection-title {
+  font-size: 0.78rem;
+  color: #9FBBD4;
+  margin-bottom: 0.5rem;
+}
+.route-options {
+  display: flex;
+  gap: 0.5rem;
+}
+.route-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  background: rgba(16, 34, 58, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.8rem;
+  color: #EAF4FB;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.route-option.selected {
+  border-color: #38BDF8;
+  background: rgba(56, 189, 248, 0.14);
+}
+.route-option-time {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.route-option-distance {
+  font-size: 0.74rem;
+  color: #9FBBD4;
+}
+.route-option-check {
+  color: #38BDF8;
+  flex: none;
 }
 

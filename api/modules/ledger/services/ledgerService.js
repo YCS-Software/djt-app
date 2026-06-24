@@ -139,9 +139,11 @@ async function postJournal(opts, externalConn) {
             await mdl.updateAccountBalance(conn, acc.acct_id, balanceAfter);
             acc.blnce_amt = balanceAfter; // keep in-memory copy fresh if account repeats
 
-            // keep the legacy wallet view in sync for customer wallets
+            // keep the legacy wallet view in sync for customer wallets — apply the
+            // signed delta (increment/decrement), never an absolute overwrite.
             if (acc.acct_typ_cd === 'customer_wallet' && acc.usr_id) {
-                const walletId = await mdl.syncWalletBalance(conn, acc.usr_id, balanceAfter);
+                const deltaRupees = (leg.direction === 'credit' ? 1 : -1) * leg.amount;
+                const walletId = await mdl.applyWalletDelta(conn, acc.usr_id, deltaRupees);
                 await mdl.insertWalletTxnMirror(conn, {
                     walletId, userId: acc.usr_id,
                     type: opts.type === 'charging_refund' ? 'refund' : leg.direction,

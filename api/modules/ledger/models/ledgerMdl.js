@@ -172,18 +172,23 @@ async function getWalletByUser(conn, userId) {
     return rows[0] || null;
 }
 
-/** Set the cached wallet balance for a user, creating the wallet row if needed. Returns wllt_id. */
-async function syncWalletBalance(conn, userId, newBalance) {
+/**
+ * Apply a SIGNED DELTA to the cached wallet balance (increment for credits,
+ * decrement for debits) — never an absolute overwrite, so it cannot clobber a
+ * balance written by another code path. Creates the wallet row if missing.
+ * Returns wllt_id.
+ */
+async function applyWalletDelta(conn, userId, deltaAmount) {
     const wallet = await getWalletByUser(conn, userId);
     if (wallet) {
         await conn.execute(
-            `UPDATE wllt_lst_t SET blnce_amt = ?, lst_updtd_ts = NOW() WHERE wllt_id = ?`,
-            [newBalance, wallet.wllt_id]);
+            `UPDATE wllt_lst_t SET blnce_amt = blnce_amt + ?, lst_updtd_ts = NOW() WHERE wllt_id = ?`,
+            [deltaAmount, wallet.wllt_id]);
         return wallet.wllt_id;
     }
     const [res] = await conn.execute(
         `INSERT INTO wllt_lst_t (usr_id, blnce_amt, a_in) VALUES (?, ?, 1)`,
-        [userId, newBalance]);
+        [userId, deltaAmount > 0 ? deltaAmount : 0]);
     return res.insertId;
 }
 
@@ -313,7 +318,7 @@ module.exports = {
     // commission
     resolveCommissionRule,
     // wallet cache
-    getWalletByUser, syncWalletBalance, insertWalletTxnMirror,
+    getWalletByUser, applyWalletDelta, insertWalletTxnMirror,
     // audit
     insertAudit,
     // webhook

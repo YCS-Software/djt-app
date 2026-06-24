@@ -49,6 +49,20 @@
   margin: 0;
 }
 
+/* Center the header title; keep the back button overlaid on the left */
+.charging-header .header-content {
+  justify-content: center;
+  position: relative;
+  min-height: 2.5rem;
+}
+.charging-header .back-btn {
+  position: absolute;
+  left: 0;
+}
+.charging-header .page-title {
+  text-align: center;
+}
+
 /* ═══════════════════════════════════════════
    MAIN CONTENT
    ═══════════════════════════════════════════ */
