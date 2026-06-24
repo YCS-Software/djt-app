@@ -129,23 +129,7 @@ export default function Wallet() {
         setAddAmount('');
       };
 
-      // 1) Mock mode (no real gateway configured) — simulate then verify
-      if (orderData.mock) {
-        setTimeout(async () => {
-          try {
-            await finishTopup({ razorpay_order_id: orderData.order_id, razorpay_payment_id: `pay_mock_${Date.now()}` });
-            alert('Money added successfully! (Mock payment)');
-          } catch (error) {
-            console.error('Error adding money:', error);
-            alert('Failed to add money. Please try again.');
-          } finally {
-            setIsLoading(false);
-          }
-        }, 1500);
-        return;
-      }
-
-      // 2) Native app (Android/iOS) — use the native Razorpay SDK so UPI/GPay/PhonePe appear
+      // Native app (Android/iOS) — use the native Razorpay SDK so UPI/GPay/PhonePe appear
       if (Capacitor.isNativePlatform()) {
         try {
           const result: any = await RazorpayCheckout.open({

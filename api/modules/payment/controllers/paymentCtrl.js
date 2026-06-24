@@ -214,7 +214,30 @@ exports.verifyPayment = function (req, res) {
         { message: "Payment verified & wallet credited" },
       );
     })
-    .catch(function (error) {
+    .catch(async function (error) {
+      const msg = (error && (error.sqlMessage || error.err_message || error.message)) || "";
+      const isDuplicate =
+        (error && error.code === "ER_DUP_ENTRY") || /duplicate entry/i.test(msg);
+      if (isDuplicate) {
+        try {
+          const bal = await ledger.getWalletBalance(userId);
+          return df.formatSucessRes(
+            req,
+            res,
+            {
+              verified: true,
+              already_processed: true,
+              order_id: razorpay_order_id,
+              new_balance: bal,
+            },
+            cntxtDtls,
+            fnm,
+            { message: "Payment already processed" },
+          );
+        } catch (_) {
+          /* fall through to the generic error response */
+        }
+      }
       console.error("[verifyPayment] Error:", error);
       return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
     });

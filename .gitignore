@@ -4,7 +4,3 @@ mobile_app/out/
 
 # Local Claude settings (machine-specific)
 .claude/settings.local.json
-
-# Transient test result logs
-tests/payment/results/
-tests/payment/playwright/results/
