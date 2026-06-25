@@ -6,6 +6,7 @@
 const std = require(appRoot + '/utils/standardMessages');
 const df = require(appRoot + '/utils/dateFormatUtil');
 const ocppServer = require(appRoot + '/api/ocpp/ocppServer');
+const ocppLogMdl = require(appRoot + '/api/ocpp/ocppLogMdl');
 const cntxtDtls = "ocppCtrl";
 
 function badRequest(res, message) {
@@ -22,6 +23,23 @@ exports.getConnections = function(req, res) {
     } catch (error) {
         return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
     }
+};
+
+/* OCPP request/response audit log (for charger vendors / support) */
+exports.getLogs = function(req, res) {
+    const fnm = "getLogs";
+    const q = req.query || {};
+    ocppLogMdl.listOcppLogs({
+        ocppId: q.ocpp_id,
+        machineId: q.machine_id,
+        action: q.action,
+        direction: q.direction,
+        messageId: q.message_id,
+        limit: q.limit,
+        offset: q.offset,
+    })
+        .then((logs) => df.formatSucessRes(req, res, { logs }, cntxtDtls, fnm, {}))
+        .catch((error) => df.formatErrorRes(res, error, cntxtDtls, fnm, {}));
 };
 
 /* Remotely start a transaction on a connected charger */

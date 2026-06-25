@@ -9,6 +9,7 @@ const std = require(appRoot + '/utils/standardMessages');
 const df = require(appRoot + '/utils/dateFormatUtil');
 const config = require(appRoot + '/config/config');
 const qrUtil = require(appRoot + '/utils/qrUtil');
+const audit = require(appRoot + '/utils/auditUtil');
 const cntxtDtls = "ownerCtrl";
 
 // Generate a reasonably-unique station code, e.g. DJT-LZ4F9K2
@@ -560,6 +561,13 @@ exports.createStation = function(req, res) {
                     message: 'Failed to create station', data: null
                 });
             }
+            const actx = audit.reqCtx(req);
+            audit.writeAudit({
+                userId: actx.userId, action: 'station_create',
+                entityType: 'station', entityId: result.insertId,
+                newVal: { name: payload.name, city: payload.city, code: payload.code, address: payload.address },
+                ip: actx.ip, userAgent: actx.userAgent
+            });
             return ownerMdl.getOwnedStationMdl({ ownerId, stationId: result.insertId })
                 .then(function(rows) {
                     return df.formatSucessRes(req, res,
@@ -633,6 +641,18 @@ exports.updateStation = function(req, res) {
                 pricePerKwh: data.price_per_kwh, isFastCharging: data.is_fast_charging,
                 power: data.power, operatorName: data.operator_name, contactNumber: data.contact_number
             }).then(function() {
+                const actx = audit.reqCtx(req);
+                audit.writeAudit({
+                    userId: actx.userId, action: 'station_update',
+                    entityType: 'station', entityId: stationId,
+                    newVal: {
+                        name: data.name, address: data.address, city: data.city, state: data.state,
+                        latitude: data.latitude, longitude: data.longitude,
+                        price_per_kwh: data.price_per_kwh, is_fast_charging: data.is_fast_charging,
+                        power: data.power, operator_name: data.operator_name, contact_number: data.contact_number
+                    },
+                    ip: actx.ip, userAgent: actx.userAgent
+                });
                 return ownerMdl.getOwnedStationMdl({ ownerId, stationId })
                     .then(function(updated) {
                         return df.formatSucessRes(req, res, { station: mapStation(updated[0]) },
@@ -758,6 +778,14 @@ exports.addMachine = function(req, res) {
                     }).then(function(result) {
                         const machineId = result.insertId;
 
+                        const actx = audit.reqCtx(req);
+                        audit.writeAudit({
+                            userId: actx.userId, action: 'machine_create',
+                            entityType: 'machine', entityId: machineId,
+                            newVal: { name: name, ocppId: ocppId, machineType: machineType, stationId: stationId },
+                            ip: actx.ip, userAgent: actx.userAgent
+                        });
+
                         // auto-create the default connectors
                         const connPromises = [];
                         for (let i = 1; i <= connectorCount; i++) {
@@ -766,6 +794,14 @@ exports.addMachine = function(req, res) {
                                 connectorType,
                                 name: `Connector ${i}`,
                                 power: maxPower
+                            }).then(function(cResult) {
+                                audit.writeAudit({
+                                    userId: actx.userId, action: 'connector_create',
+                                    entityType: 'connector', entityId: cResult && cResult.insertId,
+                                    newVal: { type: connectorType, machineId: machineId },
+                                    ip: actx.ip, userAgent: actx.userAgent
+                                });
+                                return cResult;
                             }));
                         }
 
@@ -813,6 +849,16 @@ exports.updateMachine = function(req, res) {
                 name: data.name, serialNo: data.serial_no, ocppId: data.ocpp_id,
                 machineType: data.machine_type, maxPower: data.max_power, status: data.status
             }).then(function() {
+                const actx = audit.reqCtx(req);
+                audit.writeAudit({
+                    userId: actx.userId, action: 'machine_update',
+                    entityType: 'machine', entityId: machineId,
+                    newVal: {
+                        name: data.name, serial_no: data.serial_no, ocpp_id: data.ocpp_id,
+                        machine_type: data.machine_type, max_power: data.max_power, status: data.status
+                    },
+                    ip: actx.ip, userAgent: actx.userAgent
+                });
                 return ownerMdl.recalcStationCountersMdl({ stationId })
                     .then(function() {
                         return df.formatSucessRes(req, res, {}, cntxtDtls, fnm, { message: 'Machine updated' });
@@ -850,6 +896,13 @@ exports.addConnector = function(req, res) {
                 name: data.name || connectorType,
                 power: data.power || rows[0].max_pwr_tx || null
             }).then(function(result) {
+                const actx = audit.reqCtx(req);
+                audit.writeAudit({
+                    userId: actx.userId, action: 'connector_create',
+                    entityType: 'connector', entityId: result.insertId,
+                    newVal: { type: connectorType, machineId: machineId },
+                    ip: actx.ip, userAgent: actx.userAgent
+                });
                 return df.formatSucessRes(req, res,
                     { connector_id: result.insertId },
                     cntxtDtls, fnm, { message: 'Connector added' });

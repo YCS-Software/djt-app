@@ -8,6 +8,7 @@ const std = require(appRoot + '/utils/standardMessages');
 const config = require(appRoot + '/config/config');
 const df = require(appRoot + '/utils/dateFormatUtil');
 const authAppMdl = require('../models/authAppMdl');
+const audit = require(appRoot + '/utils/auditUtil');
 const cntxtDtls = "registerCtrl";
 
 /*****************************************************************************
@@ -115,6 +116,17 @@ function createUser(userData, req, res, fnm) {
                 config.jwtSecret || config.jwt.secret,
                 { expiresIn: config.jwt.expiresIn || '30d' }
             );
+
+            const ctx = audit.reqCtx(req);
+            audit.writeAudit({
+                userId: userId,
+                action: 'register',
+                entityType: 'user',
+                entityId: userId,
+                newVal: { phone: phone, userType: userType },
+                ip: ctx.ip,
+                userAgent: ctx.userAgent
+            });
 
             return res.json({
                 status: std.message["SUCCESS"].code,
