@@ -9,6 +9,7 @@ const cntxtDtls = "menuMdl";
 
 exports.getRoleMdl = function (data) {
     const id = parseInt(data.userId, 10) || 0;
-    const QRY = `SELECT usr_typ_cd AS role FROM usr_lst_t WHERE usr_id = ${id} AND a_in = 1 LIMIT 1`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls).catch(() => []);
+    const QRY = `SELECT usr_typ_cd AS role FROM usr_lst_t WHERE usr_id = ? AND a_in = 1 LIMIT 1`;
+    const PARAMS = [id];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, PARAMS, cntxtDtls).catch(() => []);
 };

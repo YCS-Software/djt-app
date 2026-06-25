@@ -18,7 +18,7 @@ const cntxtDtls = "configurationsMdl";
 ******************************************************************************/
 exports.listMdl = function() {
     const QRY = `SELECT sttng_id AS id, '' AS stationName, sttng_ky_tx AS \`key\`, sttng_vl_tx AS value, 0 AS readonly, CASE WHEN a_in=1 THEN 'Active' ELSE 'Inactive' END AS status FROM sttng_lst_t ORDER BY sttng_ky_tx ASC`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, [], cntxtDtls);
 };
 
 /*****************************************************************************
@@ -28,8 +28,9 @@ exports.listMdl = function() {
 ******************************************************************************/
 exports.getByIdMdl = function(data) {
     const id = parseInt(data.id, 10) || 0;
-    const QRY = `SELECT * FROM ( SELECT sttng_id AS id, '' AS stationName, sttng_ky_tx AS \`key\`, sttng_vl_tx AS value, 0 AS readonly, CASE WHEN a_in=1 THEN 'Active' ELSE 'Inactive' END AS status FROM sttng_lst_t ) q WHERE q.id = ${id}`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    const QRY = `SELECT * FROM ( SELECT sttng_id AS id, '' AS stationName, sttng_ky_tx AS \`key\`, sttng_vl_tx AS value, 0 AS readonly, CASE WHEN a_in=1 THEN 'Active' ELSE 'Inactive' END AS status FROM sttng_lst_t ) q WHERE q.id = ?`;
+    const PARAMS = [id];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, PARAMS, cntxtDtls);
 };
 
 /*****************************************************************************
@@ -38,10 +39,11 @@ exports.getByIdMdl = function(data) {
 * Arguments     : data object with key, value
 ******************************************************************************/
 exports.saveByKeyMdl = function(data) {
-    const key = sqldb.MySQLConPool.escape(String(data.key == null ? '' : data.key));
-    const val = sqldb.MySQLConPool.escape(String(data.value == null ? '' : data.value));
-    const QRY = `INSERT INTO sttng_lst_t (sttng_ky_tx, sttng_vl_tx, a_in) VALUES (${key}, ${val}, 1) ON DUPLICATE KEY UPDATE sttng_vl_tx=${val}`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    const key = String(data.key == null ? '' : data.key);
+    const val = String(data.value == null ? '' : data.value);
+    const QRY = `INSERT INTO sttng_lst_t (sttng_ky_tx, sttng_vl_tx, a_in) VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE sttng_vl_tx=?`;
+    const PARAMS = [key, val, val];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, PARAMS, cntxtDtls);
 };
 
 /*****************************************************************************
@@ -51,7 +53,8 @@ exports.saveByKeyMdl = function(data) {
 ******************************************************************************/
 exports.updateByIdMdl = function(data) {
     const id = parseInt(data.id, 10) || 0;
-    const val = sqldb.MySQLConPool.escape(String(data.value == null ? '' : data.value));
-    const QRY = `UPDATE sttng_lst_t SET sttng_vl_tx=${val} WHERE sttng_id=${id}`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    const val = String(data.value == null ? '' : data.value);
+    const QRY = `UPDATE sttng_lst_t SET sttng_vl_tx=? WHERE sttng_id=?`;
+    const PARAMS = [val, id];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, PARAMS, cntxtDtls);
 };

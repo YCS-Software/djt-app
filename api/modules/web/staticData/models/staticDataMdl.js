@@ -19,7 +19,7 @@ const cntxtDtls = "staticDataMdl";
 ******************************************************************************/
 exports.listMdl = function() {
     const QRY = `SELECT sttng_id AS id, 'general' AS category, sttng_ky_tx AS code, COALESCE(NULLIF(dscrptn_tx,''), sttng_ky_tx) AS label, sttng_vl_tx AS value, CASE WHEN a_in=1 THEN 'Active' ELSE 'Inactive' END AS status FROM sttng_lst_t ORDER BY sttng_ky_tx ASC`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, [], cntxtDtls);
 };
 
 /*****************************************************************************
@@ -29,6 +29,7 @@ exports.listMdl = function() {
 ******************************************************************************/
 exports.getByIdMdl = function(data) {
     const id = parseInt(data.id, 10) || 0;
-    const QRY = `SELECT * FROM ( SELECT sttng_id AS id, 'general' AS category, sttng_ky_tx AS code, COALESCE(NULLIF(dscrptn_tx,''), sttng_ky_tx) AS label, sttng_vl_tx AS value, CASE WHEN a_in=1 THEN 'Active' ELSE 'Inactive' END AS status FROM sttng_lst_t ) q WHERE q.id = ${id}`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    const QRY = `SELECT * FROM ( SELECT sttng_id AS id, 'general' AS category, sttng_ky_tx AS code, COALESCE(NULLIF(dscrptn_tx,''), sttng_ky_tx) AS label, sttng_vl_tx AS value, CASE WHEN a_in=1 THEN 'Active' ELSE 'Inactive' END AS status FROM sttng_lst_t ) q WHERE q.id = ?`;
+    const PARAMS = [id];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, PARAMS, cntxtDtls);
 };

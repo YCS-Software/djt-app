@@ -15,7 +15,7 @@ exports.listMdl = function() {
     const QRY_TO_EXEC = `SELECT r.rvw_id AS id, u.nm_tx AS user, s.sttn_nm_tx AS station, r.rtng_nbr AS rating, r.rvw_tx AS review, r.i_ts AS createdAt FROM rvw_lst_t r LEFT JOIN usr_lst_t u ON u.usr_id=r.usr_id LEFT JOIN sttn_lst_t s ON s.sttn_id=r.sttn_id ORDER BY r.rvw_id DESC`;
 
     console.log('[listMdl] Query:', QRY_TO_EXEC);
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, [], cntxtDtls);
 };
 
 /*****************************************************************************
@@ -25,8 +25,9 @@ exports.listMdl = function() {
 ******************************************************************************/
 exports.getByIdMdl = function(data) {
     const id = parseInt(data.id, 10) || 0;
-    const QRY_TO_EXEC = `SELECT * FROM ( SELECT r.rvw_id AS id, u.nm_tx AS user, s.sttn_nm_tx AS station, r.rtng_nbr AS rating, r.rvw_tx AS review, r.i_ts AS createdAt FROM rvw_lst_t r LEFT JOIN usr_lst_t u ON u.usr_id=r.usr_id LEFT JOIN sttn_lst_t s ON s.sttn_id=r.sttn_id ORDER BY r.rvw_id DESC ) q WHERE q.id = ${id}`;
+    const QRY_TO_EXEC = `SELECT * FROM ( SELECT r.rvw_id AS id, u.nm_tx AS user, s.sttn_nm_tx AS station, r.rtng_nbr AS rating, r.rvw_tx AS review, r.i_ts AS createdAt FROM rvw_lst_t r LEFT JOIN usr_lst_t u ON u.usr_id=r.usr_id LEFT JOIN sttn_lst_t s ON s.sttn_id=r.sttn_id ORDER BY r.rvw_id DESC ) q WHERE q.id = ?`;
 
+    const PARAMS = [id];
     console.log('[getByIdMdl] Query:', QRY_TO_EXEC);
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
 };
