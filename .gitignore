@@ -2,6 +2,9 @@ mobile_app/node_modules/
 node_modules/
 mobile_app/out/
 
+# Environment / secrets (never commit)
+.env
+
 # Local Claude settings (machine-specific)
 .claude/settings.local.json
 
