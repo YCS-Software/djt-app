@@ -1,4 +1,4 @@
-package com.dreamstep.GST;
+package com.ycssoftware.djtapp;
 
 import android.os.Bundle;
 

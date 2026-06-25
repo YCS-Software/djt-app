@@ -1,4 +1,4 @@
-package com.dreamstep.GST;
+package com.ycssoftware.djtapp;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
