@@ -5,6 +5,9 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 import { ownerService } from '../services/api';
 import type { MachineQr } from '../services/api/ownerService';
 import { X, Download, Loader2, Hash, Wifi, IndianRupee, AlertTriangle, Check } from 'lucide-react';
@@ -14,6 +17,9 @@ export default function MachineQrModal({ machineId, onClose }: { machineId: numb
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [downloaded, setDownloaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState('');
+  const [saveErr, setSaveErr] = useState('');
   const previewRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -42,74 +48,105 @@ export default function MachineQrModal({ machineId, onClose }: { machineId: numb
     }).catch((e: any) => setError(e?.message || 'Failed to render QR'));
   }, [data]);
 
-  // Compose a printable label (title + station + QR + footer) and download as PNG
-  const download = async () => {
-    if (!data) return;
-    const m = data.machine;
-    const qrUrl = await QRCode.toDataURL(data.token, {
+  // Compose the printable label (title + station + QR + footer) → PNG data URL
+  const composeLabel = async (): Promise<string> => {
+    const m = data!.machine;
+    const qrUrl = await QRCode.toDataURL(data!.token, {
       width: 620, margin: 1, errorCorrectionLevel: 'M',
       color: { dark: '#0A1626', light: '#FFFFFF' },
     });
-    const img = new Image();
-    img.onload = () => {
-      const W = 760, H = 1000;
-      const cv = document.createElement('canvas');
-      cv.width = W; cv.height = H;
-      const ctx = cv.getContext('2d');
-      if (!ctx) return;
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const W = 760, H = 1000;
+        const cv = document.createElement('canvas');
+        cv.width = W; cv.height = H;
+        const ctx = cv.getContext('2d');
+        if (!ctx) { reject(new Error('Canvas not supported')); return; }
 
-      // Background
-      ctx.fillStyle = '#0B1A2E';
-      ctx.fillRect(0, 0, W, H);
-      // White card
-      const pad = 40, cardW = W - pad * 2, cardH = H - pad * 2;
-      ctx.fillStyle = '#FFFFFF';
-      roundRect(ctx, pad, pad, cardW, cardH, 28);
-      ctx.fill();
+        ctx.fillStyle = '#0B1A2E';
+        ctx.fillRect(0, 0, W, H);
+        const pad = 40, cardW = W - pad * 2, cardH = H - pad * 2;
+        ctx.fillStyle = '#FFFFFF';
+        roundRect(ctx, pad, pad, cardW, cardH, 28);
+        ctx.fill();
 
-      ctx.textAlign = 'center';
-      // Brand
-      ctx.fillStyle = '#0EA5C4';
-      ctx.font = '700 30px Outfit, Arial, sans-serif';
-      ctx.fillText('DJT POWER TECH', W / 2, 130);
-      // Machine name
-      ctx.fillStyle = '#0A1626';
-      ctx.font = '800 44px Outfit, Arial, sans-serif';
-      ctx.fillText(truncate(m.name, 22), W / 2, 190);
-      // Station
-      ctx.fillStyle = '#5A6B7B';
-      ctx.font = '500 26px Outfit, Arial, sans-serif';
-      ctx.fillText(truncate(m.station_name, 30), W / 2, 232);
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#0EA5C4';
+        ctx.font = '700 30px Outfit, Arial, sans-serif';
+        ctx.fillText('DJT POWER TECH', W / 2, 130);
+        ctx.fillStyle = '#0A1626';
+        ctx.font = '800 44px Outfit, Arial, sans-serif';
+        ctx.fillText(truncate(m.name, 22), W / 2, 190);
+        ctx.fillStyle = '#5A6B7B';
+        ctx.font = '500 26px Outfit, Arial, sans-serif';
+        ctx.fillText(truncate(m.station_name, 30), W / 2, 232);
 
-      // QR
-      const qrSize = 460;
-      ctx.drawImage(img, (W - qrSize) / 2, 280, qrSize, qrSize);
+        const qrSize = 460;
+        ctx.drawImage(img, (W - qrSize) / 2, 280, qrSize, qrSize);
 
-      // Instruction
-      ctx.fillStyle = '#0A1626';
-      ctx.font = '700 30px Outfit, Arial, sans-serif';
-      ctx.fillText('Scan with the DJT app to charge', W / 2, 800);
+        ctx.fillStyle = '#0A1626';
+        ctx.font = '700 30px Outfit, Arial, sans-serif';
+        ctx.fillText('Scan with the DJT app to charge', W / 2, 800);
 
-      // Footer details
-      ctx.fillStyle = '#5A6B7B';
-      ctx.font = '500 24px Outfit, Arial, sans-serif';
-      const power = m.power_label ? `${m.machine_type} · ${m.power_label}` : m.machine_type;
-      ctx.fillText(power, W / 2, 850);
-      ctx.fillText(`₹${m.price_per_kwh}/kWh`, W / 2, 888);
-      if (m.ocpp_id) {
-        ctx.fillStyle = '#94A3B8';
-        ctx.font = '500 20px monospace';
-        ctx.fillText(`OCPP: ${m.ocpp_id}`, W / 2, 926);
+        ctx.fillStyle = '#5A6B7B';
+        ctx.font = '500 24px Outfit, Arial, sans-serif';
+        const power = m.power_label ? `${m.machine_type} · ${m.power_label}` : m.machine_type;
+        ctx.fillText(power, W / 2, 850);
+        ctx.fillText(`₹${m.price_per_kwh}/kWh`, W / 2, 888);
+        if (m.ocpp_id) {
+          ctx.fillStyle = '#94A3B8';
+          ctx.font = '500 20px monospace';
+          ctx.fillText(`OCPP: ${m.ocpp_id}`, W / 2, 926);
+        }
+        resolve(cv.toDataURL('image/png'));
+      };
+      img.onerror = () => reject(new Error('Failed to render QR image'));
+      img.src = qrUrl;
+    });
+  };
+
+  // Save the label to the device (real file), or download in the browser.
+  const download = async () => {
+    if (!data || saving) return;
+    setSaving(true);
+    setSaveErr('');
+    setSavedMsg('');
+    try {
+      const dataUrl = await composeLabel();
+      const filename = `DJT-QR-${data.machine.ocpp_id || data.machine.machine_id}.png`;
+
+      if (Capacitor.isNativePlatform()) {
+        // Write the PNG to the public Documents folder so it shows in the file manager
+        const base64 = dataUrl.split(',')[1];
+        const written = await Filesystem.writeFile({
+          path: filename,
+          data: base64,
+          directory: Directory.Documents,
+          recursive: true,
+        });
+        setSavedMsg('Saved to Documents');
+        setDownloaded(true);
+        // Also offer the system share/save sheet (lets the user store it in Gallery, Drive, etc.)
+        try {
+          await Share.share({ title: 'Machine QR', text: `${data.machine.name} QR code`, url: written.uri });
+        } catch { /* user dismissed the share sheet — file is already saved */ }
+      } else {
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = dataUrl;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setSavedMsg('Downloaded');
+        setDownloaded(true);
       }
-
-      const link = document.createElement('a');
-      link.download = `DJT-QR-${m.ocpp_id || m.machine_id}.png`;
-      link.href = cv.toDataURL('image/png');
-      link.click();
-      setDownloaded(true);
-      setTimeout(() => setDownloaded(false), 2200);
-    };
-    img.src = qrUrl;
+      setTimeout(() => { setDownloaded(false); setSavedMsg(''); }, 3500);
+    } catch (e: any) {
+      setSaveErr(e?.message || 'Could not save the QR code');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -146,9 +183,16 @@ export default function MachineQrModal({ machineId, onClose }: { machineId: numb
 
             <p className="owner-field-hint">This QR works only inside the DJT app — generic scanners can't use it.</p>
 
-            <button className="owner-btn owner-btn-primary owner-btn-block" onClick={download}>
-              {downloaded ? <><Check size={16} /> Downloaded</> : <><Download size={16} /> Download QR</>}
+            {saveErr && <div className="owner-alert owner-alert-error">{saveErr}</div>}
+
+            <button className="owner-btn owner-btn-primary owner-btn-block" onClick={download} disabled={saving}>
+              {saving ? <><Loader2 className="owner-spin" size={16} /> Saving…</>
+                : downloaded ? <><Check size={16} /> {savedMsg || 'Saved'}</>
+                : <><Download size={16} /> Download QR</>}
             </button>
+            {downloaded && savedMsg === 'Saved to Documents' && (
+              <p className="owner-field-hint owner-qr-saved">Saved as <b>{`DJT-QR-${data.machine.ocpp_id || data.machine.machine_id}.png`}</b> in your <b>Documents</b> folder.</p>
+            )}
           </>
         ) : null}
       </div>
