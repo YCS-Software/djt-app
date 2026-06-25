@@ -14,7 +14,7 @@ const cntxtDtls = "partnersMdl";
 ******************************************************************************/
 exports.listMdl = function() {
     const QRY = `SELECT u.usr_id AS id, u.nm_tx AS name, u.eml_tx AS email, u.phn_nmbr_tx AS phone, u.usr_typ_cd AS role, (SELECT COUNT(*) FROM sttn_lst_t s WHERE s.ownr_usr_id=u.usr_id AND s.a_in=1) AS stations, CASE WHEN u.a_in=1 THEN 'Active' ELSE 'Inactive' END AS status, u.i_ts AS createdAt FROM usr_lst_t u WHERE u.usr_typ_cd='owner' ORDER BY u.usr_id DESC`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, [], cntxtDtls);
 };
 
 /*****************************************************************************
@@ -24,8 +24,9 @@ exports.listMdl = function() {
 ******************************************************************************/
 exports.getByIdMdl = function(data) {
     const id = parseInt(data.id, 10) || 0;
-    const QRY = `SELECT * FROM ( SELECT u.usr_id AS id, u.nm_tx AS name, u.eml_tx AS email, u.phn_nmbr_tx AS phone, u.usr_typ_cd AS role, (SELECT COUNT(*) FROM sttn_lst_t s WHERE s.ownr_usr_id=u.usr_id AND s.a_in=1) AS stations, CASE WHEN u.a_in=1 THEN 'Active' ELSE 'Inactive' END AS status, u.i_ts AS createdAt FROM usr_lst_t u WHERE u.usr_typ_cd='owner' ORDER BY u.usr_id DESC ) q WHERE q.id = ${id}`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    const QRY = `SELECT * FROM ( SELECT u.usr_id AS id, u.nm_tx AS name, u.eml_tx AS email, u.phn_nmbr_tx AS phone, u.usr_typ_cd AS role, (SELECT COUNT(*) FROM sttn_lst_t s WHERE s.ownr_usr_id=u.usr_id AND s.a_in=1) AS stations, CASE WHEN u.a_in=1 THEN 'Active' ELSE 'Inactive' END AS status, u.i_ts AS createdAt FROM usr_lst_t u WHERE u.usr_typ_cd='owner' ORDER BY u.usr_id DESC ) q WHERE q.id = ?`;
+    const PARAMS = [id];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, PARAMS, cntxtDtls);
 };
 
 /*****************************************************************************
@@ -34,11 +35,12 @@ exports.getByIdMdl = function(data) {
 * Arguments     : data object { name, email, phone }
 ******************************************************************************/
 exports.createMdl = function(data) {
-    const name = sqldb.MySQLConPool.escape(data.name || '');
-    const email = sqldb.MySQLConPool.escape(data.email || '');
-    const phone = sqldb.MySQLConPool.escape(data.phone || '');
-    const QRY = `INSERT INTO usr_lst_t (nm_tx, eml_tx, phn_nmbr_tx, usr_typ_cd, a_in, i_ts) VALUES (${name}, ${email}, ${phone}, 'owner', 1, NOW())`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    const name = data.name || '';
+    const email = data.email || '';
+    const phone = data.phone || '';
+    const QRY = `INSERT INTO usr_lst_t (nm_tx, eml_tx, phn_nmbr_tx, usr_typ_cd, a_in, i_ts) VALUES (?, ?, ?, 'owner', 1, NOW())`;
+    const PARAMS = [name, email, phone];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, PARAMS, cntxtDtls);
 };
 
 /*****************************************************************************
@@ -48,11 +50,12 @@ exports.createMdl = function(data) {
 ******************************************************************************/
 exports.updateMdl = function(data) {
     const id = parseInt(data.id, 10) || 0;
-    const name = sqldb.MySQLConPool.escape(data.name || '');
-    const email = sqldb.MySQLConPool.escape(data.email || '');
-    const phone = sqldb.MySQLConPool.escape(data.phone || '');
-    const QRY = `UPDATE usr_lst_t SET nm_tx=${name}, eml_tx=${email}, phn_nmbr_tx=${phone}, u_ts=NOW() WHERE usr_id=${id} AND usr_typ_cd='owner'`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    const name = data.name || '';
+    const email = data.email || '';
+    const phone = data.phone || '';
+    const QRY = `UPDATE usr_lst_t SET nm_tx=?, eml_tx=?, phn_nmbr_tx=?, u_ts=NOW() WHERE usr_id=? AND usr_typ_cd='owner'`;
+    const PARAMS = [name, email, phone, id];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, PARAMS, cntxtDtls);
 };
 
 /*****************************************************************************
@@ -62,6 +65,7 @@ exports.updateMdl = function(data) {
 ******************************************************************************/
 exports.deleteMdl = function(data) {
     const id = parseInt(data.id, 10) || 0;
-    const QRY = `UPDATE usr_lst_t SET a_in=0, d_ts=NOW() WHERE usr_id=${id} AND usr_typ_cd='owner'`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    const QRY = `UPDATE usr_lst_t SET a_in=0, d_ts=NOW() WHERE usr_id=? AND usr_typ_cd='owner'`;
+    const PARAMS = [id];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, PARAMS, cntxtDtls);
 };

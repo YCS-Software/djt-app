@@ -13,15 +13,17 @@ const cntxtDtls = "sessionMdl";
 * Arguments     : data object with sessionCode, userId, stationId, connectorId, pricePerKwh, qrCode
 ******************************************************************************/
 exports.createSessionMdl = function(data) {
-    const qrCode = data.qrCode ? `'${String(data.qrCode).replace(/'/g, "''")}'` : 'NULL';
-    const QRY_TO_EXEC = `INSERT INTO sssn_lst_t 
-        (sssn_cd, usr_id, sttn_id, cnntr_id, prce_per_kwh_amt, qr_cd_tx, sttus_cd, pymnt_sttus_cd, a_in) 
-        VALUES 
-        ('${String(data.sessionCode).replace(/'/g, "''")}', ${data.userId}, ${data.stationId}, ${data.connectorId}, 
-         ${data.pricePerKwh}, ${qrCode}, 'initiated', 'pending', 1)`;
-    
+    const qrCode = data.qrCode ? String(data.qrCode) : null;
+    const QRY_TO_EXEC = `INSERT INTO sssn_lst_t
+        (sssn_cd, usr_id, sttn_id, cnntr_id, prce_per_kwh_amt, qr_cd_tx, sttus_cd, pymnt_sttus_cd, a_in)
+        VALUES
+        (?, ?, ?, ?,
+         ?, ?, 'initiated', 'pending', 1)`;
+    const PARAMS = [String(data.sessionCode), data.userId, data.stationId, data.connectorId,
+        data.pricePerKwh, qrCode];
+
     console.log('[createSessionMdl] Query:', QRY_TO_EXEC);
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
 };
 
 /*****************************************************************************
@@ -30,13 +32,14 @@ exports.createSessionMdl = function(data) {
 * Arguments     : data object with sessionId
 ******************************************************************************/
 exports.startSessionMdl = function(data) {
-    const QRY_TO_EXEC = `UPDATE sssn_lst_t 
-        SET sttus_cd = 'active', 
-            strt_ts = NOW() 
-        WHERE sssn_id = ${data.sessionId}`;
-    
+    const QRY_TO_EXEC = `UPDATE sssn_lst_t
+        SET sttus_cd = 'active',
+            strt_ts = NOW()
+        WHERE sssn_id = ?`;
+    const PARAMS = [data.sessionId];
+
     console.log('[startSessionMdl] Query:', QRY_TO_EXEC);
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
 };
 
 /*****************************************************************************
@@ -45,17 +48,18 @@ exports.startSessionMdl = function(data) {
 * Arguments     : data object with sessionId, energyConsumed, totalCost
 ******************************************************************************/
 exports.stopSessionMdl = function(data) {
-    const QRY_TO_EXEC = `UPDATE sssn_lst_t 
-        SET sttus_cd = 'completed', 
-            end_ts = NOW(), 
-            durn_mnts_nbr = TIMESTAMPDIFF(MINUTE, strt_ts, NOW()), 
-            enrgy_cnsmd_kwh = ${data.energyConsumed}, 
-            ttl_cst_amt = ${data.totalCost}, 
-            prgrss_pct = 100 
-        WHERE sssn_id = ${data.sessionId}`;
-    
+    const QRY_TO_EXEC = `UPDATE sssn_lst_t
+        SET sttus_cd = 'completed',
+            end_ts = NOW(),
+            durn_mnts_nbr = TIMESTAMPDIFF(MINUTE, strt_ts, NOW()),
+            enrgy_cnsmd_kwh = ?,
+            ttl_cst_amt = ?,
+            prgrss_pct = 100
+        WHERE sssn_id = ?`;
+    const PARAMS = [data.energyConsumed, data.totalCost, data.sessionId];
+
     console.log('[stopSessionMdl] Query:', QRY_TO_EXEC);
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
 };
 
 /*****************************************************************************
@@ -64,14 +68,15 @@ exports.stopSessionMdl = function(data) {
 * Arguments     : data object with sessionId, progress, energyConsumed, currentCost
 ******************************************************************************/
 exports.updateProgressMdl = function(data) {
-    const QRY_TO_EXEC = `UPDATE sssn_lst_t 
-        SET prgrss_pct = ${data.progress}, 
-            enrgy_cnsmd_kwh = ${data.energyConsumed}, 
-            ttl_cst_amt = ${data.currentCost} 
-        WHERE sssn_id = ${data.sessionId}`;
-    
+    const QRY_TO_EXEC = `UPDATE sssn_lst_t
+        SET prgrss_pct = ?,
+            enrgy_cnsmd_kwh = ?,
+            ttl_cst_amt = ?
+        WHERE sssn_id = ?`;
+    const PARAMS = [data.progress, data.energyConsumed, data.currentCost, data.sessionId];
+
     console.log('[updateProgressMdl] Query:', QRY_TO_EXEC);
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
 };
 
 /*****************************************************************************
@@ -80,13 +85,14 @@ exports.updateProgressMdl = function(data) {
 * Arguments     : data object with sessionId
 ******************************************************************************/
 exports.getSessionByIdMdl = function(data) {
-    const QRY_TO_EXEC = `SELECT * FROM sssn_lst_t 
-        WHERE sssn_id = ${data.sessionId} 
-        AND a_in = 1 
+    const QRY_TO_EXEC = `SELECT * FROM sssn_lst_t
+        WHERE sssn_id = ?
+        AND a_in = 1
         LIMIT 1`;
-    
+    const PARAMS = [data.sessionId];
+
     console.log('[getSessionByIdMdl] Query:', QRY_TO_EXEC);
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
 };
 
 /*****************************************************************************
@@ -95,14 +101,15 @@ exports.getSessionByIdMdl = function(data) {
 * Arguments     : data object with sessionCode
 ******************************************************************************/
 exports.getSessionByCodeMdl = function(data) {
-    const sessionCode = String(data.sessionCode).replace(/'/g, "''");
-    const QRY_TO_EXEC = `SELECT * FROM sssn_lst_t 
-        WHERE sssn_cd = '${sessionCode}' 
-        AND a_in = 1 
+    const sessionCode = String(data.sessionCode);
+    const QRY_TO_EXEC = `SELECT * FROM sssn_lst_t
+        WHERE sssn_cd = ?
+        AND a_in = 1
         LIMIT 1`;
-    
+    const PARAMS = [sessionCode];
+
     console.log('[getSessionByCodeMdl] Query:', QRY_TO_EXEC);
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
 };
 
 /*****************************************************************************
@@ -120,15 +127,16 @@ exports.getActiveSessionMdl = function(data) {
         FROM sssn_lst_t s
         LEFT JOIN sttn_lst_t st ON s.sttn_id = st.sttn_id
         LEFT JOIN cnntr_lst_t c ON s.cnntr_id = c.cnntr_id
-        WHERE s.usr_id = ${data.userId} 
+        WHERE s.usr_id = ?
           AND s.sttus_cd = 'active'
           AND s.a_in = 1
         ORDER BY s.i_ts DESC
         LIMIT 1
     `;
-    
+    const PARAMS = [data.userId];
+
     console.log('[getActiveSessionMdl] Query:', QRY_TO_EXEC);
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
 };
 
 /*****************************************************************************
@@ -137,18 +145,21 @@ exports.getActiveSessionMdl = function(data) {
 * Arguments     : data object with userId, limit, offset, status (optional)
 ******************************************************************************/
 exports.getUserSessionsMdl = function(data) {
-    const limit = data.limit || 50;
-    const offset = data.offset || 0;
-    let whereClause = `s.usr_id = ${data.userId} AND s.a_in = 1`;
-    
+    const limit = Number.isFinite(+data.limit) && +data.limit ? Math.max(0, parseInt(data.limit, 10)) : 50;
+    const offset = Number.isFinite(+data.offset) && +data.offset ? Math.max(0, parseInt(data.offset, 10)) : 0;
+    const PARAMS = [];
+    let whereClause = `s.usr_id = ? AND s.a_in = 1`;
+    PARAMS.push(data.userId);
+
     if (data.status) {
-        const status = String(data.status).replace(/'/g, "''");
-        whereClause += ` AND s.sttus_cd = '${status}'`;
+        const status = String(data.status);
+        whereClause += ` AND s.sttus_cd = ?`;
+        PARAMS.push(status);
     }
-    
+
     const QRY_TO_EXEC = `
-        SELECT s.*, 
-               st.sttn_nm_tx, 
+        SELECT s.*,
+               st.sttn_nm_tx,
                st.addr_tx,
                c.cnntr_typ_cd
         FROM sssn_lst_t s
@@ -158,9 +169,9 @@ exports.getUserSessionsMdl = function(data) {
         ORDER BY s.i_ts DESC
         LIMIT ${limit} OFFSET ${offset}
     `;
-    
+
     console.log('[getUserSessionsMdl] Query:', QRY_TO_EXEC);
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
 };
 
 /*****************************************************************************
@@ -177,12 +188,13 @@ exports.getMachineScanInfoMdl = function(data) {
         FROM mchn_lst_t m
         INNER JOIN sttn_lst_t st ON m.sttn_id = st.sttn_id
         LEFT JOIN cnntr_lst_t c ON c.mchn_id = m.mchn_id AND c.a_in = 1
-        WHERE m.mchn_id = ${machineId} AND m.a_in = 1
+        WHERE m.mchn_id = ? AND m.a_in = 1
         ORDER BY c.cnntr_id ASC
     `;
+    const PARAMS = [machineId];
 
     console.log('[getMachineScanInfoMdl] Query:', QRY_TO_EXEC);
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
 };
 
 /*****************************************************************************
@@ -191,17 +203,21 @@ exports.getMachineScanInfoMdl = function(data) {
 * Arguments     : data object with sessionId, status, transactionId (optional)
 ******************************************************************************/
 exports.updatePaymentStatusMdl = function(data) {
-    let setClause = `pymnt_sttus_cd = '${String(data.status).replace(/'/g, "''")}'`;
-    
+    const PARAMS = [];
+    let setClause = `pymnt_sttus_cd = ?`;
+    PARAMS.push(String(data.status));
+
     if (data.transactionId) {
-        setClause += `, wllt_trxn_id = ${data.transactionId}`;
+        setClause += `, wllt_trxn_id = ?`;
+        PARAMS.push(data.transactionId);
     }
-    
-    const QRY_TO_EXEC = `UPDATE sssn_lst_t 
-        SET ${setClause} 
-        WHERE sssn_id = ${data.sessionId}`;
-    
+
+    const QRY_TO_EXEC = `UPDATE sssn_lst_t
+        SET ${setClause}
+        WHERE sssn_id = ?`;
+    PARAMS.push(data.sessionId);
+
     console.log('[updatePaymentStatusMdl] Query:', QRY_TO_EXEC);
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
 };
 

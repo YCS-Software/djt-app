@@ -29,7 +29,7 @@ exports.getOverviewMdl = function() {
                 WHERE sttus_cd = 'completed' AND DATE(strt_ts) = CURDATE())                   AS today_revenue`;
 
     console.log('[getOverviewMdl] Query:', QRY_TO_EXEC);
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, [], cntxtDtls);
 };
 
 /*****************************************************************************
@@ -39,7 +39,9 @@ exports.getOverviewMdl = function() {
 * Arguments     : data object with days
 ******************************************************************************/
 exports.getSessionTrendsMdl = function(data) {
-    const days = parseInt(data && data.days, 10) || 7;
+    // INTERVAL n DAY cannot be a bind parameter; coerce to a validated
+    // non-negative integer and inline (preserves original `parseInt(...) || 7`).
+    const days = Math.max(0, parseInt(data && data.days, 10) || 7);
 
     const QRY_TO_EXEC = `
         SELECT
@@ -54,7 +56,7 @@ exports.getSessionTrendsMdl = function(data) {
         ORDER BY period`;
 
     console.log('[getSessionTrendsMdl] Query:', QRY_TO_EXEC);
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, [], cntxtDtls);
 };
 
 /*****************************************************************************
@@ -72,7 +74,7 @@ exports.getStationStatusMdl = function() {
         WHERE a_in = 1`;
 
     console.log('[getStationStatusMdl] Query:', QRY_TO_EXEC);
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, [], cntxtDtls);
 };
 
 /*****************************************************************************
@@ -81,7 +83,9 @@ exports.getStationStatusMdl = function() {
 * Arguments     : data object with limit
 ******************************************************************************/
 exports.getTopStationsMdl = function(data) {
-    const limit = parseInt(data && data.limit, 10) || 5;
+    // LIMIT is never bound; inline a validated non-negative integer
+    // (preserves original `parseInt(...) || 5`).
+    const limit = Math.max(0, parseInt(data && data.limit, 10) || 5);
 
     const QRY_TO_EXEC = `
         SELECT
@@ -97,7 +101,7 @@ exports.getTopStationsMdl = function(data) {
         LIMIT ${limit}`;
 
     console.log('[getTopStationsMdl] Query:', QRY_TO_EXEC);
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, [], cntxtDtls);
 };
 
 /*****************************************************************************
@@ -121,7 +125,7 @@ exports.getLiveSessionsMdl = function() {
         ORDER BY s.strt_ts DESC`;
 
     console.log('[getLiveSessionsMdl] Query:', QRY_TO_EXEC);
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, [], cntxtDtls);
 };
 
 /*****************************************************************************
@@ -131,7 +135,9 @@ exports.getLiveSessionsMdl = function() {
 * Arguments     : data object with limit
 ******************************************************************************/
 exports.getRecentActivityMdl = function(data) {
-    const limit = parseInt(data && data.limit, 10) || 10;
+    // LIMIT is never bound; inline a validated non-negative integer
+    // (preserves original `parseInt(...) || 10`).
+    const limit = Math.max(0, parseInt(data && data.limit, 10) || 10);
 
     const QRY_TO_EXEC = `
         SELECT
@@ -149,5 +155,5 @@ exports.getRecentActivityMdl = function(data) {
         LIMIT ${limit}`;
 
     console.log('[getRecentActivityMdl] Query:', QRY_TO_EXEC);
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, [], cntxtDtls);
 };
