@@ -10,7 +10,9 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { ownerService } from '../services/api';
 import type { MachineQr } from '../services/api/ownerService';
-import { X, Download, Loader2, Hash, Wifi, IndianRupee, AlertTriangle, Check } from 'lucide-react';
+import { useBackHandler } from '../services/backHandler';
+import { MediaSaver } from '../services/mediaSaver';
+import { X, Download, Loader2, Hash, Wifi, IndianRupee, AlertTriangle, Check, Share2 } from 'lucide-react';
 
 export default function MachineQrModal({ machineId, onClose }: { machineId: number; onClose: () => void }) {
   const [data, setData] = useState<MachineQr | null>(null);
@@ -18,9 +20,13 @@ export default function MachineQrModal({ machineId, onClose }: { machineId: numb
   const [loading, setLoading] = useState(true);
   const [downloaded, setDownloaded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [savedMsg, setSavedMsg] = useState('');
   const [saveErr, setSaveErr] = useState('');
   const previewRef = useRef<HTMLCanvasElement>(null);
+
+  // Hardware Back closes this modal instead of leaving the page (F7)
+  useBackHandler(true, onClose);
 
   useEffect(() => {
     (async () => {
@@ -106,7 +112,9 @@ export default function MachineQrModal({ machineId, onClose }: { machineId: numb
     });
   };
 
-  // Save the label to the device (real file), or download in the browser.
+  const filename = () => `DJT-QR-${data!.machine.ocpp_id || data!.machine.machine_id}.png`;
+
+  // DOWNLOAD: save the PNG to device storage (Documents) — no share sheet.
   const download = async () => {
     if (!data || saving) return;
     setSaving(true);
@@ -114,26 +122,15 @@ export default function MachineQrModal({ machineId, onClose }: { machineId: numb
     setSavedMsg('');
     try {
       const dataUrl = await composeLabel();
-      const filename = `DJT-QR-${data.machine.ocpp_id || data.machine.machine_id}.png`;
-
       if (Capacitor.isNativePlatform()) {
-        // Write the PNG to the public Documents folder so it shows in the file manager
+        // Native MediaStore save → public Downloads/DJT (no permission on A10+)
         const base64 = dataUrl.split(',')[1];
-        const written = await Filesystem.writeFile({
-          path: filename,
-          data: base64,
-          directory: Directory.Documents,
-          recursive: true,
-        });
-        setSavedMsg('Saved to Documents');
+        await MediaSaver.saveImage({ base64, filename: filename(), mimeType: 'image/png' });
+        setSavedMsg('Saved to Downloads');
         setDownloaded(true);
-        // Also offer the system share/save sheet (lets the user store it in Gallery, Drive, etc.)
-        try {
-          await Share.share({ title: 'Machine QR', text: `${data.machine.name} QR code`, url: written.uri });
-        } catch { /* user dismissed the share sheet — file is already saved */ }
       } else {
         const link = document.createElement('a');
-        link.download = filename;
+        link.download = filename();
         link.href = dataUrl;
         document.body.appendChild(link);
         link.click();
@@ -149,12 +146,63 @@ export default function MachineQrModal({ machineId, onClose }: { machineId: numb
     }
   };
 
+  // SHARE: open the system share sheet with the PNG (separate from download).
+  const share = async () => {
+    if (!data || sharing) return;
+    setSharing(true);
+    setSaveErr('');
+    try {
+      const dataUrl = await composeLabel();
+      if (Capacitor.isNativePlatform()) {
+        const base64 = dataUrl.split(',')[1];
+        // write a temp copy to the cache dir, then share that file
+        const written = await Filesystem.writeFile({
+          path: filename(),
+          data: base64,
+          directory: Directory.Cache,
+          recursive: true,
+        });
+        await Share.share({
+          title: 'Machine QR',
+          text: `${data.machine.name} — scan with the DJT app to charge`,
+          files: [written.uri],
+        });
+      } else if ((navigator as any).share) {
+        const blob = await (await fetch(dataUrl)).blob();
+        const file = new File([blob], filename(), { type: 'image/png' });
+        const nav: any = navigator;
+        if (nav.canShare && nav.canShare({ files: [file] })) {
+          await nav.share({ files: [file], title: 'Machine QR' });
+        } else {
+          await nav.share({ title: 'Machine QR', text: data.machine.name });
+        }
+      } else {
+        // no share support on web → fall back to a download
+        await download();
+      }
+    } catch (e: any) {
+      // ignore user-cancelled share
+      if (e?.message && !/cancel|abort|dismiss/i.test(e.message)) {
+        setSaveErr(e.message);
+      }
+    } finally {
+      setSharing(false);
+    }
+  };
+
   return (
     <div className="owner-modal-overlay" onClick={onClose}>
       <div className="owner-modal" onClick={(e) => e.stopPropagation()}>
         <div className="owner-modal-head">
           <h3><Hash size={17} /> Machine QR</h3>
-          <button className="owner-icon-btn" onClick={onClose}><X size={18} /></button>
+          <div className="owner-qr-head-actions">
+            {data && (
+              <button className="owner-icon-btn" onClick={share} disabled={sharing} title="Share QR" aria-label="Share QR">
+                {sharing ? <Loader2 className="owner-spin" size={18} /> : <Share2 size={18} />}
+              </button>
+            )}
+            <button className="owner-icon-btn" onClick={onClose} aria-label="Close"><X size={18} /></button>
+          </div>
         </div>
 
         {loading ? (
@@ -190,8 +238,8 @@ export default function MachineQrModal({ machineId, onClose }: { machineId: numb
                 : downloaded ? <><Check size={16} /> {savedMsg || 'Saved'}</>
                 : <><Download size={16} /> Download QR</>}
             </button>
-            {downloaded && savedMsg === 'Saved to Documents' && (
-              <p className="owner-field-hint owner-qr-saved">Saved as <b>{`DJT-QR-${data.machine.ocpp_id || data.machine.machine_id}.png`}</b> in your <b>Documents</b> folder.</p>
+            {downloaded && savedMsg === 'Saved to Downloads' && (
+              <p className="owner-field-hint owner-qr-saved">Saved as <b>{`DJT-QR-${data.machine.ocpp_id || data.machine.machine_id}.png`}</b> in <b>Downloads/DJT</b>.</p>
             )}
           </>
         ) : null}

@@ -496,6 +496,7 @@ select.owner-input { appearance: none; }
 .owner-qr-cta { margin-top: 0.8rem; margin-bottom: 0; }
 .owner-qr-saved { text-align: center; margin-top: 0.5rem; }
 .owner-qr-saved b { color: var(--o-text-dim); }
+.owner-qr-head-actions { display: flex; align-items: center; gap: 0.4rem; }
 .owner-qr-mini {
   display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.74rem; font-weight: 700;
   padding: 0.3rem 0.6rem; border-radius: 9px; cursor: pointer; font-family: inherit;

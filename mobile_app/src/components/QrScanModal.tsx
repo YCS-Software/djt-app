@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { X, AlertTriangle, Loader2 } from 'lucide-react';
+import { useBackHandler } from '../services/backHandler';
 import './QrScanModal.css';
 
 const READER_ID = 'djt-qr-reader';
@@ -18,6 +19,9 @@ export default function QrScanModal({ onResult, onClose }: { onResult: (token: s
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [starting, setStarting] = useState(true);
+
+  // Hardware Back closes the scanner (and stops the camera via unmount) (F7)
+  useBackHandler(true, onClose);
 
   useEffect(() => {
     let cancelled = false;

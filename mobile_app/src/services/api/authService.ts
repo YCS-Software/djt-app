@@ -3,6 +3,7 @@
  */
 
 import { apiClient } from './apiClient';
+import { clearLastRoute } from '../appState';
 
 export interface SendOTPRequest {
   phonenumber: string;
@@ -114,6 +115,9 @@ export const authService = {
     localStorage.removeItem('x-access-token');
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    // Forget the saved screen so a relaunch after logout doesn't restore a
+    // previous session's route (it would be blocked anyway, but keep it clean).
+    clearLastRoute();
   },
 
   /**
