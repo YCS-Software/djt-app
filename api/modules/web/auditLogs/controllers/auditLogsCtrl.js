@@ -4,7 +4,15 @@
 const mdl = require('../models/auditLogsMdl');
 
 exports.list = function (req, res) {
-    mdl.listMdl()
+    const q = req.query || {};
+    mdl.listMdl({
+        userId: q.user_id,
+        action: q.action,
+        entityType: q.entity_type,
+        entityId: q.entity_id,
+        limit: q.limit,
+        offset: q.offset,
+    })
         .then(rows => res.status(200).json({ status: 200, rows: rows || [] }))
         .catch(e => { console.error('[auditLogs] list', e); res.status(500).json({ status: 500, error: 'Failed to load logs' }); });
 };

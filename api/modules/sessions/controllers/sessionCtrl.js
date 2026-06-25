@@ -9,6 +9,7 @@ const stationMdl = require('../../stations/models/stationMdl');
 const std = require(appRoot + '/utils/standardMessages');
 const df = require(appRoot + '/utils/dateFormatUtil');
 const qrUtil = require(appRoot + '/utils/qrUtil');
+const audit = require(appRoot + '/utils/auditUtil');
 const cntxtDtls = "sessionCtrl";
 
 /**
@@ -256,6 +257,31 @@ exports.startSession = function(req, res) {
                                             .then(function(connectorResults) {
                                                 const connector = (connectorResults && connectorResults.length > 0) ? connectorResults[0] : null;
 
+                                                const _ctx = audit.reqCtx(req);
+                                                audit.writeAudit({
+                                                    userId: _ctx.userId,
+                                                    action: 'session_start',
+                                                    entityType: 'session',
+                                                    entityId: sessionId,
+                                                    newVal: {
+                                                        stationId: station_id,
+                                                        connectorId: connector_id,
+                                                        sessionCode: sessionCode,
+                                                        walletId: wallet.wllt_id
+                                                    },
+                                                    ip: _ctx.ip,
+                                                    userAgent: _ctx.userAgent
+                                                });
+                                                audit.writeAudit({
+                                                    userId: _ctx.userId,
+                                                    action: 'session_payment',
+                                                    entityType: 'session',
+                                                    entityId: sessionId,
+                                                    newVal: { amount: totalAmountToDeduct },
+                                                    ip: _ctx.ip,
+                                                    userAgent: _ctx.userAgent
+                                                });
+
                                                 return df.formatSucessRes(req, res, {
                                                     session_id: sessionId,
                                                     session_code: sessionCode,
@@ -399,6 +425,16 @@ exports.stopSession = function(req, res) {
                                     });
                                 })
                                 .then(function() {
+                                    const _ctx = audit.reqCtx(req);
+                                    audit.writeAudit({
+                                        userId: _ctx.userId,
+                                        action: 'session_stop',
+                                        entityType: 'session',
+                                        entityId: session_id,
+                                        newVal: { energy: energyConsumed, cost: actualTotalCost, refund: Math.abs(costDifference) },
+                                        ip: _ctx.ip,
+                                        userAgent: _ctx.userAgent
+                                    });
                                     return df.formatSucessRes(req, res, {
                                         session_id: session_id,
                                         duration_minutes: session.durn_mnts_nbr || 0,
@@ -479,6 +515,25 @@ exports.stopSession = function(req, res) {
                                     });
                                 })
                                 .then(function() {
+                                    const _ctx = audit.reqCtx(req);
+                                    audit.writeAudit({
+                                        userId: _ctx.userId,
+                                        action: 'session_stop',
+                                        entityType: 'session',
+                                        entityId: session_id,
+                                        newVal: { energy: energyConsumed, cost: actualTotalCost, additionalPaid: costDifference },
+                                        ip: _ctx.ip,
+                                        userAgent: _ctx.userAgent
+                                    });
+                                    audit.writeAudit({
+                                        userId: _ctx.userId,
+                                        action: 'session_payment',
+                                        entityType: 'session',
+                                        entityId: session_id,
+                                        newVal: { amount: costDifference },
+                                        ip: _ctx.ip,
+                                        userAgent: _ctx.userAgent
+                                    });
                                     return df.formatSucessRes(req, res, {
                                         session_id: session_id,
                                         duration_minutes: session.durn_mnts_nbr || 0,
@@ -494,6 +549,16 @@ exports.stopSession = function(req, res) {
                             }
                             // If actual cost equals prepaid, no additional transaction needed
                             else {
+                                const _ctx = audit.reqCtx(req);
+                                audit.writeAudit({
+                                    userId: _ctx.userId,
+                                    action: 'session_stop',
+                                    entityType: 'session',
+                                    entityId: session_id,
+                                    newVal: { energy: energyConsumed, cost: actualTotalCost },
+                                    ip: _ctx.ip,
+                                    userAgent: _ctx.userAgent
+                                });
                                 return df.formatSucessRes(req, res, {
                                     session_id: session_id,
                                     duration_minutes: session.durn_mnts_nbr || 0,
@@ -601,6 +666,25 @@ exports.stopSession = function(req, res) {
                                     transactionId: transactionResults.insertId 
                                 })
                                 .then(function() {
+                                    const _ctx = audit.reqCtx(req);
+                                    audit.writeAudit({
+                                        userId: _ctx.userId,
+                                        action: 'session_stop',
+                                        entityType: 'session',
+                                        entityId: session_id,
+                                        newVal: { energy: energyConsumed, cost: actualTotalCost },
+                                        ip: _ctx.ip,
+                                        userAgent: _ctx.userAgent
+                                    });
+                                    audit.writeAudit({
+                                        userId: _ctx.userId,
+                                        action: 'session_payment',
+                                        entityType: 'session',
+                                        entityId: session_id,
+                                        newVal: { amount: actualTotalCost },
+                                        ip: _ctx.ip,
+                                        userAgent: _ctx.userAgent
+                                    });
                                     return df.formatSucessRes(req, res, {
                                         session_id: session_id,
                                         duration_minutes: session.durn_mnts_nbr || 0,

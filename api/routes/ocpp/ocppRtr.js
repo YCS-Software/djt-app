@@ -14,6 +14,7 @@ router.use(accessCtrl.verifyToken);
 router.use(accessCtrl.isOwner);
 
 router.get('/connections', ocppCtrl.getConnections);
+router.get('/logs', ocppCtrl.getLogs);
 router.post('/remote-start', ocppCtrl.remoteStart);
 router.post('/remote-stop', ocppCtrl.remoteStop);
 
