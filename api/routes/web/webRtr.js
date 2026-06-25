@@ -50,5 +50,42 @@ router.use('/coupons', require('./couponsRtr'));
 router.use('/reports', require('./reportsRtr'));
 router.use('/disputes', require('./disputesRtr'));
 router.use('/stations', require('./stationsRtr'));
+// Bulk remote commands resolve at POST /web/stations/bulk-remote
+router.use('/stations', require('./bulkRemoteRtr'));
+
+// ── MANAGE group ────────────────────────────────────────────────────────────
+router.use('/businesses', require('./businessesRtr'));
+router.use('/settlements', require('./settlementsRtr'));
+
+// ── LIVE ANALYTICS ──────────────────────────────────────────────────────────
+router.use('/live-sessions', require('./live-sessionsRtr'));
+
+// ── Role-based navigation menu (login-based sidebar) ────────────────────────
+router.use('/menu', require('./menuRtr'));
+
+// ── NETWORK group (no backing *_lst_t table yet — list returns [], writes no-op) ──
+router.use('/subscriptions', require('./subscriptionsRtr'));
+router.use('/member-groups', require('./member-groupsRtr'));
+router.use('/courtesy-sessions', require('./courtesy-sessionsRtr'));
+router.use('/agents', require('./agentsRtr'));
+
+// ── ROAMING + CHARGE extras ─────────────────────────────────────────────────
+router.use('/cdr', require('./cdrRtr'));
+router.use('/emsp-tokens', require('./emsp-tokensRtr'));
+router.use('/downtime', require('./downtimeRtr'));
+router.use('/smart-scheduling', require('./smart-schedulingRtr'));
+router.use('/connections', require('./connectionsRtr'));
+router.use('/server-logs', require('./serverLogsRtr'));
+router.use('/audit-logs', require('./auditLogsRtr'));
+
+// ── TOOLS & UTILITIES + ADMIN TOOLS group (new) ─────────────────────────────
+// static-data, configurations, roles, settings are backed by real *_lst_t
+// tables; instructions and products have no backing table yet (list -> []).
+router.use('/static-data', require('./staticDataRtr'));
+router.use('/configurations', require('./configurationsRtr'));
+router.use('/instructions', require('./instructionsRtr'));
+router.use('/roles', require('./rolesRtr'));
+router.use('/products', require('./productsRtr'));
+router.use('/settings', require('./settingsRtr'));
 
 module.exports = router;

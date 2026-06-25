@@ -17,3 +17,22 @@ exports.get = function(req, res) {
         .then(rows => res.status(200).json({ status: 200, row: (rows && rows[0]) || null }))
         .catch(e => { console.error('[locations] get', e); res.status(500).json({ status: 500, error: 'Failed to load locations' }); });
 };
+
+exports.create = function(req, res) {
+    mdl.createMdl(req.body || {})
+        .then(() => res.status(200).json({ status: 200, message: 'Location created' }))
+        .catch(e => { console.error('[locations] create', e); res.status(500).json({ status: 500, error: 'Failed to create location' }); });
+};
+
+exports.update = function(req, res) {
+    const data = Object.assign({}, req.body || {}, { id: req.params.id });
+    mdl.updateMdl(data)
+        .then(() => res.status(200).json({ status: 200, message: 'Location updated' }))
+        .catch(e => { console.error('[locations] update', e); res.status(500).json({ status: 500, error: 'Failed to update location' }); });
+};
+
+exports.delete = function(req, res) {
+    mdl.deleteMdl({ id: req.params.id })
+        .then(() => res.status(200).json({ status: 200, message: 'Location deleted' }))
+        .catch(e => { console.error('[locations] delete', e); res.status(500).json({ status: 500, error: 'Failed to delete location' }); });
+};
