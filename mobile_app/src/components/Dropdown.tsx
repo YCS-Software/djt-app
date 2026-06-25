@@ -6,6 +6,7 @@
  * outside-click / scroll / Escape.
  */
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
 
 export interface DropdownOption {
@@ -87,7 +88,7 @@ export default function Dropdown({
         <ChevronDown size={16} className="dd-chevron" />
       </button>
 
-      {open && pos && (
+      {open && pos && createPortal(
         <>
           <div className="dd-backdrop" onClick={() => setOpen(false)} />
           <div
@@ -122,7 +123,8 @@ export default function Dropdown({
               ))
             )}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );

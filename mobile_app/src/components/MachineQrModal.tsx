@@ -23,13 +23,6 @@ export default function MachineQrModal({ machineId, onClose }: { machineId: numb
       try {
         const qr = await ownerService.getMachineQr(machineId);
         setData(qr);
-        // render the on-screen preview
-        if (previewRef.current) {
-          await QRCode.toCanvas(previewRef.current, qr.token, {
-            width: 200, margin: 1, errorCorrectionLevel: 'M',
-            color: { dark: '#0A1626', light: '#FFFFFF' },
-          });
-        }
       } catch (e: any) {
         setError(e?.message || 'Failed to generate QR');
       } finally {
@@ -37,6 +30,17 @@ export default function MachineQrModal({ machineId, onClose }: { machineId: numb
       }
     })();
   }, [machineId]);
+
+  // Render the QR ONCE the data is loaded AND the canvas is mounted. Doing this
+  // inside the fetch effect raced the canvas mount (previewRef.current was null),
+  // which is why the QR rendered in dev but not in production builds.
+  useEffect(() => {
+    if (!data || !previewRef.current) return;
+    QRCode.toCanvas(previewRef.current, data.token, {
+      width: 200, margin: 1, errorCorrectionLevel: 'M',
+      color: { dark: '#0A1626', light: '#FFFFFF' },
+    }).catch((e: any) => setError(e?.message || 'Failed to render QR'));
+  }, [data]);
 
   // Compose a printable label (title + station + QR + footer) and download as PNG
   const download = async () => {

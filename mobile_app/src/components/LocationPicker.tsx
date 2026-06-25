@@ -1,7 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Crosshair, MapPin } from 'lucide-react';
+import { Crosshair, MapPin, Search } from 'lucide-react';
+
+interface GeoResult { display_name: string; lat: string; lon: string; }
 
 interface LocationPickerProps {
   latitude: number | null;
@@ -90,14 +92,82 @@ export default function LocationPicker({ latitude, longitude, onChange, height =
     );
   };
 
+  // ---- Location search (geocode by name / area / pincode via OpenStreetMap) ----
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<GeoResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+
+  const runSearch = async () => {
+    const q = query.trim();
+    if (!q) return;
+    setSearching(true);
+    setShowResults(true);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=in&q=${encodeURIComponent(q)}`;
+      const res = await fetch(url, { headers: { Accept: 'application/json' } });
+      const json = await res.json();
+      setResults(Array.isArray(json) ? json : []);
+    } catch {
+      setResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const pickResult = (r: GeoResult) => {
+    const lat = +parseFloat(r.lat).toFixed(6);
+    const lng = +parseFloat(r.lon).toFixed(6);
+    onChangeRef.current(lat, lng);
+    if (mapRef.current && markerRef.current) {
+      markerRef.current.setLatLng([lat, lng]);
+      mapRef.current.setView([lat, lng], 16, { animate: true });
+    }
+    setQuery(r.display_name.split(',').slice(0, 2).join(',').trim());
+    setShowResults(false);
+    setResults([]);
+  };
+
   return (
-    <div className="loc-picker">
-      <div ref={elRef} className="loc-picker-map" style={{ height }} />
-      <button type="button" className="loc-picker-locate" onClick={useMyLocation}>
-        <Crosshair size={16} /> Use my location
-      </button>
-      <div className="loc-picker-hint">
-        <MapPin size={13} /> Tap the map or drag the pin to set the exact spot
+    <div className="loc-wrap">
+      <div className="loc-search">
+        <Search size={15} className="loc-search-icon" />
+        <input
+          className="loc-search-input"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); runSearch(); } }}
+          placeholder="Search location, area or pincode"
+        />
+        <button type="button" className="loc-search-btn" onClick={runSearch} disabled={searching}>
+          {searching ? '…' : 'Search'}
+        </button>
+        {showResults && (
+          <div className="loc-results">
+            {searching ? (
+              <div className="loc-result loc-result-empty">Searching…</div>
+            ) : results.length === 0 ? (
+              <div className="loc-result loc-result-empty">No matches found</div>
+            ) : (
+              results.map((r, i) => (
+                <button type="button" key={i} className="loc-result" onClick={() => pickResult(r)}>
+                  <MapPin size={13} />
+                  <span>{r.display_name}</span>
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="loc-picker">
+        <div ref={elRef} className="loc-picker-map" style={{ height }} />
+        <button type="button" className="loc-picker-locate" onClick={useMyLocation}>
+          <Crosshair size={16} /> Use my location
+        </button>
+        <div className="loc-picker-hint">
+          <MapPin size={13} /> Tap the map or drag the pin to set the exact spot
+        </div>
       </div>
     </div>
   );
