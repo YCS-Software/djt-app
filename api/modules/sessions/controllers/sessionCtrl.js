@@ -443,11 +443,19 @@ exports.getActiveSession = function(req, res) {
             const session = sessionResults[0];
             const sessionData = {
                 session_id: session.sssn_id,
+                session_code: session.sssn_cd,
+                station_id: session.sttn_id,
                 station_name: session.sttn_nm_tx,
+                address: session.addr_tx || null,
+                connector_id: session.cnntr_id,
                 connector_type: session.cnntr_typ_cd,
+                power: session.pwr_tx || null,
                 start_time: session.strt_ts,
                 duration_minutes: session.durn_mnts_nbr || 0,
                 energy_consumed: parseFloat(session.enrgy_cnsmd_kwh) || 0,
+                price_per_kwh: parseFloat(session.prce_per_kwh_amt) || 0,
+                // prepaid hold (units were bought for this amount; ttl_cst_amt holds it)
+                prepaid_amount: parseFloat(session.ttl_cst_amt) || 0,
                 current_cost: parseFloat(session.ttl_cst_amt) || 0,
                 progress: session.prgrss_pct || 0,
                 status: session.sttus_cd

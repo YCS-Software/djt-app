@@ -10,13 +10,17 @@ export interface ChargingSession {
   station_name: string;
   station_id?: number;
   address?: string;
+  connector_id?: number;
   connector_type: string;
+  power?: string | null;
   start_time: string;
   end_time?: string;
   duration_minutes?: number;
   energy_consumed: number;
   current_cost?: number;
   total_cost?: number;
+  /** prepaid hold for the session (units bought × price) */
+  prepaid_amount?: number;
   price_per_kwh: number;
   progress: number;
   status: string;

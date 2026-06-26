@@ -93,8 +93,41 @@ export default function Charging() {
       fetchStations();
     } else if (view === 'history') {
       fetchHistory();
+    } else {
+      // Default view: if a charge is already running (e.g. the app was closed /
+      // the charger dropped), resume it so the user always has a Stop button.
+      resumeActiveSession();
     }
   }, [navigate, view]);
+
+  // Restore an in-progress session from the server so the Stop button is always
+  // reachable after an app reopen / reconnect.
+  const resumeActiveSession = async () => {
+    try {
+      const s = await sessionService.getActiveSession();
+      if (!s || s.status !== 'active' || !s.session_id) return;
+      const price = s.price_per_kwh || 0;
+      const prepaid = s.prepaid_amount ?? s.current_cost ?? 0;
+      const purchased = price > 0 ? Math.round((prepaid / price) * 1000) / 1000 : 0;
+      setStationInfo({
+        station_id: s.station_id || 0,
+        name: s.station_name,
+        chargerId: s.session_code || '',
+        connector_id: s.connector_id || 0,
+        pricePerUnit: price,
+        address: s.address || '',
+        power: s.power || '—',
+      });
+      setCurrentSessionId(s.session_id);
+      setUnitsPurchased(purchased);
+      setUnitsConsumed(s.energy_consumed || 0);
+      setPrepaidAmount(prepaid);
+      setIsCharging(false); // frozen on resume; user can Stop & get refunded for the unused
+      setState('charging');
+    } catch (e) {
+      console.error('Error resuming active session:', e);
+    }
+  };
 
   const fetchWalletBalance = async () => {
     try {
