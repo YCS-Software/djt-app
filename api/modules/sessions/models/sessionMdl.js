@@ -198,6 +198,31 @@ exports.getMachineScanInfoMdl = function(data) {
 };
 
 /*****************************************************************************
+* Function      : getMachineScanInfoByOcppMdl
+* Description   : Same as getMachineScanInfoMdl but resolves by the charger's
+*                 OCPP id (so a QR/sticker that encodes the OCPP id or ws-url
+*                 still resolves to the station + connectors).
+* Arguments     : data object with ocppId
+******************************************************************************/
+exports.getMachineScanInfoByOcppMdl = function(data) {
+    const ocppId = String(data.ocppId || '');
+    const QRY_TO_EXEC = `
+        SELECT m.mchn_id, m.mchn_nm_tx, m.ocpp_id_tx, m.mchn_typ_cd, m.max_pwr_tx, m.sttus_cd AS mchn_sttus_cd,
+               st.sttn_id, st.sttn_nm_tx, st.addr_tx, st.prce_per_kwh_amt, st.sttn_cd,
+               c.cnntr_id, c.cnntr_typ_cd, c.cnntr_nm_tx, c.pwr_tx, c.is_avlbl_in
+        FROM mchn_lst_t m
+        INNER JOIN sttn_lst_t st ON m.sttn_id = st.sttn_id
+        LEFT JOIN cnntr_lst_t c ON c.mchn_id = m.mchn_id AND c.a_in = 1
+        WHERE m.ocpp_id_tx = ? AND m.a_in = 1
+        ORDER BY c.cnntr_id ASC
+    `;
+    const PARAMS = [ocppId];
+
+    console.log('[getMachineScanInfoByOcppMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+/*****************************************************************************
 * Function      : updatePaymentStatusMdl
 * Description   : Update session payment status
 * Arguments     : data object with sessionId, status, transactionId (optional)

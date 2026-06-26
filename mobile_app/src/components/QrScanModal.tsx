@@ -31,7 +31,11 @@ export default function QrScanModal({ onResult, onClose }: { onResult: (token: s
     const onDecoded = (text: string) => {
       if (handledRef.current) return;
       const value = (text || '').trim();
-      if (!value.startsWith(TOKEN_PREFIX)) {
+      // Accept the signed app token (preferred) OR a sticker/QR that encodes the
+      // charger ws-url or a bare DJT OCPP id — the server resolves all three.
+      const isToken = value.startsWith(TOKEN_PREFIX);
+      const isWsOrOcpp = /\/ocpp\/[^/?#\s]+/i.test(value) || /^DJT-\d+-CP\d+-[A-Za-z0-9]+$/i.test(value);
+      if (!isToken && !isWsOrOcpp) {
         setNotice('Not a DJT charger code — scan the QR on the machine');
         return;
       }

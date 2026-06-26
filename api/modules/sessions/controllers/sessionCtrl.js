@@ -17,21 +17,44 @@ const cntxtDtls = "sessionCtrl";
  * Generic scanners can't use the opaque token; only this endpoint, which holds
  * the secret, verifies the signature and returns the charge target.
  */
+/**
+ * Pull a charge-point OCPP id out of scanned QR content that ISN'T a signed
+ * DJTEV1 token — i.e. a ws-url ("ws://host/ocpp/<id>") or a bare OCPP id
+ * (e.g. "DJT-12-CP1-T6I"). Returns null if nothing safe is found.
+ */
+function extractOcppId(raw) {
+    const s = String(raw || '').trim();
+    if (!s) return null;
+    const m = s.match(/\/ocpp\/([^/?#\s]+)/i);   // ws://.../ocpp/<id>
+    if (m) return decodeURIComponent(m[1]);
+    if (/^DJT-\d+-CP\d+-[A-Za-z0-9]+$/i.test(s)) return s;  // bare DJT OCPP id
+    return null;
+}
+
 exports.scanQr = function(req, res) {
     const fnm = "scanQr";
     const data = req.body && req.body.data ? req.body.data : (req.body || {});
     const token = data.token || data.qr || data.qr_code || '';
 
+    // Primary: signed app-only token (DJTEV1...). Fallback: a sticker/QR that
+    // encodes the raw OCPP id or the charger ws-url (resolve by OCPP id).
     const payload = qrUtil.decode(token);
-    if (!payload || payload.t !== 'machine' || !payload.mid) {
-        return res.status(std.message["BAD_REQUEST"].code).json({
-            status: std.message["BAD_REQUEST"].code,
-            message: 'This QR code is not a valid DJT charger code',
-            data: null
-        });
+    let lookup = null;
+    if (payload && payload.t === 'machine' && payload.mid) {
+        lookup = sessionMdl.getMachineScanInfoMdl({ machineId: payload.mid });
+    } else {
+        const ocppId = extractOcppId(token);
+        if (!ocppId) {
+            return res.status(std.message["BAD_REQUEST"].code).json({
+                status: std.message["BAD_REQUEST"].code,
+                message: 'This QR code is not a valid DJT charger code',
+                data: null
+            });
+        }
+        lookup = sessionMdl.getMachineScanInfoByOcppMdl({ ocppId });
     }
 
-    sessionMdl.getMachineScanInfoMdl({ machineId: payload.mid })
+    lookup
         .then(function(rows) {
             if (!rows || rows.length === 0) {
                 return res.status(std.message["NOT_FOUND"].code).json({
