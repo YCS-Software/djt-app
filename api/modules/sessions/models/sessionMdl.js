@@ -223,6 +223,44 @@ exports.getMachineScanInfoByOcppMdl = function(data) {
 };
 
 /*****************************************************************************
+* Function      : getMachineLiveByIdMdl
+* Description   : Machine + connector availability for live pre-charge status
+* Arguments     : data object with machineId
+******************************************************************************/
+exports.getMachineLiveByIdMdl = function(data) {
+    const machineId = parseInt(data.machineId) || 0;
+    const QRY_TO_EXEC = `
+        SELECT m.mchn_id, m.ocpp_id_tx, m.sttus_cd AS mchn_sttus, m.mchn_nm_tx, m.mchn_typ_cd, m.max_pwr_tx,
+               (SELECT COUNT(*) FROM cnntr_lst_t c WHERE c.mchn_id = m.mchn_id AND c.a_in = 1 AND c.is_avlbl_in = 1) AS available_connectors,
+               (SELECT COUNT(*) FROM cnntr_lst_t c WHERE c.mchn_id = m.mchn_id AND c.a_in = 1) AS total_connectors
+        FROM mchn_lst_t m
+        WHERE m.mchn_id = ? AND m.a_in = 1
+        LIMIT 1`;
+    const PARAMS = [machineId];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+/*****************************************************************************
+* Function      : getSessionLiveInfoMdl
+* Description   : Live session + machine/connector status for the charging poll
+* Arguments     : data object with sessionId, userId
+******************************************************************************/
+exports.getSessionLiveInfoMdl = function(data) {
+    const QRY_TO_EXEC = `
+        SELECT s.sssn_id, s.usr_id, s.sttus_cd AS sssn_sttus, s.enrgy_cnsmd_kwh, s.ttl_cst_amt,
+               s.prgrss_pct, s.prce_per_kwh_amt,
+               m.mchn_id, m.ocpp_id_tx, m.sttus_cd AS mchn_sttus,
+               c.cnntr_id, c.is_avlbl_in
+        FROM sssn_lst_t s
+        INNER JOIN cnntr_lst_t c ON s.cnntr_id = c.cnntr_id
+        INNER JOIN mchn_lst_t m ON c.mchn_id = m.mchn_id
+        WHERE s.sssn_id = ? AND s.usr_id = ? AND s.a_in = 1
+        LIMIT 1`;
+    const PARAMS = [parseInt(data.sessionId) || 0, parseInt(data.userId) || 0];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+/*****************************************************************************
 * Function      : updatePaymentStatusMdl
 * Description   : Update session payment status
 * Arguments     : data object with sessionId, status, transactionId (optional)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   QrCode, 
@@ -17,17 +17,33 @@ import {
   History,
   ArrowLeft,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Plug,
+  Wifi,
+  WifiOff,
+  PauseCircle
 } from 'lucide-react';
 import { Toast } from '@capacitor/toast';
 import { stationService } from '../../services/api/stationService';
 import { sessionService } from '../../services/api/sessionService';
 import { walletService } from '../../services/api/walletService';
 import type { ChargingStation } from '../../services/api/stationService';
-import type { ChargingSession } from '../../services/api/sessionService';
+import type { ChargingSession, ConnectorState } from '../../services/api/sessionService';
 import StationMap from '../../components/StationMap';
 import QrScanModal from '../../components/QrScanModal';
 import './charging.css';
+
+// UI metadata for each live connector state (label, colour tone, gate message)
+const CONNECTOR_UI: Record<ConnectorState, { label: string; tone: string; msg: string }> = {
+  charging:    { label: 'Charging',           tone: 'green',  msg: '' },
+  plugged:     { label: 'Connector plugged',  tone: 'cyan',   msg: '' },
+  unplugged:   { label: 'Not plugged in',     tone: 'amber',  msg: 'Please plug the connector into your vehicle, then tap Start.' },
+  offline:     { label: 'Charger offline',    tone: 'red',    msg: 'This charger is offline right now. Please try another.' },
+  faulted:     { label: 'Charger faulted',    tone: 'red',    msg: 'This charger reported a fault. Please try another charger.' },
+  unavailable: { label: 'Under maintenance',  tone: 'violet', msg: 'This charger is under maintenance. Please try another.' },
+};
+// States from which charging may NOT start
+const BLOCKING_STATES: ConnectorState[] = ['offline', 'faulted', 'unavailable'];
 
 type ChargingState = 'idle' | 'scanning' | 'station-details' | 'charging' | 'completed';
 
@@ -74,6 +90,14 @@ export default function Charging() {
 
   // QR scanner
   const [showScanner, setShowScanner] = useState(false);
+
+  // Live charger / connector state (real-time, OCPP-driven)
+  const [machineId, setMachineId] = useState<number | null>(null);
+  const [machineDetails, setMachineDetails] = useState<{ name: string; type: string; power: string; connectorType: string } | null>(null);
+  const [connectorState, setConnectorState] = useState<ConnectorState>('unplugged');
+  const [machineOnline, setMachineOnline] = useState(true);
+  const [paused, setPaused] = useState(false);
+  const serverDriven = useRef(false); // true once the server reports real meter data
 
   useEffect(() => {
     const token = localStorage.getItem('x-access-token');
@@ -253,10 +277,12 @@ export default function Charging() {
     }
   }, [currentSessionId, unitsConsumed, unitsPurchased, stationInfo, fetchWalletBalance]);
 
-  // Charging timer
+  // Charging timer (local fallback simulation). Pauses when the connector is
+  // unplugged/offline, and stands down entirely once the server reports real
+  // meter data (serverDriven) so live OCPP values take over.
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (isCharging && unitsConsumed < unitsPurchased) {
+    if (isCharging && !paused && !serverDriven.current && unitsConsumed < unitsPurchased) {
       interval = setInterval(() => {
         setChargingTime(prev => prev + 1);
         setUnitsConsumed(prev => {
@@ -273,7 +299,62 @@ export default function Charging() {
       }, 500);
     }
     return () => clearInterval(interval);
-  }, [isCharging, unitsConsumed, unitsPurchased, handleStopCharging]);
+  }, [isCharging, paused, unitsConsumed, unitsPurchased, handleStopCharging]);
+
+  // Pre-charge: poll the live charger state while on the station-details screen
+  // so the "plug in" gate reflects reality (F: status + plug detection).
+  useEffect(() => {
+    if (state !== 'station-details' || !machineId) return;
+    let active = true;
+    const poll = async () => {
+      try {
+        const s = await sessionService.getMachineStatus(machineId);
+        if (!active) return;
+        setConnectorState(s.connector_state);
+        setMachineOnline(s.machine_online);
+      } catch { /* keep last known state */ }
+    };
+    poll();
+    const id = setInterval(poll, 4000);
+    return () => { active = false; clearInterval(id); };
+  }, [state, machineId]);
+
+  // During charge: poll the live session meter + connector state. Drives real
+  // energy/cost, pause-on-unplug, and server-side completion.
+  useEffect(() => {
+    if (state !== 'charging' || !currentSessionId) return;
+    let active = true;
+    const poll = async () => {
+      try {
+        const live = await sessionService.getSessionLive(currentSessionId);
+        if (!active) return;
+        setConnectorState(live.connector_state);
+        setMachineOnline(live.machine_online);
+
+        const isPaused = ['unplugged', 'offline', 'faulted', 'unavailable'].includes(live.connector_state);
+        setPaused(isPaused);
+
+        // Real meter data from the charger takes over from the simulation
+        if (live.energy_consumed > 0) {
+          serverDriven.current = true;
+          setUnitsConsumed(live.energy_consumed);
+        }
+
+        // Charger finished the transaction server-side
+        if (live.status === 'completed') {
+          setIsCharging(false);
+          setPaused(false);
+          if (live.energy_consumed > 0) setUnitsConsumed(live.energy_consumed);
+          await fetchWalletBalance();
+          setState('completed');
+        }
+      } catch { /* transient — keep last known state */ }
+    };
+    poll();
+    const id = setInterval(poll, 3000);
+    return () => { active = false; clearInterval(id); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, currentSessionId]);
 
   // Open the live camera scanner
   const handleScanQR = () => {
@@ -322,6 +403,25 @@ export default function Charging() {
         address: result.station.address,
         power: result.machine.power || result.connector.power || '—',
       });
+      // Live machine/connector context for the status card + plug gate
+      setMachineId(result.machine.machine_id);
+      setMachineDetails({
+        name: result.machine.name,
+        type: result.machine.machine_type,
+        power: result.machine.power || result.connector.power || '—',
+        connectorType: result.connector.type,
+      });
+      setMachineOnline(result.machine.online);
+      // Initial connector state (refined immediately by live polling below)
+      setConnectorState(
+        !result.machine.online ? 'offline'
+          : result.machine.status === 'faulted' ? 'faulted'
+          : result.machine.status === 'maintenance' ? 'unavailable'
+          : result.machine.status === 'in_use' ? 'plugged'
+          : 'unplugged'
+      );
+      serverDriven.current = false;
+      setPaused(false);
       setState('station-details');
     } catch (error: any) {
       console.error('Error resolving QR:', error);
@@ -341,13 +441,21 @@ export default function Charging() {
   };
 
   const handlePayAndStart = async () => {
-    if (!canPay() || !stationInfo) {
-      alert('Insufficient wallet balance. Please add money to your wallet.');
+    if (!stationInfo) return;
+
+    // Plug-in / charger-state gate (real-time, before taking money)
+    if (connectorState !== 'plugged' && connectorState !== 'charging') {
+      await notify(CONNECTOR_UI[connectorState].msg || 'Please plug in the connector to start charging.');
+      return;
+    }
+
+    if (!canPay()) {
+      await notify('Insufficient wallet balance. Please add money to your wallet.');
       return;
     }
 
     if (!stationInfo.station_id || !stationInfo.connector_id) {
-      alert('Invalid station or connector information. Please scan QR code again.');
+      await notify('Invalid station or connector information. Please scan the QR again.');
       return;
     }
 
@@ -399,7 +507,14 @@ export default function Charging() {
     setChargingTime(0);
     setCurrentSessionId(null);
     setPrepaidAmount(0);
-    
+    // reset live charger context
+    setMachineId(null);
+    setMachineDetails(null);
+    setConnectorState('unplugged');
+    setMachineOnline(true);
+    setPaused(false);
+    serverDriven.current = false;
+
     // Refresh wallet balance
     await fetchWalletBalance();
   };
@@ -689,6 +804,35 @@ export default function Charging() {
               </div>
             </section>
 
+            {/* Live machine status + connector state */}
+            {machineDetails && (
+              <section className="machine-status-card">
+                <div className="ms-head">
+                  <div className="ms-title">
+                    <Zap size={16} />
+                    <span>{machineDetails.name}</span>
+                  </div>
+                  <span className={`ms-online ${machineOnline ? 'on' : 'off'}`}>
+                    {machineOnline ? <><Wifi size={12} /> Online</> : <><WifiOff size={12} /> Offline</>}
+                  </span>
+                </div>
+                <div className="ms-specs">
+                  <span className="ms-chip">{machineDetails.type}</span>
+                  <span className="ms-chip">{machineDetails.power}</span>
+                  <span className="ms-chip"><Plug size={11} /> {machineDetails.connectorType}</span>
+                </div>
+                <div className={`ms-connector tone-${CONNECTOR_UI[connectorState].tone}`}>
+                  <span className="ms-dot" />
+                  {connectorState === 'unplugged'
+                    ? <><Plug size={14} /> {CONNECTOR_UI[connectorState].label}</>
+                    : <><Zap size={14} /> {CONNECTOR_UI[connectorState].label}</>}
+                </div>
+                {CONNECTOR_UI[connectorState].msg && (
+                  <p className="ms-hint">{CONNECTOR_UI[connectorState].msg}</p>
+                )}
+              </section>
+            )}
+
             <section className="purchase-card">
               <h3 className="purchase-title">Select Units to Charge</h3>
               
@@ -728,13 +872,16 @@ export default function Charging() {
                 </div>
               )}
 
-              <button 
+              <button
                 className="pay-btn"
                 onClick={handlePayAndStart}
-                disabled={!canPay()}
+                disabled={!canPay() || BLOCKING_STATES.includes(connectorState)}
               >
-                <Wallet size={20} />
-                <span>Pay from Wallet</span>
+                {connectorState === 'unplugged'
+                  ? <><Plug size={20} /> <span>Plug in to Start</span></>
+                  : BLOCKING_STATES.includes(connectorState)
+                    ? <><AlertCircle size={20} /> <span>{CONNECTOR_UI[connectorState].label}</span></>
+                    : <><Wallet size={20} /> <span>Pay &amp; Start Charging</span></>}
               </button>
             </section>
           </div>
@@ -743,13 +890,32 @@ export default function Charging() {
         {/* CHARGING STATE */}
         {state === 'charging' && stationInfo && (
           <div className="charging-state">
+            {/* Pause banner when the connector is disconnected / charger drops */}
+            {paused && (
+              <div className="charge-pause-banner">
+                <PauseCircle size={20} />
+                <div>
+                  <strong>Charging paused</strong>
+                  <span>
+                    {connectorState === 'unplugged' ? 'Connector unplugged — re-plug to resume.'
+                      : connectorState === 'offline' ? 'Charger went offline — it will resume when reconnected.'
+                      : connectorState === 'faulted' ? 'Charger reported a fault. Please contact the operator.'
+                      : 'Charger temporarily unavailable.'}
+                  </span>
+                </div>
+              </div>
+            )}
+
             <section className="charging-active-card">
               <div className="charging-status">
-                <div className="status-icon charging">
-                  <Zap size={32} />
+                <div className={`status-icon ${paused ? 'paused' : 'charging'}`}>
+                  {paused ? <PauseCircle size={32} /> : <Zap size={32} />}
                 </div>
-                <h2 className="status-title">Charging in Progress</h2>
+                <h2 className="status-title">{paused ? 'Charging Paused' : 'Charging in Progress'}</h2>
                 <p className="status-subtitle">{stationInfo.name}</p>
+                <span className={`charge-conn-chip tone-${CONNECTOR_UI[connectorState].tone}`}>
+                  <span className="ms-dot" /> {CONNECTOR_UI[connectorState].label}
+                </span>
               </div>
 
               <div className="progress-section">

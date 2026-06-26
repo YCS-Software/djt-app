@@ -31,6 +31,10 @@ export interface StartSessionRequest {
   station_id: number;
   connector_id: number;
   qr_code?: string;
+  /** units (kWh) the customer chose to buy */
+  selected_units?: number;
+  /** prepaid amount (units × price) to hold from the wallet */
+  total_amount?: number;
 }
 
 export interface StopSessionRequest {
@@ -112,7 +116,46 @@ export const sessionService = {
     );
     return response.data;
   },
+
+  /** Live charger state before charging — drives the "plug in" gate. */
+  getMachineStatus: async (machineId: number): Promise<MachineLiveStatus> => {
+    const response = await apiClient.get<{ data: MachineLiveStatus }>(
+      `/sessions/machine/${machineId}/status`,
+      { requiresAuth: true },
+    );
+    return response.data;
+  },
+
+  /** Live session meter + connector state during charging. */
+  getSessionLive: async (sessionId: number): Promise<SessionLive> => {
+    const response = await apiClient.get<{ data: SessionLive }>(
+      `/sessions/${sessionId}/live`,
+      { requiresAuth: true },
+    );
+    return response.data;
+  },
 };
+
+/** offline | faulted | unavailable | charging | plugged | unplugged */
+export type ConnectorState = 'offline' | 'faulted' | 'unavailable' | 'charging' | 'plugged' | 'unplugged';
+
+export interface MachineLiveStatus {
+  machine_online: boolean;
+  machine_status: string;
+  connector_state: ConnectorState;
+  available_connectors: number;
+  total_connectors: number;
+}
+
+export interface SessionLive {
+  session_id: number;
+  status: string;
+  energy_consumed: number;
+  current_cost: number;
+  progress: number;
+  connector_state: ConnectorState;
+  machine_online: boolean;
+}
 
 export interface ScanConnector {
   connector_id: number;

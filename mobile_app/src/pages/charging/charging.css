@@ -1127,3 +1127,69 @@
   font-size: 1rem;
   font-weight: 500;
 }
+
+/* ============================================================
+   Live machine status + connector state (real-time charging)
+   ============================================================ */
+.machine-status-card {
+  background: #fff;
+  border: 1px solid #E5E7EB;
+  border-radius: 1rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.ms-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.ms-title { display: flex; align-items: center; gap: 0.4rem; font-weight: 700; color: #111827; }
+.ms-title svg { color: #22D3EE; }
+.ms-online {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 999px;
+}
+.ms-online.on { background: rgba(16,185,129,0.12); color: #059669; }
+.ms-online.off { background: rgba(239,68,68,0.12); color: #DC2626; }
+
+.ms-specs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.6rem 0; }
+.ms-chip {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  font-size: 0.72rem; font-weight: 600; color: #374151;
+  background: #F3F4F6; border-radius: 0.5rem; padding: 0.2rem 0.5rem;
+}
+
+.ms-connector {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  font-size: 0.84rem; font-weight: 700; padding: 0.4rem 0.7rem; border-radius: 0.6rem;
+}
+.ms-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.ms-hint { font-size: 0.78rem; color: #6B7280; margin: 0.5rem 0 0; }
+
+/* Connector / status tones (shared by station-details and charging screens) */
+.tone-green  { color: #059669; background: rgba(16,185,129,0.12); }
+.tone-cyan   { color: #0891B2; background: rgba(34,211,238,0.14); }
+.tone-amber  { color: #B45309; background: rgba(245,158,11,0.15); }
+.tone-red    { color: #DC2626; background: rgba(239,68,68,0.12); }
+.tone-violet { color: #7C3AED; background: rgba(139,92,246,0.14); }
+.ms-connector.tone-green  { animation: conn-glow 1.6s ease-in-out infinite; }
+@keyframes conn-glow { 0%,100% { opacity: 1; } 50% { opacity: 0.78; } }
+
+/* Charging screen: connector chip under the title */
+.charge-conn-chip {
+  display: inline-flex; align-items: center; gap: 0.35rem; margin-top: 0.5rem;
+  font-size: 0.76rem; font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 999px;
+}
+
+/* Paused state icon + banner */
+.status-icon.paused {
+  background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%);
+  color: #fff; box-shadow: 0 0 20px rgba(245,158,11,0.4);
+}
+.charge-pause-banner {
+  display: flex; align-items: center; gap: 0.6rem;
+  background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.4);
+  color: #92400E; border-radius: 0.85rem; padding: 0.75rem 0.9rem; margin-bottom: 1rem;
+  animation: pause-slide 240ms ease;
+}
+.charge-pause-banner svg { color: #D97706; flex: none; }
+.charge-pause-banner strong { display: block; font-size: 0.9rem; }
+.charge-pause-banner span { display: block; font-size: 0.78rem; opacity: 0.85; }
+@keyframes pause-slide { from { transform: translateY(-8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }

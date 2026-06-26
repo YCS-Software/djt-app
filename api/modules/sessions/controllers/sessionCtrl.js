@@ -20,6 +20,100 @@ function isChargerOnline(ocppId) {
 }
 
 /**
+ * Derive a human connector state from live OCPP-updated fields:
+ *  offline   – charger not connected to the CSMS socket
+ *  faulted / unavailable – charger error / maintenance
+ *  charging  – an active transaction is metering on this machine
+ *  plugged   – cable connected (Occupied) but not yet charging
+ *  unplugged – online and free (Available)
+ */
+function deriveConnectorState(online, mchnStatus, sssnStatus) {
+    if (!online) return 'offline';
+    if (mchnStatus === 'faulted') return 'faulted';
+    if (mchnStatus === 'maintenance') return 'unavailable';
+    if (sssnStatus === 'active' && mchnStatus === 'in_use') return 'charging';
+    if (mchnStatus === 'in_use') return 'plugged';
+    return 'unplugged';
+}
+
+/**
+ * GET /sessions/machine/:machineId/status
+ * Live machine + connector state before charging (drives the "plug in" gate).
+ */
+exports.getMachineStatus = function(req, res) {
+    const fnm = "getMachineStatus";
+    const machineId = parseInt(req.params.machineId);
+    if (!machineId) {
+        return res.status(std.message["BAD_REQUEST"].code).json({
+            status: std.message["BAD_REQUEST"].code, message: 'Machine ID is required', data: null
+        });
+    }
+    sessionMdl.getMachineLiveByIdMdl({ machineId })
+        .then(function(rows) {
+            const m = rows && rows[0];
+            if (!m) {
+                return res.status(std.message["NOT_FOUND"].code).json({
+                    status: std.message["NOT_FOUND"].code, message: 'Charger not found', data: null
+                });
+            }
+            const online = isChargerOnline(m.ocpp_id_tx);
+            return df.formatSucessRes(req, res, {
+                machine_online: online,
+                machine_status: m.mchn_sttus,
+                connector_state: deriveConnectorState(online, m.mchn_sttus, null),
+                available_connectors: Number(m.available_connectors) || 0,
+                total_connectors: Number(m.total_connectors) || 0
+            }, cntxtDtls, fnm, {});
+        })
+        .catch(function(error) {
+            console.error('[sessionCtrl] getMachineStatus error:', error);
+            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+        });
+};
+
+/**
+ * GET /sessions/:sessionId/live
+ * Live session meter + connector state during charging (drives pause-on-unplug
+ * and real energy/cost display).
+ */
+exports.getSessionLive = function(req, res) {
+    const fnm = "getSessionLive";
+    const userId = req.user.userId;
+    const sessionId = parseInt(req.params.sessionId);
+    if (!sessionId) {
+        return res.status(std.message["BAD_REQUEST"].code).json({
+            status: std.message["BAD_REQUEST"].code, message: 'Session ID is required', data: null
+        });
+    }
+    sessionMdl.getSessionLiveInfoMdl({ sessionId, userId })
+        .then(function(rows) {
+            const r = rows && rows[0];
+            if (!r) {
+                return res.status(std.message["NOT_FOUND"].code).json({
+                    status: std.message["NOT_FOUND"].code, message: 'Session not found', data: null
+                });
+            }
+            const online = isChargerOnline(r.ocpp_id_tx);
+            const energy = Number(r.enrgy_cnsmd_kwh) || 0;
+            const price = Number(r.prce_per_kwh_amt) || 0;
+            const cost = Number(r.ttl_cst_amt) || Math.round(energy * price * 100) / 100;
+            return df.formatSucessRes(req, res, {
+                session_id: r.sssn_id,
+                status: r.sssn_sttus,
+                energy_consumed: energy,
+                current_cost: cost,
+                progress: Number(r.prgrss_pct) || 0,
+                connector_state: deriveConnectorState(online, r.mchn_sttus, r.sssn_sttus),
+                machine_online: online
+            }, cntxtDtls, fnm, {});
+        })
+        .catch(function(error) {
+            console.error('[sessionCtrl] getSessionLive error:', error);
+            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+        });
+};
+
+/**
  * Resolve a scanned machine QR (signed, app-only token) → station + connector.
  * Generic scanners can't use the opaque token; only this endpoint, which holds
  * the secret, verifies the signature and returns the charge target.
