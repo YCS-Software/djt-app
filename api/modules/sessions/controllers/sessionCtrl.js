@@ -42,6 +42,16 @@ exports.scanQr = function(req, res) {
     const data = req.body && req.body.data ? req.body.data : (req.body || {});
     const token = data.token || data.qr || data.qr_code || '';
 
+    // Audit every scan attempt (success and failures), so support can trace
+    // exactly who scanned what charger and the outcome (e.g. offline scans).
+    const actx = audit.reqCtx(req);
+    const auditScan = (result, machineId, detail) => audit.writeAudit({
+        userId: actx.userId, action: 'charger_scan', entityType: 'machine',
+        entityId: machineId != null ? machineId : null,
+        newVal: Object.assign({ result }, detail || {}),
+        ip: actx.ip, userAgent: actx.userAgent,
+    });
+
     // Primary: signed app-only token (DJTEV1...). Fallback: a sticker/QR that
     // encodes the raw OCPP id or the charger ws-url (resolve by OCPP id).
     const payload = qrUtil.decode(token);
@@ -51,6 +61,7 @@ exports.scanQr = function(req, res) {
     } else {
         const ocppId = extractOcppId(token);
         if (!ocppId) {
+            auditScan('invalid_code');
             return res.status(std.message["BAD_REQUEST"].code).json({
                 status: std.message["BAD_REQUEST"].code,
                 message: 'This QR code is not a valid DJT charger code',
@@ -63,6 +74,7 @@ exports.scanQr = function(req, res) {
     lookup
         .then(function(rows) {
             if (!rows || rows.length === 0) {
+                auditScan('not_found');
                 return res.status(std.message["NOT_FOUND"].code).json({
                     status: std.message["NOT_FOUND"].code, message: 'Charger not found', data: null
                 });
@@ -82,10 +94,16 @@ exports.scanQr = function(req, res) {
 
             const available = connectors.find(function(c) { return c.is_available; }) || connectors[0] || null;
             if (!available) {
+                auditScan('no_connectors', head.mchn_id, { ocpp_id: head.ocpp_id_tx || null });
                 return res.status(std.message["BAD_REQUEST"].code).json({
                     status: std.message["BAD_REQUEST"].code, message: 'This charger has no connectors configured', data: null
                 });
             }
+
+            const online = isChargerOnline(head.ocpp_id_tx);
+            auditScan(online ? 'ok' : 'offline', head.mchn_id, {
+                ocpp_id: head.ocpp_id_tx || null, station_id: head.sttn_id, online, configured: !!head.ocpp_id_tx,
+            });
 
             return df.formatSucessRes(req, res, {
                 machine: {
@@ -98,7 +116,7 @@ exports.scanQr = function(req, res) {
                     configured: !!head.ocpp_id_tx,
                     // live connectivity from the OCPP WebSocket registry (real-time,
                     // authoritative — not the cached DB status)
-                    online: isChargerOnline(head.ocpp_id_tx)
+                    online: online
                 },
                 station: {
                     station_id: head.sttn_id,

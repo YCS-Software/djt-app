@@ -433,6 +433,13 @@ exports.getMachineQr = function(req, res) {
                 pwr: powerLabel
             };
 
+            const actx = audit.reqCtx(req);
+            audit.writeAudit({
+                userId: actx.userId, action: 'qr_generate', entityType: 'machine', entityId: m.mchn_id,
+                newVal: { ocpp_id: m.ocpp_id_tx || null, station_id: m.sttn_id, configured: !!m.ocpp_id_tx },
+                ip: actx.ip, userAgent: actx.userAgent,
+            });
+
             return df.formatSucessRes(req, res, {
                 token: qrUtil.encode(payload),
                 machine: {
