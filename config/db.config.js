@@ -27,10 +27,7 @@ const config = {
     keepAliveInitialDelay: 10000,        // Start keepalive after 10 seconds
     idleTimeout: 60000,                   // Close idle connections after 60 seconds
     connectTimeout: 20000,                // Connection timeout 20 seconds
-    multipleStatements: true,
-    // Interpret DB DATE/TIME values in this zone. MUST match the MySQL server's
-    // time_zone (set default-time-zone='+05:30' on the server). IST by default.
-    timezone: process.env.DB_TIMEZONE || '+05:30'
+    multipleStatements: true
 };
 
 // Create connection pool
