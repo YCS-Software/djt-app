@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
+import { Toast } from '@capacitor/toast';
 import { stationService } from '../../services/api/stationService';
 import { sessionService } from '../../services/api/sessionService';
 import { walletService } from '../../services/api/walletService';
@@ -242,7 +243,16 @@ export default function Charging() {
     setShowScanner(true);
   };
 
-  // Called with the validated DJTEV1 token from the scanner — resolve it server-side
+  // Show a native toast (falls back to alert if the toast plugin is unavailable)
+  const notify = async (message: string) => {
+    try {
+      await Toast.show({ text: message, duration: 'long' });
+    } catch {
+      alert(message);
+    }
+  };
+
+  // Called with the validated token / charger code from the scanner — resolve it server-side
   const handleScanToken = async (token: string) => {
     setShowScanner(false);
     setState('scanning');
@@ -250,12 +260,18 @@ export default function Charging() {
       const result = await sessionService.resolveScan(token);
 
       if (!result.connector || !result.connector.connector_id) {
-        alert('This charger has no connectors configured. Please try another.');
+        await notify('This charger has no connectors configured. Please try another.');
         setState('idle');
         return;
       }
       if (!result.machine.configured) {
-        alert('This charger is not yet connected (no OCPP ID). Please contact the operator.');
+        await notify('This charger is not yet connected (no OCPP ID). Please contact the operator.');
+        setState('idle');
+        return;
+      }
+      // Only allow charging when the charger is live-connected to the server.
+      if (!result.machine.online) {
+        await notify('This charger is offline right now. Please try another charger or try again later.');
         setState('idle');
         return;
       }
@@ -272,7 +288,7 @@ export default function Charging() {
       setState('station-details');
     } catch (error: any) {
       console.error('Error resolving QR:', error);
-      alert(error?.message || 'Could not read this charger QR. Please try again.');
+      await notify(error?.message || 'Could not read this charger QR. Please try again.');
       setState('idle');
     }
   };
@@ -330,7 +346,7 @@ export default function Charging() {
       }
     } catch (error: any) {
       console.error('Error starting charging session:', error);
-      alert(error.message || 'Failed to start charging session. Please try again.');
+      await notify(error.message || 'Failed to start charging session. Please try again.');
     } finally {
       setLoading(false);
     }

@@ -121,6 +121,8 @@ export interface ScanResult {
     power: string | null;
     status: string;
     configured: boolean;
+    /** live OCPP connectivity (real-time, from the server's socket registry) */
+    online: boolean;
   };
   station: {
     station_id: number;

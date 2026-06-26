@@ -10,7 +10,13 @@ const std = require(appRoot + '/utils/standardMessages');
 const df = require(appRoot + '/utils/dateFormatUtil');
 const qrUtil = require(appRoot + '/utils/qrUtil');
 const audit = require(appRoot + '/utils/auditUtil');
+const ocppServer = require(appRoot + '/api/ocpp/ocppServer');
 const cntxtDtls = "sessionCtrl";
+
+// A charger is "online" only while it holds a live OCPP WebSocket to us.
+function isChargerOnline(ocppId) {
+    return !!(ocppId && ocppServer.getConnection(ocppId));
+}
 
 /**
  * Resolve a scanned machine QR (signed, app-only token) → station + connector.
@@ -89,7 +95,10 @@ exports.scanQr = function(req, res) {
                     machine_type: head.mchn_typ_cd,
                     power: head.max_pwr_tx,
                     status: head.mchn_sttus_cd,
-                    configured: !!head.ocpp_id_tx
+                    configured: !!head.ocpp_id_tx,
+                    // live connectivity from the OCPP WebSocket registry (real-time,
+                    // authoritative — not the cached DB status)
+                    online: isChargerOnline(head.ocpp_id_tx)
                 },
                 station: {
                     station_id: head.sttn_id,
@@ -130,6 +139,17 @@ exports.startSession = function(req, res) {
         return res.status(std.message["BAD_REQUEST"].code).json({
             status: std.message["BAD_REQUEST"].code,
             message: 'Station ID and Connector ID are required',
+            data: null
+        });
+    }
+
+    // Defense-in-depth: refuse to start if the charger isn't connected. The app
+    // sends the charger's OCPP id as `qr_code`; only enforce when it's a real
+    // OCPP id so other callers aren't affected.
+    if (qr_code && extractOcppId(qr_code) && !isChargerOnline(qr_code)) {
+        return res.status(std.message["BAD_REQUEST"].code).json({
+            status: std.message["BAD_REQUEST"].code,
+            message: 'This charger is offline. Please try again once it is back online.',
             data: null
         });
     }
