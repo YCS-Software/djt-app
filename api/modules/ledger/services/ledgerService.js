@@ -355,13 +355,39 @@ async function getOwnerBalance(ownerUserId) {
     return acc ? parseFloat(acc.blnce_amt) : 0;
 }
 
+/**
+ * Does this session have a ledger escrow hold? (i.e. was it started via the new
+ * chargingHold flow). Lets the controller tell new sessions from legacy ones.
+ */
+async function getSessionHold(sessionId) {
+    const [rows] = await mdl.pool.execute(
+        `SELECT jrnl_id, ttl_amt FROM jrnl_lst_t
+          WHERE ref_typ_cd='session' AND ref_id=? AND jrnl_typ_cd='charging_hold' AND a_in=1
+          ORDER BY jrnl_id DESC LIMIT 1`, [sessionId]);
+    return rows[0] || null;
+}
+
+/**
+ * Cache-correct a single user's ledger wallet account to match the authoritative
+ * legacy wallet (wllt_lst_t). Used only to keep LEGACY (pre-ledger) sessions in
+ * sync after a stop — new sessions never need this (they post through the ledger).
+ */
+async function syncWalletAccountToLegacy(userId) {
+    const [w] = await mdl.pool.execute(`SELECT blnce_amt FROM wllt_lst_t WHERE usr_id=? LIMIT 1`, [userId]);
+    if (!w[0]) return null;
+    const bal = parseFloat(w[0].blnce_amt) || 0;
+    const acc = await mdl.getAccountByCodePooled(`WALLET_${userId}`);
+    if (acc) await mdl.pool.execute(`UPDATE acct_lst_t SET blnce_amt=?, u_ts=NOW() WHERE acct_id=?`, [bal, acc.acct_id]);
+    return bal;
+}
+
 module.exports = {
     // engine
     postJournal,
     // flows
     walletTopup, chargingHold, chargingSettle, chargingCancel, payout,
     // reads
-    getWalletBalance, getOwnerBalance,
+    getWalletBalance, getOwnerBalance, getSessionHold, syncWalletAccountToLegacy,
     // helpers (exported for tests/reuse)
     splitConsumed, toPaise, toRupees,
 };

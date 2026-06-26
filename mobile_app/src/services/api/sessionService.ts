@@ -31,6 +31,12 @@ export interface StartSessionRequest {
 
 export interface StopSessionRequest {
   session_id: number;
+  /** units actually consumed (driver app reports this from the live meter/sim) */
+  charged_units?: number;
+  /** cost actually consumed (optional; server computes from units × price if omitted) */
+  charged_cost?: number;
+  /** true when charging reached the purchased units (consume the full prepaid) */
+  is_fully_completed?: boolean;
 }
 
 export const sessionService = {

@@ -305,97 +305,126 @@ exports.startSession = function(req, res) {
 /**
  * Stop charging session
  */
-exports.stopSession = function(req, res) {
-    var fnm = "stopSession";
+exports.stopSession = async function(req, res) {
+    const fnm = "stopSession";
     const userId = req.user.userId;
-    const { session_id } = req.body;
+    const { session_id, charged_units, charged_cost, is_fully_completed } = req.body || {};
+    const _ctx = audit.reqCtx(req);
 
     if (!session_id) {
         return res.status(std.message["BAD_REQUEST"].code).json({
-            status: std.message["BAD_REQUEST"].code,
-            message: 'Session ID is required',
-            data: null
+            status: std.message["BAD_REQUEST"].code, message: 'Session ID is required', data: null
         });
     }
 
-    // Get session
-    sessionMdl.getSessionByIdMdl({ sessionId: session_id })
-        .then(function(sessionResults) {
-            if (!sessionResults || sessionResults.length === 0) {
-                return res.status(std.message["NOT_FOUND"].code).json({
-                    status: std.message["NOT_FOUND"].code,
-                    message: 'Session not found',
-                    data: null
-                });
+    try {
+        const sessionResults = await sessionMdl.getSessionByIdMdl({ sessionId: session_id });
+        const session = sessionResults && sessionResults[0];
+        if (!session || session.usr_id !== userId) {
+            return res.status(std.message["NOT_FOUND"].code).json({
+                status: std.message["NOT_FOUND"].code, message: 'Session not found', data: null
+            });
+        }
+        // Already stopped -> idempotent guard (covers double-stop / retry after a
+        // dropped connection). Return the finalized figures instead of erroring.
+        if (session.sttus_cd !== 'active') {
+            return df.formatSucessRes(req, res, {
+                session_id: session_id,
+                duration_minutes: session.durn_mnts_nbr || 0,
+                energy_consumed: parseFloat(session.enrgy_cnsmd_kwh) || 0,
+                actual_cost: parseFloat(session.ttl_cst_amt) || 0,
+                total_cost: parseFloat(session.ttl_cst_amt) || 0,
+                status: session.sttus_cd,
+                already_stopped: true
+            }, cntxtDtls, fnm, { message: 'Session already stopped' });
+        }
+
+        const price = parseFloat(session.prce_per_kwh_amt) || 0;
+        const prepaidAmount = Math.round((parseFloat(session.ttl_cst_amt) || 0) * 100) / 100;
+
+        // ---- determine consumption ----
+        // Priority: "fully completed" -> consume the whole prepaid; else the
+        // client-reported charged_units; else whatever the DB has (OCPP meter).
+        let consumedUnits;
+        if (is_fully_completed) {
+            consumedUnits = price > 0 ? prepaidAmount / price : (parseFloat(session.enrgy_cnsmd_kwh) || 0);
+        } else if (charged_units !== undefined && charged_units !== null && !isNaN(parseFloat(charged_units))) {
+            consumedUnits = Math.max(0, parseFloat(charged_units));
+        } else {
+            consumedUnits = parseFloat(session.enrgy_cnsmd_kwh) || 0;
+        }
+        let consumedCost = (charged_cost !== undefined && charged_cost !== null && !isNaN(parseFloat(charged_cost)))
+            ? Math.max(0, parseFloat(charged_cost))
+            : Math.round(consumedUnits * price * 100) / 100;
+        // Never settle more than was prepaid (no surprise extra charge); never < 0.
+        if (consumedCost > prepaidAmount) { consumedCost = prepaidAmount; consumedUnits = price > 0 ? Math.round((prepaidAmount / price) * 1000) / 1000 : consumedUnits; }
+        if (consumedCost < 0) consumedCost = 0;
+
+        // Resolve the station owner (vendor) for the split
+        const stnRows = await stationMdl.getStationByIdMdl({ stationId: session.sttn_id });
+        const ownerUserId = (stnRows && stnRows[0] && stnRows[0].ownr_usr_id) ? stnRows[0].ownr_usr_id : null;
+
+        // Finalize the session row
+        await sessionMdl.stopSessionMdl({ sessionId: session_id, energyConsumed: consumedUnits, totalCost: consumedCost });
+
+        const hold = await ledgerService.getSessionHold(session_id);
+        let refundAmount = 0, splitInfo = null;
+
+        if (hold) {
+            // NEW flow: escrow exists -> split consumed (vendor%/DJT%) + refund unused,
+            // all via the ledger (mirrors customer + vendor wallets, audited).
+            const settle = await ledgerService.chargingSettle({
+                userId, sessionId: session_id, stationId: session.sttn_id, ownerUserId,
+                holdAmount: prepaidAmount, consumedAmount: consumedCost,
+                audit: { actnCd: 'charging_payment', userId, ip: _ctx.ip, userAgent: _ctx.userAgent },
+            });
+            await sessionMdl.updatePaymentStatusMdl({ sessionId: session_id, status: 'paid', transactionId: null });
+            refundAmount = settle.refundAmount;
+            consumedCost = settle.consumedAmount;
+            splitInfo = settle.commission;
+        } else {
+            // LEGACY flow: prepaid was taken via the old wallet deduct (no escrow).
+            // Refund the unused to the customer's wallet, then re-sync the ledger cache.
+            refundAmount = Math.round((prepaidAmount - consumedCost) * 100) / 100;
+            if (refundAmount > 0) {
+                const wRows = await walletMdl.getUserWalletMdl({ userId });
+                const wallet = wRows && wRows[0];
+                if (wallet) {
+                    const before = parseFloat(wallet.blnce_amt) || 0;
+                    await walletMdl.addMoneyMdl({ walletId: wallet.wllt_id, amount: refundAmount, userId });
+                    await walletMdl.createTransactionMdl({
+                        walletId: wallet.wllt_id, userId, type: 'credit', category: 'refund', amount: refundAmount,
+                        balanceBefore: before, balanceAfter: Math.round((before + refundAmount) * 100) / 100,
+                        description: `Charging session refund - ${session.sssn_cd || 'Session ' + session_id}`,
+                        status: 'completed', referenceId: String(session_id), referenceType: 'session',
+                    });
+                }
             }
+            await sessionMdl.updatePaymentStatusMdl({ sessionId: session_id, status: 'paid', transactionId: null });
+            try { await ledgerService.syncWalletAccountToLegacy(userId); } catch (e) { /* best-effort cache fix */ }
+        }
 
-            const session = sessionResults[0];
-
-            if (session.usr_id !== userId) {
-                return res.status(std.message["NOT_FOUND"].code).json({
-                    status: std.message["NOT_FOUND"].code,
-                    message: 'Session not found',
-                    data: null
-                });
-            }
-
-            if (session.sttus_cd !== 'active') {
-                return res.status(std.message["BAD_REQUEST"].code).json({
-                    status: std.message["BAD_REQUEST"].code,
-                    message: 'Session is not active',
-                    data: null
-                });
-            }
-
-            // Calculate energy and cost based on actual consumption
-            const energyConsumed = parseFloat(session.enrgy_cnsmd_kwh) || 0;
-            const price = parseFloat(session.prce_per_kwh_amt) || 0;
-            const actualTotalCost = Math.round(energyConsumed * price * 100) / 100;
-            const prepaidAmount = parseFloat(session.ttl_cst_amt) || 0;
-            const _ctx = audit.reqCtx(req);
-
-            // Resolve the station owner (vendor), finalize the session, then SETTLE
-            // via the LEDGER: split the consumed amount between vendor (owner %) and
-            // DJT (platform %), and refund the unused hold to the customer. All
-            // double-entry, mirrored to customer + vendor wallets, and audited.
-            return stationMdl.getStationByIdMdl({ stationId: session.sttn_id })
-                .then(function(stnRows) {
-                    const ownerUserId = (stnRows && stnRows[0] && stnRows[0].ownr_usr_id) ? stnRows[0].ownr_usr_id : null;
-                    return sessionMdl.stopSessionMdl({ sessionId: session_id, energyConsumed: energyConsumed, totalCost: actualTotalCost })
-                        .then(function() {
-                            return ledgerService.chargingSettle({
-                                userId: userId, sessionId: session_id, stationId: session.sttn_id, ownerUserId: ownerUserId,
-                                holdAmount: prepaidAmount, consumedAmount: actualTotalCost,
-                                audit: { actnCd: 'charging_payment', userId: userId, ip: _ctx.ip, userAgent: _ctx.userAgent },
-                            });
-                        })
-                        .then(function(settle) {
-                            return sessionMdl.updatePaymentStatusMdl({ sessionId: session_id, status: 'paid', transactionId: null })
-                                .then(function() {
-                                    audit.writeAudit({
-                                        userId: _ctx.userId, action: 'session_stop', entityType: 'session', entityId: session_id,
-                                        newVal: { energy: energyConsumed, cost: settle.consumedAmount, refund: settle.refundAmount, ownerUserId: ownerUserId, commission: settle.commission },
-                                        ip: _ctx.ip, userAgent: _ctx.userAgent
-                                    });
-                                    return df.formatSucessRes(req, res, {
-                                        session_id: session_id,
-                                        duration_minutes: session.durn_mnts_nbr || 0,
-                                        energy_consumed: energyConsumed,
-                                        prepaid_amount: prepaidAmount,
-                                        actual_cost: settle.consumedAmount,
-                                        refund_amount: settle.refundAmount,
-                                        total_cost: settle.consumedAmount,
-                                        status: 'completed',
-                                        end_time: new Date().toISOString()
-                                    }, cntxtDtls, fnm, { message: 'Charging session stopped' });
-                                });
-                        });
-                });
-        })
-        .catch(function(error) {
-            console.error('[SessionCtrl] stopSession error:', error);
-            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+        audit.writeAudit({
+            userId: _ctx.userId, action: 'session_stop', entityType: 'session', entityId: session_id,
+            newVal: { energy: consumedUnits, cost: consumedCost, refund: refundAmount, ownerUserId, legacy: !hold, commission: splitInfo },
+            ip: _ctx.ip, userAgent: _ctx.userAgent
         });
+
+        return df.formatSucessRes(req, res, {
+            session_id: session_id,
+            duration_minutes: session.durn_mnts_nbr || 0,
+            energy_consumed: consumedUnits,
+            prepaid_amount: prepaidAmount,
+            actual_cost: consumedCost,
+            refund_amount: refundAmount,
+            total_cost: consumedCost,
+            status: 'completed',
+            end_time: new Date().toISOString()
+        }, cntxtDtls, fnm, { message: 'Charging session stopped' });
+    } catch (error) {
+        console.error('[SessionCtrl] stopSession error:', error);
+        return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+    }
 };
 
 /**

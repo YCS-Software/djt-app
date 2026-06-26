@@ -188,7 +188,11 @@ export default function Charging() {
     try {
       setLoading(true);
       
-      // Stop session via API - backend will calculate refund (prepaid - charged) and add to wallet
+      // Report actual consumption; backend splits it (vendor/DJT) and refunds the
+      // unused (prepaid - charged) to the customer's wallet.
+      const chargedUnits = Math.round(unitsConsumed * 1000) / 1000;
+      const chargedCost = Math.round(chargedUnits * (stationInfo?.pricePerUnit || 0) * 100) / 100;
+      const isFullyCompleted = unitsPurchased > 0 && unitsConsumed >= unitsPurchased;
       const stoppedSession = await sessionService.stopSession({
         session_id: currentSessionId,
         charged_units: chargedUnits,
