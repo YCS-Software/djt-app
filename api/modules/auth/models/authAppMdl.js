@@ -13,14 +13,18 @@ const cntxtDtls = "authAppMdl";
 * Arguments     : data object with phoneNumber, otp, expiryMinutes
 ******************************************************************************/
 exports.storeOTPMdl = function(data) {
-    const expiryTime = new Date(Date.now() + data.expiryMinutes * 60000);
-    const expiryTimestamp = expiryTime.toISOString().slice(0, 19).replace('T', ' ');
-    
+    // Compute expiry server-side via DATE_ADD(NOW(), ...) so it stays consistent
+    // with the verify check (expry_ts > NOW()) regardless of the DB time zone.
+    // (A UTC string from toISOString() would skew by the tz offset once the
+    // server time_zone is set to IST.) expiryMinutes is a validated integer, so
+    // inlining it into INTERVAL is injection-safe.
+    const expiryMinutes = parseInt(data.expiryMinutes, 10) || 5;
+
     const QRY_TO_EXEC = `INSERT INTO otp_lst_t
         (phn_nmbr_tx, otp_tx, expry_ts, attmpts_nbr, is_vrfd_in, a_in)
         VALUES
-        (?, ?, ?, 0, 0, 1)`;
-    const PARAMS = [data.phoneNumber, data.otp, expiryTimestamp];
+        (?, ?, DATE_ADD(NOW(), INTERVAL ${expiryMinutes} MINUTE), 0, 0, 1)`;
+    const PARAMS = [data.phoneNumber, data.otp];
 
     console.log('[storeOTPMdl] Query:', QRY_TO_EXEC);
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);

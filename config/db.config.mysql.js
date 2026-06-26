@@ -24,7 +24,10 @@ const config = {
     connectionLimit: MAX_POOL_SIZE,
     queueLimit: 0,
     enableKeepAlive: true,
-    keepAliveInitialDelay: 0
+    keepAliveInitialDelay: 0,
+    // Interpret DB DATE/TIME values in this zone. MUST match the MySQL server's
+    // time_zone (set default-time-zone='+05:30' on the server). IST by default.
+    timezone: process.env.DB_TIMEZONE || '+05:30'
 };
 
 // Create connection pool
