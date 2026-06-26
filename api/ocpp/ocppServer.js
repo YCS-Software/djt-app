@@ -186,9 +186,31 @@ function attachOcpp(server) {
             pendingCalls: new Map(),
         };
         registry.set(ocppId, conn);
-        console.log(`[OCPP] Charge point connected: ${ocppId} (${registry.size} online)`);
+        // Diagnostics: what subprotocol(s) the charger offered vs what we negotiated,
+        // plus its firmware user-agent. A charger that offers e.g. "ocpp1.6" will show
+        // negotiated_subprotocol = null here (this server only speaks ocpp2.0.1).
+        const offeredProtocols = req.headers['sec-websocket-protocol'] || null;
+        const userAgent = req.headers['user-agent'] || null;
+        console.log(`[OCPP] Charge point connected: ${ocppId} (${registry.size} online) ` +
+            `offered=[${offeredProtocols || '-'}] negotiated=${ws.protocol || '-'}`);
         logMsg(conn, { direction: 'sys', messageType: 'CONNECT',
-            payload: { subprotocol: ws.protocol || null, path: req.url || null } });
+            payload: {
+                negotiated_subprotocol: ws.protocol || null,
+                offered_subprotocols: offeredProtocols,
+                user_agent: userAgent,
+                path: req.url || null,
+            } });
+
+        // Boot watchdog: a healthy OCPP charger sends BootNotification right after
+        // connecting. If no OCPP message arrives within 15s, record a clear flag —
+        // this is the classic signature of an OCPP version/subprotocol mismatch.
+        conn.bootWatch = setTimeout(() => {
+            if (registry.get(ocppId) === conn && conn.lastSeen <= conn.connectedAt) {
+                console.warn(`[OCPP] ${ocppId}: no OCPP message within 15s of connect (offered=[${offeredProtocols || '-'}])`);
+                logMsg(conn, { direction: 'sys', messageType: 'ERROR', errorCode: 'NoBootNotification',
+                    errorDesc: `No OCPP message received within 15s of connect — likely OCPP version/subprotocol mismatch (server speaks ocpp2.0.1; charger offered [${offeredProtocols || 'none'}])` });
+            }
+        }, 15000);
 
         ws.on('message', (raw) => onMessage(conn, raw));
         ws.on('error', (e) => {
@@ -196,11 +218,19 @@ function attachOcpp(server) {
             logMsg(conn, { direction: 'sys', messageType: 'ERROR', errorCode: 'SocketError', errorDesc: e.message });
         });
         ws.on('close', async (code, reason) => {
+            clearTimeout(conn.bootWatch);
             registry.delete(ocppId);
             conn.pendingCalls.forEach((p) => { clearTimeout(p.timer); p.reject(new Error('Connection closed')); });
-            console.log(`[OCPP] Charge point disconnected: ${ocppId} (${registry.size} online)`);
+            const durationMs = Date.now() - conn.connectedAt;
+            const gotBoot = conn.lastSeen > conn.connectedAt;
+            console.log(`[OCPP] Charge point disconnected: ${ocppId} (${registry.size} online) after ${durationMs}ms, gotMessages=${gotBoot}`);
             logMsg(conn, { direction: 'sys', messageType: 'DISCONNECT',
-                payload: { code: code || null, reason: reason ? reason.toString() : null } });
+                payload: {
+                    code: code || null,
+                    reason: reason ? reason.toString() : null,
+                    duration_ms: durationMs,
+                    received_any_ocpp_message: gotBoot,
+                } });
             if (conn.machineId) {
                 try { await ocppMdl.setMachineStatusMdl(conn.machineId, 'offline'); } catch (e) { /* ignore */ }
             }
