@@ -123,6 +123,29 @@ All test entities and balances were cleaned up after the run.
 
 ---
 
+## 6a. Stopping a session — scenarios & edge cases
+
+`POST /api/sessions/stop` accepts `{ session_id, charged_units?, charged_cost?, is_fully_completed? }`.
+Consumption priority: **is_fully_completed** (consume whole prepaid) → **charged_units**
+(client/meter reported) → DB `enrgy_cnsmd_kwh`. It is always capped to `[0, prepaid]`.
+
+| Scenario | Behaviour |
+|---|---|
+| Charging completes fully | `is_fully_completed` → consume whole prepaid, split vendor/DJT, **no refund** |
+| User manually stops early | consume reported units → split that, **refund unused** to customer wallet |
+| Charger stops filling | user stops → settles whatever was consumed, refunds the rest |
+| Charger disconnects | user stops manually (app-driven, **no charger needed**); unused refunded |
+| Double-stop / retry | idempotent guard — returns the finalized figures, no double refund/charge |
+| Over-consumption | capped to the prepaid hold (no surprise extra charge) |
+| Legacy (pre-ledger) session | refund unused to wallet + **re-sync the ledger wallet cache** (no escrow existed) |
+
+New (ledger-hold) sessions settle via `chargingSettle` (split + refund). Legacy
+sessions (started before the ledger wiring, no escrow) refund the unused amount
+directly and re-align the ledger cache via `syncWalletAccountToLegacy()`.
+
+Client: the driver app reports `charged_units` (live consumption) and
+`is_fully_completed` on stop, so the refund is correct.
+
 ## 7. Prerequisites & caveats
 
 - **Wallets must be ledger‑backed.** `chargingHold` debits the ledger
