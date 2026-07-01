@@ -494,6 +494,25 @@ select.owner-input { appearance: none; }
 .owner-qr-row > span svg { color: var(--o-cyan); }
 .owner-qr-row > b { min-width: 0; text-align: right; font-weight: 700; }
 .owner-qr-cta { margin-top: 0.8rem; margin-bottom: 0; }
+
+/* Segmented control (e.g. number of connectors) */
+.owner-seg { display: flex; gap: 0.4rem; }
+.owner-seg-btn {
+  flex: 1; padding: 0.55rem 0.5rem; border-radius: 10px; cursor: pointer; font-family: inherit;
+  font-size: 0.82rem; font-weight: 700; color: var(--o-text-dim);
+  background: rgba(7, 18, 33, 0.7); border: 1.5px solid var(--o-border); transition: all 160ms ease;
+}
+.owner-seg-btn.active { color: #06121A; background: var(--o-grad); border-color: transparent; }
+
+/* Small per-connector QR button (in connector pills / rows) */
+.owner-conn-qr-btn {
+  display: inline-grid; place-items: center; width: 20px; height: 20px; margin-left: 0.3rem;
+  border-radius: 6px; cursor: pointer; flex: none;
+  background: rgba(56, 189, 248, 0.14); border: 1px solid var(--o-border-hi); color: var(--o-cyan);
+  transition: background 150ms ease;
+}
+.owner-conn-qr-btn:hover { background: rgba(56, 189, 248, 0.26); }
+.owner-conn-qr-btn.lg { width: 30px; height: 30px; border-radius: 8px; margin-left: 0.4rem; }
 .owner-qr-saved { text-align: center; margin-top: 0.5rem; }
 .owner-qr-saved b { color: var(--o-text-dim); }
 .owner-qr-head-actions { display: flex; align-items: center; gap: 0.4rem; }

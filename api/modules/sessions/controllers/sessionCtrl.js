@@ -151,7 +151,11 @@ exports.scanQr = function(req, res) {
     // encodes the raw OCPP id or the charger ws-url (resolve by OCPP id).
     const payload = qrUtil.decode(token);
     let lookup = null;
-    if (payload && payload.t === 'machine' && payload.mid) {
+    let targetConnectorId = null;          // set when a per-connector QR was scanned
+    if (payload && payload.t === 'connector' && payload.mid) {
+        targetConnectorId = Number(payload.cid) || null;
+        lookup = sessionMdl.getMachineScanInfoMdl({ machineId: payload.mid });
+    } else if (payload && payload.t === 'machine' && payload.mid) {
         lookup = sessionMdl.getMachineScanInfoMdl({ machineId: payload.mid });
     } else {
         const ocppId = extractOcppId(token);
@@ -180,6 +184,7 @@ exports.scanQr = function(req, res) {
                 .map(function(r) {
                     return {
                         connector_id: r.cnntr_id,
+                        code: r.cnntr_cd_tx || null,
                         type: r.cnntr_typ_cd,
                         name: r.cnntr_nm_tx,
                         power: r.pwr_tx,
@@ -187,7 +192,19 @@ exports.scanQr = function(req, res) {
                     };
                 });
 
-            const available = connectors.find(function(c) { return c.is_available; }) || connectors[0] || null;
+            // Per-connector QR → that exact connector; otherwise pick an available one.
+            let available;
+            if (targetConnectorId) {
+                available = connectors.find(function(c) { return c.connector_id === targetConnectorId; }) || null;
+                if (!available) {
+                    auditScan('connector_not_found', head.mchn_id, { connector_id: targetConnectorId });
+                    return res.status(std.message["NOT_FOUND"].code).json({
+                        status: std.message["NOT_FOUND"].code, message: 'Connector not found on this charger', data: null
+                    });
+                }
+            } else {
+                available = connectors.find(function(c) { return c.is_available; }) || connectors[0] || null;
+            }
             if (!available) {
                 auditScan('no_connectors', head.mchn_id, { ocpp_id: head.ocpp_id_tx || null });
                 return res.status(std.message["BAD_REQUEST"].code).json({

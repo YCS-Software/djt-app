@@ -184,7 +184,7 @@ exports.getMachineScanInfoMdl = function(data) {
     const QRY_TO_EXEC = `
         SELECT m.mchn_id, m.mchn_nm_tx, m.ocpp_id_tx, m.mchn_typ_cd, m.max_pwr_tx, m.sttus_cd AS mchn_sttus_cd,
                st.sttn_id, st.sttn_nm_tx, st.addr_tx, st.prce_per_kwh_amt, st.sttn_cd,
-               c.cnntr_id, c.cnntr_typ_cd, c.cnntr_nm_tx, c.pwr_tx, c.is_avlbl_in
+               c.cnntr_id, c.cnntr_cd_tx, c.cnntr_typ_cd, c.cnntr_nm_tx, c.pwr_tx, c.is_avlbl_in
         FROM mchn_lst_t m
         INNER JOIN sttn_lst_t st ON m.sttn_id = st.sttn_id
         LEFT JOIN cnntr_lst_t c ON c.mchn_id = m.mchn_id AND c.a_in = 1
@@ -209,7 +209,7 @@ exports.getMachineScanInfoByOcppMdl = function(data) {
     const QRY_TO_EXEC = `
         SELECT m.mchn_id, m.mchn_nm_tx, m.ocpp_id_tx, m.mchn_typ_cd, m.max_pwr_tx, m.sttus_cd AS mchn_sttus_cd,
                st.sttn_id, st.sttn_nm_tx, st.addr_tx, st.prce_per_kwh_amt, st.sttn_cd,
-               c.cnntr_id, c.cnntr_typ_cd, c.cnntr_nm_tx, c.pwr_tx, c.is_avlbl_in
+               c.cnntr_id, c.cnntr_cd_tx, c.cnntr_typ_cd, c.cnntr_nm_tx, c.pwr_tx, c.is_avlbl_in
         FROM mchn_lst_t m
         INNER JOIN sttn_lst_t st ON m.sttn_id = st.sttn_id
         LEFT JOIN cnntr_lst_t c ON c.mchn_id = m.mchn_id AND c.a_in = 1

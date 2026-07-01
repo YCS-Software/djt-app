@@ -219,6 +219,7 @@ CREATE TABLE cnntr_lst_t (
     cnntr_id INT PRIMARY KEY AUTO_INCREMENT,
     sttn_id INT NOT NULL,
     mchn_id INT NULL COMMENT 'Owning machine (FK mchn_lst_t)',
+    cnntr_cd_tx VARCHAR(60) NULL COMMENT 'Unique connector code (per connector QR)',
     cnntr_typ_cd VARCHAR(30) NOT NULL COMMENT 'CCS2, CHAdeMO, Type2',
     cnntr_nm_tx VARCHAR(50),
     pwr_tx VARCHAR(20) COMMENT 'Power rating',

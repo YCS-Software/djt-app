@@ -95,6 +95,7 @@ function mapConnector(c) {
         connector_id: c.cnntr_id,
         station_id: c.sttn_id,
         machine_id: c.mchn_id,
+        code: c.cnntr_cd_tx || null,
         type: c.cnntr_typ_cd,
         name: c.cnntr_nm_tx,
         power: c.pwr_tx,
@@ -462,6 +463,70 @@ exports.getMachineQr = function(req, res) {
 };
 
 /*****************************************************************************
+* Function      : getConnectorQr
+* Description   : Signed, app-only QR token for ONE connector (each plug has its
+*                 own QR). Encodes the connector id + code, OCPP id, WS URL,
+*                 price and machine/station details. Ownership enforced.
+******************************************************************************/
+exports.getConnectorQr = function(req, res) {
+    const fnm = "getConnectorQr";
+    const ownerId = req.user.userId;
+    const connectorId = parseInt(req.params.connectorId);
+    if (!connectorId) return badRequest(res, 'Connector ID is required');
+
+    ownerMdl.getOwnedConnectorMdl({ ownerId, connectorId })
+        .then(function(rows) {
+            const c = rows && rows[0];
+            if (!c) return notFound(res, 'Connector not found');
+
+            const wsUrl = c.ocpp_id_tx ? ocppWsUrl(c.ocpp_id_tx) : null;
+            const powerLabel = c.pwr_lbl_tx || (c.max_pwr_tx ? `${c.mchn_typ_cd} ${c.max_pwr_tx}` : null);
+            const price = parseFloat(c.prce_per_kwh_amt) || 0;
+
+            const payload = {
+                v: 1,
+                t: 'connector',
+                cid: c.cnntr_id,
+                mid: c.mchn_id,
+                sid: c.sttn_id,
+                ccode: c.cnntr_cd_tx || null,
+                ctyp: c.cnntr_typ_cd,
+                ocpp: c.ocpp_id_tx || null,
+                ws: wsUrl,
+                price: price,
+                st: c.sttn_nm_tx,
+                mn: c.mchn_nm_tx,
+                typ: c.mchn_typ_cd,
+                pwr: powerLabel
+            };
+
+            return df.formatSucessRes(req, res, {
+                token: qrUtil.encode(payload),
+                connector: {
+                    connector_id: c.cnntr_id,
+                    code: c.cnntr_cd_tx || null,
+                    type: c.cnntr_typ_cd,
+                    name: c.cnntr_nm_tx,
+                    power: c.pwr_tx || powerLabel,
+                    is_available: c.is_avlbl_in === 1,
+                    machine_id: c.mchn_id,
+                    machine_name: c.mchn_nm_tx,
+                    machine_type: c.mchn_typ_cd,
+                    station_name: c.sttn_nm_tx,
+                    ocpp_id: c.ocpp_id_tx || null,
+                    ws_url: wsUrl,
+                    price_per_kwh: price,
+                    configured: !!c.ocpp_id_tx
+                }
+            }, cntxtDtls, fnm, {});
+        })
+        .catch(function(error) {
+            console.error('[ownerCtrl] getConnectorQr error:', error);
+            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+        });
+};
+
+/*****************************************************************************
 * Function      : getTransactions
 * Description   : Full transaction (session) list across the owner's stations.
 ******************************************************************************/
@@ -753,8 +818,8 @@ exports.addMachine = function(req, res) {
     const powerId = parseInt(data.mchn_pwr_id || data.power_id);
     if (!powerId) return badRequest(res, 'Please select a power rating');
 
-    // default 2 connectors, clamp 1..6
-    const connectorCount = Math.min(Math.max(parseInt(data.connector_count) || 2, 1), 6);
+    // connectors: user-chosen, clamp 1..2 (default 2)
+    const connectorCount = Math.min(Math.max(parseInt(data.connector_count) || 2, 1), 2);
 
     ownerMdl.getOwnedStationMdl({ ownerId, stationId })
         .then(function(rows) {
@@ -793,11 +858,13 @@ exports.addMachine = function(req, res) {
                             ip: actx.ip, userAgent: actx.userAgent
                         });
 
-                        // auto-create the default connectors
+                        // create the chosen number of connectors, each with a unique code
                         const connPromises = [];
                         for (let i = 1; i <= connectorCount; i++) {
+                            const connectorCode = `${ocppId}-C${i}`;
                             connPromises.push(ownerMdl.createConnectorMdl({
                                 stationId, machineId,
+                                code: connectorCode,
                                 connectorType,
                                 name: `Connector ${i}`,
                                 power: maxPower

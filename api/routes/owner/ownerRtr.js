@@ -36,6 +36,9 @@ router.get('/stations/:stationId/machines', ownerCtrl.getStationMachines);
 router.post('/stations/:stationId/machines', ownerCtrl.addMachine);
 router.get('/machines/:machineId', ownerCtrl.getMachineProfile);
 router.get('/machines/:machineId/qr', ownerCtrl.getMachineQr);
+
+// Per-connector QR (each plug has its own QR)
+router.get('/connectors/:connectorId/qr', ownerCtrl.getConnectorQr);
 router.put('/machines/:machineId', ownerCtrl.updateMachine);
 
 // Connectors under a machine

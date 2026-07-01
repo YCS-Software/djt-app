@@ -220,11 +220,11 @@ exports.updateMachineMdl = function(data) {
 
 exports.createConnectorMdl = function(data) {
     const QRY_TO_EXEC = `INSERT INTO cnntr_lst_t
-        (sttn_id, mchn_id, cnntr_typ_cd, cnntr_nm_tx, pwr_tx, is_avlbl_in, a_in, i_ts)
+        (sttn_id, mchn_id, cnntr_cd_tx, cnntr_typ_cd, cnntr_nm_tx, pwr_tx, is_avlbl_in, a_in, i_ts)
         VALUES
-        (?, ?, ?,
+        (?, ?, ?, ?,
          ?, ?, 1, 1, NOW())`;
-    const PARAMS = [numVal(data.stationId), numVal(data.machineId), escVal(data.connectorType),
+    const PARAMS = [numVal(data.stationId), numVal(data.machineId), escVal(data.code), escVal(data.connectorType),
         escVal(data.name), escVal(data.power)];
 
     console.log('[createConnectorMdl] Query:', QRY_TO_EXEC);
@@ -238,6 +238,28 @@ exports.getConnectorsByMachineMdl = function(data) {
     const PARAMS = [numVal(data.machineId)];
 
     console.log('[getConnectorsByMachineMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+// Count connectors on a machine (used to sequence connector codes)
+exports.getConnectorCountMdl = function(data) {
+    const QRY_TO_EXEC = `SELECT COUNT(*) AS cnt FROM cnntr_lst_t WHERE mchn_id = ? AND a_in = 1`;
+    const PARAMS = [numVal(data.machineId)];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+// One connector joined to its machine + station (ownership guard) for QR / detail
+exports.getOwnedConnectorMdl = function(data) {
+    const QRY_TO_EXEC = `SELECT c.*, m.ocpp_id_tx, m.mchn_nm_tx, m.mchn_typ_cd, m.max_pwr_tx,
+            m.sttus_cd AS mchn_sttus, p.pwr_lbl_tx,
+            s.sttn_id, s.sttn_nm_tx, s.prce_per_kwh_amt, s.ownr_usr_id
+        FROM cnntr_lst_t c
+        INNER JOIN mchn_lst_t m ON c.mchn_id = m.mchn_id
+        INNER JOIN sttn_lst_t s ON m.sttn_id = s.sttn_id
+        LEFT JOIN mchn_pwr_lst_t p ON m.mchn_pwr_id = p.mchn_pwr_id
+        WHERE c.cnntr_id = ? AND s.ownr_usr_id = ? AND c.a_in = 1
+        LIMIT 1`;
+    const PARAMS = [numVal(data.connectorId), numVal(data.ownerId)];
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
 };
 
