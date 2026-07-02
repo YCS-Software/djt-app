@@ -13,6 +13,7 @@ public class MainActivity extends BridgeActivity implements PaymentResultWithDat
     public void onCreate(Bundle savedInstanceState) {
         // Register custom plugins BEFORE the Capacitor bridge initialises.
         registerPlugin(RazorpayCheckoutPlugin.class);
+        registerPlugin(MediaSaverPlugin.class);
         super.onCreate(savedInstanceState);
         // Warm up the Razorpay SDK for faster checkout.
         Checkout.preload(getApplicationContext());

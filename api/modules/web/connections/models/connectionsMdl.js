@@ -14,7 +14,7 @@ const cntxtDtls = "connectionsMdl";
 ******************************************************************************/
 exports.listMdl = function () {
     const QRY = `SELECT m.mchn_id AS id, s.sttn_nm_tx AS stationName, m.ocpp_id_tx AS ocppId, 'OCPP1.6J' AS protocol, m.lst_hb_ts AS lastHeartbeat, m.sttus_cd AS status FROM mchn_lst_t m LEFT JOIN sttn_lst_t s ON s.sttn_id=m.sttn_id ORDER BY m.mchn_id DESC`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, [], cntxtDtls);
 };
 
 /*****************************************************************************
@@ -24,6 +24,7 @@ exports.listMdl = function () {
 ******************************************************************************/
 exports.getByIdMdl = function (data) {
     const id = parseInt(data.id, 10) || 0;
-    const QRY = `SELECT * FROM ( SELECT m.mchn_id AS id, s.sttn_nm_tx AS stationName, m.ocpp_id_tx AS ocppId, 'OCPP1.6J' AS protocol, m.lst_hb_ts AS lastHeartbeat, m.sttus_cd AS status FROM mchn_lst_t m LEFT JOIN sttn_lst_t s ON s.sttn_id=m.sttn_id ORDER BY m.mchn_id DESC ) q WHERE q.id = ${id}`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    const QRY = `SELECT * FROM ( SELECT m.mchn_id AS id, s.sttn_nm_tx AS stationName, m.ocpp_id_tx AS ocppId, 'OCPP1.6J' AS protocol, m.lst_hb_ts AS lastHeartbeat, m.sttus_cd AS status FROM mchn_lst_t m LEFT JOIN sttn_lst_t s ON s.sttn_id=m.sttn_id ORDER BY m.mchn_id DESC ) q WHERE q.id = ?`;
+    const PARAMS = [id];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, PARAMS, cntxtDtls);
 };

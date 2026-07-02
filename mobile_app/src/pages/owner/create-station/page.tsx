@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ownerService } from '../../../services/api';
+import { saveDraft, loadDraft, clearDraft } from '../../../services/appState';
 import LocationPicker from '../../../components/LocationPicker';
 import {
   ArrowLeft, Building2, MapPin, AlertTriangle, Loader2, CheckCircle2, Zap, IndianRupee,
 } from 'lucide-react';
+
+const DRAFT_KEY = 'create-station';
 
 export default function CreateStationPage() {
   const navigate = useNavigate();
@@ -25,6 +28,26 @@ export default function CreateStationPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showLocWarning, setShowLocWarning] = useState(false);
+  const draftLoaded = useRef(false);
+
+  // Restore an in-progress draft (survives process death / accidental exit, F1)
+  useEffect(() => {
+    (async () => {
+      const draft = await loadDraft<{ form: typeof form; lat: number | null; lng: number | null }>(DRAFT_KEY);
+      if (draft && draft.form) {
+        setForm(draft.form);
+        if (typeof draft.lat === 'number') setLat(draft.lat);
+        if (typeof draft.lng === 'number') setLng(draft.lng);
+      }
+      draftLoaded.current = true;
+    })();
+  }, []);
+
+  // Autosave the draft as the user edits (skip the initial render before restore)
+  useEffect(() => {
+    if (!draftLoaded.current) return;
+    saveDraft(DRAFT_KEY, { form, lat, lng });
+  }, [form, lat, lng]);
 
   const set = (k: string, v: any) => setForm((f) => ({ ...f, [k]: v }));
   const locationCaptured = lat != null && lng != null;
@@ -63,6 +86,8 @@ export default function CreateStationPage() {
         operator_name: form.operator_name.trim() || undefined,
         contact_number: form.contact_number.trim() || undefined,
       });
+      // success — drop the saved draft so it doesn't reappear next time
+      await clearDraft(DRAFT_KEY);
       // straight into infrastructure setup for the new station
       navigate(`/owner/stations/${station.station_id}`, { replace: true });
     } catch (e: any) {

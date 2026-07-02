@@ -9,30 +9,171 @@ const stationMdl = require('../../stations/models/stationMdl');
 const std = require(appRoot + '/utils/standardMessages');
 const df = require(appRoot + '/utils/dateFormatUtil');
 const qrUtil = require(appRoot + '/utils/qrUtil');
+const audit = require(appRoot + '/utils/auditUtil');
+const ocppServer = require(appRoot + '/api/ocpp/ocppServer');
+const ledgerService = require(appRoot + '/api/modules/ledger/services/ledgerService');
 const cntxtDtls = "sessionCtrl";
+
+// A charger is "online" only while it holds a live OCPP WebSocket to us.
+function isChargerOnline(ocppId) {
+    return !!(ocppId && ocppServer.getConnection(ocppId));
+}
+
+/**
+ * Derive a human connector state from live OCPP-updated fields:
+ *  offline   – charger not connected to the CSMS socket
+ *  faulted / unavailable – charger error / maintenance
+ *  charging  – an active transaction is metering on this machine
+ *  plugged   – cable connected (Occupied) but not yet charging
+ *  unplugged – online and free (Available)
+ */
+function deriveConnectorState(online, mchnStatus, sssnStatus) {
+    if (!online) return 'offline';
+    if (mchnStatus === 'faulted') return 'faulted';
+    if (mchnStatus === 'maintenance') return 'unavailable';
+    if (sssnStatus === 'active' && mchnStatus === 'in_use') return 'charging';
+    if (mchnStatus === 'in_use') return 'plugged';
+    return 'unplugged';
+}
+
+/**
+ * GET /sessions/machine/:machineId/status
+ * Live machine + connector state before charging (drives the "plug in" gate).
+ */
+exports.getMachineStatus = function(req, res) {
+    const fnm = "getMachineStatus";
+    const machineId = parseInt(req.params.machineId);
+    if (!machineId) {
+        return res.status(std.message["BAD_REQUEST"].code).json({
+            status: std.message["BAD_REQUEST"].code, message: 'Machine ID is required', data: null
+        });
+    }
+    sessionMdl.getMachineLiveByIdMdl({ machineId })
+        .then(function(rows) {
+            const m = rows && rows[0];
+            if (!m) {
+                return res.status(std.message["NOT_FOUND"].code).json({
+                    status: std.message["NOT_FOUND"].code, message: 'Charger not found', data: null
+                });
+            }
+            const online = isChargerOnline(m.ocpp_id_tx);
+            return df.formatSucessRes(req, res, {
+                machine_online: online,
+                machine_status: m.mchn_sttus,
+                connector_state: deriveConnectorState(online, m.mchn_sttus, null),
+                available_connectors: Number(m.available_connectors) || 0,
+                total_connectors: Number(m.total_connectors) || 0
+            }, cntxtDtls, fnm, {});
+        })
+        .catch(function(error) {
+            console.error('[sessionCtrl] getMachineStatus error:', error);
+            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+        });
+};
+
+/**
+ * GET /sessions/:sessionId/live
+ * Live session meter + connector state during charging (drives pause-on-unplug
+ * and real energy/cost display).
+ */
+exports.getSessionLive = function(req, res) {
+    const fnm = "getSessionLive";
+    const userId = req.user.userId;
+    const sessionId = parseInt(req.params.sessionId);
+    if (!sessionId) {
+        return res.status(std.message["BAD_REQUEST"].code).json({
+            status: std.message["BAD_REQUEST"].code, message: 'Session ID is required', data: null
+        });
+    }
+    sessionMdl.getSessionLiveInfoMdl({ sessionId, userId })
+        .then(function(rows) {
+            const r = rows && rows[0];
+            if (!r) {
+                return res.status(std.message["NOT_FOUND"].code).json({
+                    status: std.message["NOT_FOUND"].code, message: 'Session not found', data: null
+                });
+            }
+            const online = isChargerOnline(r.ocpp_id_tx);
+            const energy = Number(r.enrgy_cnsmd_kwh) || 0;
+            const price = Number(r.prce_per_kwh_amt) || 0;
+            const cost = Number(r.ttl_cst_amt) || Math.round(energy * price * 100) / 100;
+            return df.formatSucessRes(req, res, {
+                session_id: r.sssn_id,
+                status: r.sssn_sttus,
+                energy_consumed: energy,
+                current_cost: cost,
+                progress: Number(r.prgrss_pct) || 0,
+                connector_state: deriveConnectorState(online, r.mchn_sttus, r.sssn_sttus),
+                machine_online: online
+            }, cntxtDtls, fnm, {});
+        })
+        .catch(function(error) {
+            console.error('[sessionCtrl] getSessionLive error:', error);
+            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+        });
+};
 
 /**
  * Resolve a scanned machine QR (signed, app-only token) → station + connector.
  * Generic scanners can't use the opaque token; only this endpoint, which holds
  * the secret, verifies the signature and returns the charge target.
  */
+/**
+ * Pull a charge-point OCPP id out of scanned QR content that ISN'T a signed
+ * DJTEV1 token — i.e. a ws-url ("ws://host/ocpp/<id>") or a bare OCPP id
+ * (e.g. "DJT-12-CP1-T6I"). Returns null if nothing safe is found.
+ */
+function extractOcppId(raw) {
+    const s = String(raw || '').trim();
+    if (!s) return null;
+    const m = s.match(/\/ocpp\/([^/?#\s]+)/i);   // ws://.../ocpp/<id>
+    if (m) return decodeURIComponent(m[1]);
+    if (/^DJT-\d+-CP\d+-[A-Za-z0-9]+$/i.test(s)) return s;  // bare DJT OCPP id
+    return null;
+}
+
 exports.scanQr = function(req, res) {
     const fnm = "scanQr";
     const data = req.body && req.body.data ? req.body.data : (req.body || {});
     const token = data.token || data.qr || data.qr_code || '';
 
+    // Audit every scan attempt (success and failures), so support can trace
+    // exactly who scanned what charger and the outcome (e.g. offline scans).
+    const actx = audit.reqCtx(req);
+    const auditScan = (result, machineId, detail) => audit.writeAudit({
+        userId: actx.userId, action: 'charger_scan', entityType: 'machine',
+        entityId: machineId != null ? machineId : null,
+        newVal: Object.assign({ result }, detail || {}),
+        ip: actx.ip, userAgent: actx.userAgent,
+    });
+
+    // Primary: signed app-only token (DJTEV1...). Fallback: a sticker/QR that
+    // encodes the raw OCPP id or the charger ws-url (resolve by OCPP id).
     const payload = qrUtil.decode(token);
-    if (!payload || payload.t !== 'machine' || !payload.mid) {
-        return res.status(std.message["BAD_REQUEST"].code).json({
-            status: std.message["BAD_REQUEST"].code,
-            message: 'This QR code is not a valid DJT charger code',
-            data: null
-        });
+    let lookup = null;
+    let targetConnectorId = null;          // set when a per-connector QR was scanned
+    if (payload && payload.t === 'connector' && payload.mid) {
+        targetConnectorId = Number(payload.cid) || null;
+        lookup = sessionMdl.getMachineScanInfoMdl({ machineId: payload.mid });
+    } else if (payload && payload.t === 'machine' && payload.mid) {
+        lookup = sessionMdl.getMachineScanInfoMdl({ machineId: payload.mid });
+    } else {
+        const ocppId = extractOcppId(token);
+        if (!ocppId) {
+            auditScan('invalid_code');
+            return res.status(std.message["BAD_REQUEST"].code).json({
+                status: std.message["BAD_REQUEST"].code,
+                message: 'This QR code is not a valid DJT charger code',
+                data: null
+            });
+        }
+        lookup = sessionMdl.getMachineScanInfoByOcppMdl({ ocppId });
     }
 
-    sessionMdl.getMachineScanInfoMdl({ machineId: payload.mid })
+    lookup
         .then(function(rows) {
             if (!rows || rows.length === 0) {
+                auditScan('not_found');
                 return res.status(std.message["NOT_FOUND"].code).json({
                     status: std.message["NOT_FOUND"].code, message: 'Charger not found', data: null
                 });
@@ -43,6 +184,7 @@ exports.scanQr = function(req, res) {
                 .map(function(r) {
                     return {
                         connector_id: r.cnntr_id,
+                        code: r.cnntr_cd_tx || null,
                         type: r.cnntr_typ_cd,
                         name: r.cnntr_nm_tx,
                         power: r.pwr_tx,
@@ -50,12 +192,30 @@ exports.scanQr = function(req, res) {
                     };
                 });
 
-            const available = connectors.find(function(c) { return c.is_available; }) || connectors[0] || null;
+            // Per-connector QR → that exact connector; otherwise pick an available one.
+            let available;
+            if (targetConnectorId) {
+                available = connectors.find(function(c) { return c.connector_id === targetConnectorId; }) || null;
+                if (!available) {
+                    auditScan('connector_not_found', head.mchn_id, { connector_id: targetConnectorId });
+                    return res.status(std.message["NOT_FOUND"].code).json({
+                        status: std.message["NOT_FOUND"].code, message: 'Connector not found on this charger', data: null
+                    });
+                }
+            } else {
+                available = connectors.find(function(c) { return c.is_available; }) || connectors[0] || null;
+            }
             if (!available) {
+                auditScan('no_connectors', head.mchn_id, { ocpp_id: head.ocpp_id_tx || null });
                 return res.status(std.message["BAD_REQUEST"].code).json({
                     status: std.message["BAD_REQUEST"].code, message: 'This charger has no connectors configured', data: null
                 });
             }
+
+            const online = isChargerOnline(head.ocpp_id_tx);
+            auditScan(online ? 'ok' : 'offline', head.mchn_id, {
+                ocpp_id: head.ocpp_id_tx || null, station_id: head.sttn_id, online, configured: !!head.ocpp_id_tx,
+            });
 
             return df.formatSucessRes(req, res, {
                 machine: {
@@ -65,7 +225,10 @@ exports.scanQr = function(req, res) {
                     machine_type: head.mchn_typ_cd,
                     power: head.max_pwr_tx,
                     status: head.mchn_sttus_cd,
-                    configured: !!head.ocpp_id_tx
+                    configured: !!head.ocpp_id_tx,
+                    // live connectivity from the OCPP WebSocket registry (real-time,
+                    // authoritative — not the cached DB status)
+                    online: online
                 },
                 station: {
                     station_id: head.sttn_id,
@@ -106,6 +269,17 @@ exports.startSession = function(req, res) {
         return res.status(std.message["BAD_REQUEST"].code).json({
             status: std.message["BAD_REQUEST"].code,
             message: 'Station ID and Connector ID are required',
+            data: null
+        });
+    }
+
+    // Defense-in-depth: refuse to start if the charger isn't connected. The app
+    // sends the charger's OCPP id as `qr_code`; only enforce when it's a real
+    // OCPP id so other callers aren't affected.
+    if (qr_code && extractOcppId(qr_code) && !isChargerOnline(qr_code)) {
+        return res.status(std.message["BAD_REQUEST"].code).json({
+            status: std.message["BAD_REQUEST"].code,
+            message: 'This charger is offline. Please try again once it is back online.',
             data: null
         });
     }
@@ -184,90 +358,50 @@ exports.startSession = function(req, res) {
 
                                 const sessionId = createResults.insertId;
 
-                                // Deduct amount from wallet before starting session
-                                const balanceBefore = walletBalance;
-                                const balanceAfter = balanceBefore - totalAmountToDeduct;
-
-                                return walletMdl.deductMoneyMdl({ 
-                                    walletId: wallet.wllt_id, 
-                                    amount: totalAmountToDeduct, 
-                                    userId: userId 
+                                // Prepay via the LEDGER: DEBIT customer wallet -> CREDIT escrow.
+                                // This keeps the customer's ledger wallet + legacy wllt_lst_t
+                                // accurate and lets us split owner/platform at stop.
+                                const _ctx = audit.reqCtx(req);
+                                return ledgerService.chargingHold({
+                                    userId: userId,
+                                    sessionId: sessionId,
+                                    amount: totalAmountToDeduct,
+                                    audit: { actnCd: 'charging_hold', userId: userId, ip: _ctx.ip, userAgent: _ctx.userAgent },
                                 })
                                 .then(function() {
-                                    // Verify wallet was updated
-                                    return walletMdl.getUserWalletMdl({ userId: userId });
+                                    return sessionMdl.updatePaymentStatusMdl({ sessionId: sessionId, status: 'paid', transactionId: null });
                                 })
-                                .then(function(updatedWalletResults) {
-                                    if (!updatedWalletResults || updatedWalletResults.length === 0) {
-                                        throw new Error('Failed to verify wallet update');
-                                    }
-
-                                    const updatedWallet = updatedWalletResults[0];
-                                    const actualBalance = parseFloat(updatedWallet.blnce_amt) || 0;
-
-                                    // Verify balance matches expected value
-                                    if (Math.abs(actualBalance - balanceAfter) > 0.01) {
-                                        throw new Error(`Wallet balance mismatch: expected ${balanceAfter}, got ${actualBalance}`);
-                                    }
-
-                                    // Create transaction record for prepayment
-                                    return walletMdl.createTransactionMdl({
-                                        walletId: wallet.wllt_id,
-                                        userId: userId,
-                                        type: 'debit',
-                                        category: 'charging',
-                                        amount: totalAmountToDeduct,
-                                        balanceBefore: balanceBefore,
-                                        balanceAfter: balanceAfter,
-                                        description: `Charging session prepayment - ${sessionCode}`,
-                                        status: 'completed',
-                                        referenceId: sessionId.toString(),
-                                        referenceType: 'session'
-                                    });
+                                .then(function() {
+                                    return sessionMdl.startSessionMdl({ sessionId: sessionId });
                                 })
-                                .then(function(transactionResults) {
-                                    // Verify transaction was created
-                                    if (!transactionResults || !transactionResults.insertId) {
-                                        throw new Error('Failed to create wallet transaction');
-                                    }
-
-                                    // Update session with prepaid amount and transaction ID
-                                    return sessionMdl.updatePaymentStatusMdl({ 
-                                        sessionId: sessionId, 
-                                        status: 'paid', 
-                                        transactionId: transactionResults.insertId 
-                                    })
-                                    .then(function() {
-                                        // Start the session
-                                        return sessionMdl.startSessionMdl({ sessionId: sessionId });
-                                    })
-                                    .then(function() {
-                                        // Update session with prepaid amount (store in ttl_cst_amt as prepaid)
-                                        return sessionMdl.updateProgressMdl({
-                                            sessionId: sessionId,
-                                            progress: 0,
-                                            energyConsumed: 0,
-                                            currentCost: totalAmountToDeduct
-                                        });
-                                    })
-                                    .then(function() {
-                                        // Get connector details
-                                        return stationMdl.getConnectorByIdMdl({ connectorId: connector_id })
-                                            .then(function(connectorResults) {
-                                                const connector = (connectorResults && connectorResults.length > 0) ? connectorResults[0] : null;
-
-                                                return df.formatSucessRes(req, res, {
-                                                    session_id: sessionId,
-                                                    session_code: sessionCode,
-                                                    station_name: station.sttn_nm_tx,
-                                                    connector_type: connector ? connector.cnntr_typ_cd : null,
-                                                    price_per_kwh: parseFloat(station.prce_per_kwh_amt),
-                                                    prepaid_amount: totalAmountToDeduct,
-                                                    status: 'active',
-                                                    start_time: new Date().toISOString()
-                                                }, cntxtDtls, fnm, { message: 'Charging session started' });
+                                .then(function() {
+                                    // store prepaid amount in ttl_cst_amt (read back as the hold at stop)
+                                    return sessionMdl.updateProgressMdl({ sessionId: sessionId, progress: 0, energyConsumed: 0, currentCost: totalAmountToDeduct });
+                                })
+                                .then(function() {
+                                    return stationMdl.getConnectorByIdMdl({ connectorId: connector_id })
+                                        .then(function(connectorResults) {
+                                            const connector = (connectorResults && connectorResults.length > 0) ? connectorResults[0] : null;
+                                            audit.writeAudit({
+                                                userId: _ctx.userId, action: 'session_start', entityType: 'session', entityId: sessionId,
+                                                newVal: { stationId: station_id, connectorId: connector_id, sessionCode: sessionCode, walletId: wallet.wllt_id },
+                                                ip: _ctx.ip, userAgent: _ctx.userAgent
                                             });
-                                    });
+                                            audit.writeAudit({
+                                                userId: _ctx.userId, action: 'session_payment', entityType: 'session', entityId: sessionId,
+                                                newVal: { amount: totalAmountToDeduct, via: 'ledger_hold' }, ip: _ctx.ip, userAgent: _ctx.userAgent
+                                            });
+                                            return df.formatSucessRes(req, res, {
+                                                session_id: sessionId,
+                                                session_code: sessionCode,
+                                                station_name: station.sttn_nm_tx,
+                                                connector_type: connector ? connector.cnntr_typ_cd : null,
+                                                price_per_kwh: parseFloat(station.prce_per_kwh_amt),
+                                                prepaid_amount: totalAmountToDeduct,
+                                                status: 'active',
+                                                start_time: new Date().toISOString()
+                                            }, cntxtDtls, fnm, { message: 'Charging session started' });
+                                        });
                                 });
                             });
                         });
@@ -282,343 +416,126 @@ exports.startSession = function(req, res) {
 /**
  * Stop charging session
  */
-exports.stopSession = function(req, res) {
-    var fnm = "stopSession";
+exports.stopSession = async function(req, res) {
+    const fnm = "stopSession";
     const userId = req.user.userId;
-    const { session_id } = req.body;
+    const { session_id, charged_units, charged_cost, is_fully_completed } = req.body || {};
+    const _ctx = audit.reqCtx(req);
 
     if (!session_id) {
         return res.status(std.message["BAD_REQUEST"].code).json({
-            status: std.message["BAD_REQUEST"].code,
-            message: 'Session ID is required',
-            data: null
+            status: std.message["BAD_REQUEST"].code, message: 'Session ID is required', data: null
         });
     }
 
-    // Get session
-    sessionMdl.getSessionByIdMdl({ sessionId: session_id })
-        .then(function(sessionResults) {
-            if (!sessionResults || sessionResults.length === 0) {
-                return res.status(std.message["NOT_FOUND"].code).json({
-                    status: std.message["NOT_FOUND"].code,
-                    message: 'Session not found',
-                    data: null
-                });
+    try {
+        const sessionResults = await sessionMdl.getSessionByIdMdl({ sessionId: session_id });
+        const session = sessionResults && sessionResults[0];
+        if (!session || session.usr_id !== userId) {
+            return res.status(std.message["NOT_FOUND"].code).json({
+                status: std.message["NOT_FOUND"].code, message: 'Session not found', data: null
+            });
+        }
+        // Already stopped -> idempotent guard (covers double-stop / retry after a
+        // dropped connection). Return the finalized figures instead of erroring.
+        if (session.sttus_cd !== 'active') {
+            return df.formatSucessRes(req, res, {
+                session_id: session_id,
+                duration_minutes: session.durn_mnts_nbr || 0,
+                energy_consumed: parseFloat(session.enrgy_cnsmd_kwh) || 0,
+                actual_cost: parseFloat(session.ttl_cst_amt) || 0,
+                total_cost: parseFloat(session.ttl_cst_amt) || 0,
+                status: session.sttus_cd,
+                already_stopped: true
+            }, cntxtDtls, fnm, { message: 'Session already stopped' });
+        }
+
+        const price = parseFloat(session.prce_per_kwh_amt) || 0;
+        const prepaidAmount = Math.round((parseFloat(session.ttl_cst_amt) || 0) * 100) / 100;
+
+        // ---- determine consumption ----
+        // Priority: "fully completed" -> consume the whole prepaid; else the
+        // client-reported charged_units; else whatever the DB has (OCPP meter).
+        let consumedUnits;
+        if (is_fully_completed) {
+            consumedUnits = price > 0 ? prepaidAmount / price : (parseFloat(session.enrgy_cnsmd_kwh) || 0);
+        } else if (charged_units !== undefined && charged_units !== null && !isNaN(parseFloat(charged_units))) {
+            consumedUnits = Math.max(0, parseFloat(charged_units));
+        } else {
+            consumedUnits = parseFloat(session.enrgy_cnsmd_kwh) || 0;
+        }
+        let consumedCost = (charged_cost !== undefined && charged_cost !== null && !isNaN(parseFloat(charged_cost)))
+            ? Math.max(0, parseFloat(charged_cost))
+            : Math.round(consumedUnits * price * 100) / 100;
+        // Never settle more than was prepaid (no surprise extra charge); never < 0.
+        if (consumedCost > prepaidAmount) { consumedCost = prepaidAmount; consumedUnits = price > 0 ? Math.round((prepaidAmount / price) * 1000) / 1000 : consumedUnits; }
+        if (consumedCost < 0) consumedCost = 0;
+
+        // Resolve the station owner (vendor) for the split
+        const stnRows = await stationMdl.getStationByIdMdl({ stationId: session.sttn_id });
+        const ownerUserId = (stnRows && stnRows[0] && stnRows[0].ownr_usr_id) ? stnRows[0].ownr_usr_id : null;
+
+        // Finalize the session row
+        await sessionMdl.stopSessionMdl({ sessionId: session_id, energyConsumed: consumedUnits, totalCost: consumedCost });
+
+        const hold = await ledgerService.getSessionHold(session_id);
+        let refundAmount = 0, splitInfo = null;
+
+        if (hold) {
+            // NEW flow: escrow exists -> split consumed (vendor%/DJT%) + refund unused,
+            // all via the ledger (mirrors customer + vendor wallets, audited).
+            const settle = await ledgerService.chargingSettle({
+                userId, sessionId: session_id, stationId: session.sttn_id, ownerUserId,
+                holdAmount: prepaidAmount, consumedAmount: consumedCost,
+                audit: { actnCd: 'charging_payment', userId, ip: _ctx.ip, userAgent: _ctx.userAgent },
+            });
+            await sessionMdl.updatePaymentStatusMdl({ sessionId: session_id, status: 'paid', transactionId: null });
+            refundAmount = settle.refundAmount;
+            consumedCost = settle.consumedAmount;
+            splitInfo = settle.commission;
+        } else {
+            // LEGACY flow: prepaid was taken via the old wallet deduct (no escrow).
+            // Refund the unused to the customer's wallet, then re-sync the ledger cache.
+            refundAmount = Math.round((prepaidAmount - consumedCost) * 100) / 100;
+            if (refundAmount > 0) {
+                const wRows = await walletMdl.getUserWalletMdl({ userId });
+                const wallet = wRows && wRows[0];
+                if (wallet) {
+                    const before = parseFloat(wallet.blnce_amt) || 0;
+                    await walletMdl.addMoneyMdl({ walletId: wallet.wllt_id, amount: refundAmount, userId });
+                    await walletMdl.createTransactionMdl({
+                        walletId: wallet.wllt_id, userId, type: 'credit', category: 'refund', amount: refundAmount,
+                        balanceBefore: before, balanceAfter: Math.round((before + refundAmount) * 100) / 100,
+                        description: `Charging session refund - ${session.sssn_cd || 'Session ' + session_id}`,
+                        status: 'completed', referenceId: String(session_id), referenceType: 'session',
+                    });
+                }
             }
+            await sessionMdl.updatePaymentStatusMdl({ sessionId: session_id, status: 'paid', transactionId: null });
+            try { await ledgerService.syncWalletAccountToLegacy(userId); } catch (e) { /* best-effort cache fix */ }
+        }
 
-            const session = sessionResults[0];
-
-            if (session.usr_id !== userId) {
-                return res.status(std.message["NOT_FOUND"].code).json({
-                    status: std.message["NOT_FOUND"].code,
-                    message: 'Session not found',
-                    data: null
-                });
-            }
-
-            if (session.sttus_cd !== 'active') {
-                return res.status(std.message["BAD_REQUEST"].code).json({
-                    status: std.message["BAD_REQUEST"].code,
-                    message: 'Session is not active',
-                    data: null
-                });
-            }
-
-            // Calculate energy and cost based on actual consumption
-            const energyConsumed = parseFloat(session.enrgy_cnsmd_kwh) || 0;
-            const actualTotalCost = energyConsumed * parseFloat(session.prce_per_kwh_amt);
-            const prepaidAmount = parseFloat(session.ttl_cst_amt) || 0;
-            const paymentAlreadyMade = session.pymnt_sttus_cd === 'paid';
-
-            // Get wallet
-            return walletMdl.getUserWalletMdl({ userId: userId })
-                .then(function(walletResults) {
-                    if (!walletResults || walletResults.length === 0) {
-                        return res.status(std.message["BAD_REQUEST"].code).json({
-                            status: std.message["BAD_REQUEST"].code,
-                            message: 'Wallet not found. Cannot process payment.',
-                            data: null
-                        });
-                    }
-
-                    const wallet = walletResults[0];
-                    const walletBalance = parseFloat(wallet.blnce_amt) || 0;
-
-                    // If payment was already made upfront, calculate difference
-                    if (paymentAlreadyMade && prepaidAmount > 0) {
-                        const costDifference = actualTotalCost - prepaidAmount;
-                        
-                        // Stop session with actual cost
-                        return sessionMdl.stopSessionMdl({ 
-                            sessionId: session_id, 
-                            energyConsumed: energyConsumed, 
-                            totalCost: actualTotalCost 
-                        })
-                        .then(function() {
-                            // If actual cost is less than prepaid, refund the difference
-                            if (costDifference < 0) {
-                                const refundAmount = Math.abs(costDifference);
-                                const balanceBefore = walletBalance;
-                                const balanceAfter = balanceBefore + refundAmount;
-
-                                return walletMdl.addMoneyMdl({ 
-                                    walletId: wallet.wllt_id, 
-                                    amount: refundAmount, 
-                                    userId: userId 
-                                })
-                                .then(function() {
-                                    // Verify wallet was updated
-                                    return walletMdl.getUserWalletMdl({ userId: userId });
-                                })
-                                .then(function(updatedWalletResults) {
-                                    if (!updatedWalletResults || updatedWalletResults.length === 0) {
-                                        throw new Error('Failed to verify wallet update');
-                                    }
-
-                                    const updatedWallet = updatedWalletResults[0];
-                                    const actualBalance = parseFloat(updatedWallet.blnce_amt) || 0;
-
-                                    // Verify balance matches expected value
-                                    if (Math.abs(actualBalance - balanceAfter) > 0.01) {
-                                        throw new Error(`Wallet balance mismatch: expected ${balanceAfter}, got ${actualBalance}`);
-                                    }
-
-                                    // Create refund transaction record
-                                    return walletMdl.createTransactionMdl({
-                                        walletId: wallet.wllt_id,
-                                        userId: userId,
-                                        type: 'credit',
-                                        category: 'refund',
-                                        amount: refundAmount,
-                                        balanceBefore: balanceBefore,
-                                        balanceAfter: balanceAfter,
-                                        description: `Charging session refund - ${session.sssn_cd || 'Session ' + session_id} (Prepaid: ₹${prepaidAmount.toFixed(2)}, Actual: ₹${actualTotalCost.toFixed(2)})`,
-                                        status: 'completed',
-                                        referenceId: session_id.toString(),
-                                        referenceType: 'session'
-                                    });
-                                })
-                                .then(function() {
-                                    return df.formatSucessRes(req, res, {
-                                        session_id: session_id,
-                                        duration_minutes: session.durn_mnts_nbr || 0,
-                                        energy_consumed: energyConsumed,
-                                        prepaid_amount: prepaidAmount,
-                                        actual_cost: actualTotalCost,
-                                        refund_amount: Math.abs(costDifference),
-                                        total_cost: actualTotalCost,
-                                        status: 'completed',
-                                        end_time: new Date().toISOString()
-                                    }, cntxtDtls, fnm, { message: 'Charging session stopped' });
-                                });
-                            } 
-                            // If actual cost is more than prepaid, deduct additional amount
-                            else if (costDifference > 0) {
-                                if (walletBalance < costDifference) {
-                                    // Cannot pay additional amount, mark as pending
-                                    return sessionMdl.updatePaymentStatusMdl({ 
-                                        sessionId: session_id, 
-                                        status: 'pending', 
-                                        transactionId: null 
-                                    })
-                                    .then(function() {
-                                        return res.status(std.message["BAD_REQUEST"].code).json({
-                                            status: std.message["BAD_REQUEST"].code,
-                                            message: `Additional payment required. Required: ₹${costDifference.toFixed(2)}, Available: ₹${walletBalance.toFixed(2)}`,
-                                            data: {
-                                                session_id: session_id,
-                                                energy_consumed: energyConsumed,
-                                                prepaid_amount: prepaidAmount,
-                                                actual_cost: actualTotalCost,
-                                                additional_required: costDifference,
-                                                status: 'completed',
-                                                payment_status: 'pending'
-                                            }
-                                        });
-                                    });
-                                }
-
-                                const balanceBefore = walletBalance;
-                                const balanceAfter = balanceBefore - costDifference;
-
-                                return walletMdl.deductMoneyMdl({ 
-                                    walletId: wallet.wllt_id, 
-                                    amount: costDifference, 
-                                    userId: userId 
-                                })
-                                .then(function() {
-                                    // Verify wallet was updated
-                                    return walletMdl.getUserWalletMdl({ userId: userId });
-                                })
-                                .then(function(updatedWalletResults) {
-                                    if (!updatedWalletResults || updatedWalletResults.length === 0) {
-                                        throw new Error('Failed to verify wallet update');
-                                    }
-
-                                    const updatedWallet = updatedWalletResults[0];
-                                    const actualBalance = parseFloat(updatedWallet.blnce_amt) || 0;
-
-                                    // Verify balance matches expected value
-                                    if (Math.abs(actualBalance - balanceAfter) > 0.01) {
-                                        throw new Error(`Wallet balance mismatch: expected ${balanceAfter}, got ${actualBalance}`);
-                                    }
-
-                                    // Create additional payment transaction record
-                                    return walletMdl.createTransactionMdl({
-                                        walletId: wallet.wllt_id,
-                                        userId: userId,
-                                        type: 'debit',
-                                        category: 'charging',
-                                        amount: costDifference,
-                                        balanceBefore: balanceBefore,
-                                        balanceAfter: balanceAfter,
-                                        description: `Charging session additional payment - ${session.sssn_cd || 'Session ' + session_id} (Prepaid: ₹${prepaidAmount.toFixed(2)}, Actual: ₹${actualTotalCost.toFixed(2)})`,
-                                        status: 'completed',
-                                        referenceId: session_id.toString(),
-                                        referenceType: 'session'
-                                    });
-                                })
-                                .then(function() {
-                                    return df.formatSucessRes(req, res, {
-                                        session_id: session_id,
-                                        duration_minutes: session.durn_mnts_nbr || 0,
-                                        energy_consumed: energyConsumed,
-                                        prepaid_amount: prepaidAmount,
-                                        actual_cost: actualTotalCost,
-                                        additional_paid: costDifference,
-                                        total_cost: actualTotalCost,
-                                        status: 'completed',
-                                        end_time: new Date().toISOString()
-                                    }, cntxtDtls, fnm, { message: 'Charging session stopped' });
-                                });
-                            }
-                            // If actual cost equals prepaid, no additional transaction needed
-                            else {
-                                return df.formatSucessRes(req, res, {
-                                    session_id: session_id,
-                                    duration_minutes: session.durn_mnts_nbr || 0,
-                                    energy_consumed: energyConsumed,
-                                    prepaid_amount: prepaidAmount,
-                                    actual_cost: actualTotalCost,
-                                    total_cost: actualTotalCost,
-                                    status: 'completed',
-                                    end_time: new Date().toISOString()
-                                }, cntxtDtls, fnm, { message: 'Charging session stopped' });
-                            }
-                        });
-                    }
-                    // If payment was not made upfront, deduct now (old flow for backward compatibility)
-                    else {
-                        // Verify wallet has sufficient balance
-                        if (walletBalance < actualTotalCost) {
-                            // Stop session but mark payment as failed
-                            return sessionMdl.stopSessionMdl({ 
-                                sessionId: session_id, 
-                                energyConsumed: energyConsumed, 
-                                totalCost: actualTotalCost 
-                            })
-                            .then(function() {
-                                return sessionMdl.updatePaymentStatusMdl({ 
-                                    sessionId: session_id, 
-                                    status: 'pending', 
-                                    transactionId: null 
-                                });
-                            })
-                            .then(function() {
-                                return res.status(std.message["BAD_REQUEST"].code).json({
-                                    status: std.message["BAD_REQUEST"].code,
-                                    message: `Insufficient wallet balance. Required: ₹${actualTotalCost.toFixed(2)}, Available: ₹${walletBalance.toFixed(2)}`,
-                                    data: {
-                                        session_id: session_id,
-                                        energy_consumed: energyConsumed,
-                                        total_cost: actualTotalCost,
-                                        wallet_balance: walletBalance,
-                                        status: 'completed',
-                                        payment_status: 'pending'
-                                    }
-                                });
-                            });
-                        }
-
-                        // Stop session
-                        return sessionMdl.stopSessionMdl({ 
-                            sessionId: session_id, 
-                            energyConsumed: energyConsumed, 
-                            totalCost: actualTotalCost 
-                        })
-                        .then(function() {
-                            // Deduct from wallet
-                            const balanceBefore = walletBalance;
-                            const balanceAfter = balanceBefore - actualTotalCost;
-
-                            return walletMdl.deductMoneyMdl({ 
-                                walletId: wallet.wllt_id, 
-                                amount: actualTotalCost, 
-                                userId: userId 
-                            })
-                            .then(function() {
-                                // Verify wallet was updated
-                                return walletMdl.getUserWalletMdl({ userId: userId });
-                            })
-                            .then(function(updatedWalletResults) {
-                                if (!updatedWalletResults || updatedWalletResults.length === 0) {
-                                    throw new Error('Failed to verify wallet update');
-                                }
-
-                                const updatedWallet = updatedWalletResults[0];
-                                const actualBalance = parseFloat(updatedWallet.blnce_amt) || 0;
-
-                                // Verify balance matches expected value
-                                if (Math.abs(actualBalance - balanceAfter) > 0.01) {
-                                    throw new Error(`Wallet balance mismatch: expected ${balanceAfter}, got ${actualBalance}`);
-                                }
-
-                                // Create transaction record
-                                return walletMdl.createTransactionMdl({
-                                    walletId: wallet.wllt_id,
-                                    userId: userId,
-                                    type: 'debit',
-                                    category: 'charging',
-                                    amount: actualTotalCost,
-                                    balanceBefore: balanceBefore,
-                                    balanceAfter: balanceAfter,
-                                    description: `Charging session payment - ${session.sssn_cd || 'Session ' + session_id}`,
-                                    status: 'completed',
-                                    referenceId: session_id.toString(),
-                                    referenceType: 'session'
-                                });
-                            })
-                            .then(function(transactionResults) {
-                                // Verify transaction was created
-                                if (!transactionResults || !transactionResults.insertId) {
-                                    throw new Error('Failed to create wallet transaction');
-                                }
-
-                                // Update session payment status
-                                return sessionMdl.updatePaymentStatusMdl({ 
-                                    sessionId: session_id, 
-                                    status: 'paid', 
-                                    transactionId: transactionResults.insertId 
-                                })
-                                .then(function() {
-                                    return df.formatSucessRes(req, res, {
-                                        session_id: session_id,
-                                        duration_minutes: session.durn_mnts_nbr || 0,
-                                        energy_consumed: energyConsumed,
-                                        total_cost: actualTotalCost,
-                                        status: 'completed',
-                                        end_time: new Date().toISOString()
-                                    }, cntxtDtls, fnm, { message: 'Charging session stopped' });
-                                });
-                            });
-                        });
-                    }
-                });
-        })
-        .catch(function(error) {
-            console.error('[SessionCtrl] stopSession error:', error);
-            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+        audit.writeAudit({
+            userId: _ctx.userId, action: 'session_stop', entityType: 'session', entityId: session_id,
+            newVal: { energy: consumedUnits, cost: consumedCost, refund: refundAmount, ownerUserId, legacy: !hold, commission: splitInfo },
+            ip: _ctx.ip, userAgent: _ctx.userAgent
         });
+
+        return df.formatSucessRes(req, res, {
+            session_id: session_id,
+            duration_minutes: session.durn_mnts_nbr || 0,
+            energy_consumed: consumedUnits,
+            prepaid_amount: prepaidAmount,
+            actual_cost: consumedCost,
+            refund_amount: refundAmount,
+            total_cost: consumedCost,
+            status: 'completed',
+            end_time: new Date().toISOString()
+        }, cntxtDtls, fnm, { message: 'Charging session stopped' });
+    } catch (error) {
+        console.error('[SessionCtrl] stopSession error:', error);
+        return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+    }
 };
 
 /**
@@ -637,11 +554,19 @@ exports.getActiveSession = function(req, res) {
             const session = sessionResults[0];
             const sessionData = {
                 session_id: session.sssn_id,
+                session_code: session.sssn_cd,
+                station_id: session.sttn_id,
                 station_name: session.sttn_nm_tx,
+                address: session.addr_tx || null,
+                connector_id: session.cnntr_id,
                 connector_type: session.cnntr_typ_cd,
+                power: session.pwr_tx || null,
                 start_time: session.strt_ts,
                 duration_minutes: session.durn_mnts_nbr || 0,
                 energy_consumed: parseFloat(session.enrgy_cnsmd_kwh) || 0,
+                price_per_kwh: parseFloat(session.prce_per_kwh_amt) || 0,
+                // prepaid hold (units were bought for this amount; ttl_cst_amt holds it)
+                prepaid_amount: parseFloat(session.ttl_cst_amt) || 0,
                 current_cost: parseFloat(session.ttl_cst_amt) || 0,
                 progress: session.prgrss_pct || 0,
                 status: session.sttus_cd

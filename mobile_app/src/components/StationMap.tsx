@@ -6,6 +6,8 @@ import type { LatLngExpression } from 'leaflet';
 import L from 'leaflet';
 import { Navigation, X, Clock, Route, Play, Square, RotateCcw, AlertCircle, CheckCircle, Volume2, VolumeX, ExternalLink } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
+import { speakText, stopSpeaking, setVoiceEnabled } from '../services/voice';
 import 'leaflet/dist/leaflet.css';
 import './StationMap.css';
 import {
@@ -180,17 +182,12 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
 
   const speak = useCallback((text: string) => {
     if (!voiceOn || !text) return;
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    try {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.rate = 1;
-      u.lang = 'en-IN';
-      window.speechSynthesis.speak(u);
-    } catch {
-      /* ignore speech errors */
-    }
+    // Native TTS in the built app, speechSynthesis fallback on the web (voice.ts)
+    void speakText(text, 'en-IN');
   }, [voiceOn]);
+
+  // Keep the voice service's enabled flag in sync with the mute toggle
+  useEffect(() => { setVoiceEnabled(voiceOn); }, [voiceOn]);
 
   // Open the route in Google Maps (native app turn-by-turn when available)
   const openInGoogleMaps = useCallback(() => {
@@ -332,10 +329,27 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
   }, [selectedRouteIndex, selectedRoute, effectiveUserLocation.latitude, effectiveUserLocation.longitude, isNavigating]);
 
   // Start location tracking
-  const startLocationTracking = useCallback(() => {
+  const startLocationTracking = useCallback(async () => {
     if (!navigator.geolocation) {
       console.warn('Geolocation not supported');
       return;
+    }
+
+    // On the built app, navigator.geolocation only works once the native
+    // location permission is granted — request it explicitly (F: nav tracking).
+    if (Capacitor.isNativePlatform()) {
+      try {
+        let perm = await Geolocation.checkPermissions();
+        if (perm.location !== 'granted' && perm.coarseLocation !== 'granted') {
+          perm = await Geolocation.requestPermissions({ permissions: ['location'] });
+        }
+        if (perm.location !== 'granted' && perm.coarseLocation !== 'granted') {
+          console.warn('Location permission denied — navigation cannot track position');
+          return;
+        }
+      } catch (e) {
+        console.warn('Location permission request failed:', e);
+      }
     }
 
     const options = {
@@ -421,9 +435,7 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
   const stopNavigation = useCallback(() => {
     setIsNavigating(false);
     stopLocationTracking();
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
+    void stopSpeaking();
     if (routeCheckInterval.current) {
       clearInterval(routeCheckInterval.current);
       routeCheckInterval.current = null;
@@ -735,9 +747,7 @@ export default function StationMap({ station, userLocation, onClose }: StationMa
               <button
                 className={`nav-action-btn secondary ${voiceOn ? 'voice-on' : ''}`}
                 onClick={() => {
-                  if (voiceOn && typeof window !== 'undefined' && 'speechSynthesis' in window) {
-                    window.speechSynthesis.cancel();
-                  }
+                  if (voiceOn) void stopSpeaking();
                   setVoiceOn((v) => !v);
                 }}
                 title={voiceOn ? 'Mute voice' : 'Unmute voice'}

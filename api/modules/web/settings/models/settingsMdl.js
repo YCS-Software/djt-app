@@ -18,9 +18,10 @@ const cntxtDtls = "settingsMdl";
 ******************************************************************************/
 exports.getByScopeMdl = function(data) {
     const scope = String(data.scope == null ? '' : data.scope);
-    const prefix = sqldb.MySQLConPool.escape(scope + '.%');
-    const QRY = `SELECT sttng_ky_tx AS k, sttng_vl_tx AS v FROM sttng_lst_t WHERE a_in=1 AND sttng_ky_tx LIKE ${prefix}`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    const prefix = scope + '.%';
+    const QRY = `SELECT sttng_ky_tx AS k, sttng_vl_tx AS v FROM sttng_lst_t WHERE a_in=1 AND sttng_ky_tx LIKE ?`;
+    const PARAMS = [prefix];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, PARAMS, cntxtDtls);
 };
 
 /*****************************************************************************
@@ -30,8 +31,9 @@ exports.getByScopeMdl = function(data) {
 ******************************************************************************/
 exports.saveByScopeMdl = function(data) {
     const scope = String(data.scope == null ? '' : data.scope);
-    const fullKey = sqldb.MySQLConPool.escape(scope + '.' + String(data.key == null ? '' : data.key));
-    const val = sqldb.MySQLConPool.escape(String(data.value == null ? '' : data.value));
-    const QRY = `INSERT INTO sttng_lst_t (sttng_ky_tx, sttng_vl_tx, a_in) VALUES (${fullKey}, ${val}, 1) ON DUPLICATE KEY UPDATE sttng_vl_tx=${val}`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    const fullKey = scope + '.' + String(data.key == null ? '' : data.key);
+    const val = String(data.value == null ? '' : data.value);
+    const QRY = `INSERT INTO sttng_lst_t (sttng_ky_tx, sttng_vl_tx, a_in) VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE sttng_vl_tx=?`;
+    const PARAMS = [fullKey, val, val];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, PARAMS, cntxtDtls);
 };

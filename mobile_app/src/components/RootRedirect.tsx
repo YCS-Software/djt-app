@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/api';
+import { getRestorableRoute } from '../services/appState';
 
 export default function RootRedirect() {
   const navigate = useNavigate();
@@ -11,8 +12,10 @@ export default function RootRedirect() {
     const user = localStorage.getItem('user');
 
     if (token && user) {
-      // User is logged in — route to the area for their role
-      navigate(authService.homeRouteForRole(), { replace: true });
+      // Restore the last screen the user was on (survives process death, F1);
+      // fall back to the role's home if there's no recent/valid saved route.
+      const restore = getRestorableRoute();
+      navigate(restore || authService.homeRouteForRole(), { replace: true });
     } else {
       // User is not logged in, redirect to login
       navigate('/login', { replace: true });

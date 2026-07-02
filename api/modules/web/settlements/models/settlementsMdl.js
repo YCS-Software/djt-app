@@ -25,7 +25,7 @@ exports.listMdl = function () {
                  FROM setlmnt_lst_t s
                  LEFT JOIN usr_lst_t u ON u.usr_id = s.ownr_usr_id
                  ORDER BY s.setlmnt_id DESC`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls).catch(() => []);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, [], cntxtDtls).catch(() => []);
 };
 
 /*****************************************************************************
@@ -38,6 +38,7 @@ exports.getByIdMdl = function (data) {
                         s.ttl_rvnu_amt AS totalRevenue, s.cmsn_amt AS commission,
                         s.setlmnt_amt AS settlementAmount, s.sttus_cd AS status
                  FROM setlmnt_lst_t s LEFT JOIN usr_lst_t u ON u.usr_id = s.ownr_usr_id
-                 WHERE s.setlmnt_id = ${id}`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls).catch(() => []);
+                 WHERE s.setlmnt_id = ?`;
+    const PARAMS = [id];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, PARAMS, cntxtDtls).catch(() => []);
 };

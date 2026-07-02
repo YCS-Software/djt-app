@@ -18,7 +18,7 @@ const cntxtDtls = "emspTokensMdl";
 ******************************************************************************/
 exports.listMdl = function () {
     const QRY = `SELECT t.tkn_id AS uid, t.tkn_typ_cd AS type, NULL AS contractId, NULL AS issuer, CASE WHEN t.is_rvkd_in=1 THEN 'Revoked' WHEN t.a_in=1 THEN 'Active' ELSE 'Inactive' END AS status FROM tkn_lst_t t ORDER BY t.tkn_id DESC`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, [], cntxtDtls);
 };
 
 /*****************************************************************************
@@ -28,8 +28,9 @@ exports.listMdl = function () {
 ******************************************************************************/
 exports.getByIdMdl = function (data) {
     const id = parseInt(data.id, 10) || 0;
-    const QRY = `SELECT * FROM ( SELECT t.tkn_id AS uid, t.tkn_typ_cd AS type, NULL AS contractId, NULL AS issuer, CASE WHEN t.is_rvkd_in=1 THEN 'Revoked' WHEN t.a_in=1 THEN 'Active' ELSE 'Inactive' END AS status FROM tkn_lst_t t ORDER BY t.tkn_id DESC ) q WHERE q.uid = ${id}`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    const QRY = `SELECT * FROM ( SELECT t.tkn_id AS uid, t.tkn_typ_cd AS type, NULL AS contractId, NULL AS issuer, CASE WHEN t.is_rvkd_in=1 THEN 'Revoked' WHEN t.a_in=1 THEN 'Active' ELSE 'Inactive' END AS status FROM tkn_lst_t t ORDER BY t.tkn_id DESC ) q WHERE q.uid = ?`;
+    const PARAMS = [id];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, PARAMS, cntxtDtls);
 };
 
 /*****************************************************************************
@@ -38,9 +39,10 @@ exports.getByIdMdl = function (data) {
 * Arguments     : data object with type
 ******************************************************************************/
 exports.createMdl = function (data) {
-    const type = sqldb.MySQLConPool.escape(data.type || 'rfid');
-    const QRY = `INSERT INTO tkn_lst_t (tkn_typ_cd, a_in, i_ts) VALUES (${type}, 1, NOW())`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    const type = data.type || 'rfid';
+    const QRY = `INSERT INTO tkn_lst_t (tkn_typ_cd, a_in, i_ts) VALUES (?, 1, NOW())`;
+    const PARAMS = [type];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, PARAMS, cntxtDtls);
 };
 
 /*****************************************************************************
@@ -50,9 +52,10 @@ exports.createMdl = function (data) {
 ******************************************************************************/
 exports.updateMdl = function (data) {
     const id = parseInt(data.id, 10) || 0;
-    const type = sqldb.MySQLConPool.escape(data.type || 'rfid');
-    const QRY = `UPDATE tkn_lst_t SET tkn_typ_cd=${type} WHERE tkn_id=${id}`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    const type = data.type || 'rfid';
+    const QRY = `UPDATE tkn_lst_t SET tkn_typ_cd=? WHERE tkn_id=?`;
+    const PARAMS = [type, id];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, PARAMS, cntxtDtls);
 };
 
 /*****************************************************************************
@@ -62,6 +65,7 @@ exports.updateMdl = function (data) {
 ******************************************************************************/
 exports.deleteMdl = function (data) {
     const id = parseInt(data.id, 10) || 0;
-    const QRY = `UPDATE tkn_lst_t SET a_in=0 WHERE tkn_id=${id}`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    const QRY = `UPDATE tkn_lst_t SET a_in=0 WHERE tkn_id=?`;
+    const PARAMS = [id];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, PARAMS, cntxtDtls);
 };

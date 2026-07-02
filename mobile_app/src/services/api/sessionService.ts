@@ -10,13 +10,17 @@ export interface ChargingSession {
   station_name: string;
   station_id?: number;
   address?: string;
+  connector_id?: number;
   connector_type: string;
+  power?: string | null;
   start_time: string;
   end_time?: string;
   duration_minutes?: number;
   energy_consumed: number;
   current_cost?: number;
   total_cost?: number;
+  /** prepaid hold for the session (units bought × price) */
+  prepaid_amount?: number;
   price_per_kwh: number;
   progress: number;
   status: string;
@@ -27,10 +31,20 @@ export interface StartSessionRequest {
   station_id: number;
   connector_id: number;
   qr_code?: string;
+  /** units (kWh) the customer chose to buy */
+  selected_units?: number;
+  /** prepaid amount (units × price) to hold from the wallet */
+  total_amount?: number;
 }
 
 export interface StopSessionRequest {
   session_id: number;
+  /** units actually consumed (driver app reports this from the live meter/sim) */
+  charged_units?: number;
+  /** cost actually consumed (optional; server computes from units × price if omitted) */
+  charged_cost?: number;
+  /** true when charging reached the purchased units (consume the full prepaid) */
+  is_fully_completed?: boolean;
 }
 
 export const sessionService = {
@@ -102,7 +116,46 @@ export const sessionService = {
     );
     return response.data;
   },
+
+  /** Live charger state before charging — drives the "plug in" gate. */
+  getMachineStatus: async (machineId: number): Promise<MachineLiveStatus> => {
+    const response = await apiClient.get<{ data: MachineLiveStatus }>(
+      `/sessions/machine/${machineId}/status`,
+      { requiresAuth: true },
+    );
+    return response.data;
+  },
+
+  /** Live session meter + connector state during charging. */
+  getSessionLive: async (sessionId: number): Promise<SessionLive> => {
+    const response = await apiClient.get<{ data: SessionLive }>(
+      `/sessions/${sessionId}/live`,
+      { requiresAuth: true },
+    );
+    return response.data;
+  },
 };
+
+/** offline | faulted | unavailable | charging | plugged | unplugged */
+export type ConnectorState = 'offline' | 'faulted' | 'unavailable' | 'charging' | 'plugged' | 'unplugged';
+
+export interface MachineLiveStatus {
+  machine_online: boolean;
+  machine_status: string;
+  connector_state: ConnectorState;
+  available_connectors: number;
+  total_connectors: number;
+}
+
+export interface SessionLive {
+  session_id: number;
+  status: string;
+  energy_consumed: number;
+  current_cost: number;
+  progress: number;
+  connector_state: ConnectorState;
+  machine_online: boolean;
+}
 
 export interface ScanConnector {
   connector_id: number;
@@ -121,6 +174,8 @@ export interface ScanResult {
     power: string | null;
     status: string;
     configured: boolean;
+    /** live OCPP connectivity (real-time, from the server's socket registry) */
+    online: boolean;
   };
   station: {
     station_id: number;

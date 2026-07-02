@@ -4,6 +4,7 @@
  */
 
 const mdl = require('../models/emspTokensMdl');
+const audit = require(appRoot + '/utils/auditUtil');
 
 exports.list = function (req, res) {
     mdl.listMdl()
@@ -18,19 +19,33 @@ exports.get = function (req, res) {
 };
 
 exports.create = function (req, res) {
-    mdl.createMdl(req.body || {})
-        .then(() => res.status(200).json({ status: 200, message: 'eMSP token created' }))
+    const body = req.body || {};
+    mdl.createMdl(body)
+        .then(result => {
+            const ctx = audit.reqCtx(req);
+            audit.writeAudit({ userId: ctx.userId, action: 'emsp_token_create', entityType: 'emsp_token', entityId: result && result.insertId, newVal: { type: body.type }, ip: ctx.ip, userAgent: ctx.userAgent });
+            res.status(200).json({ status: 200, message: 'eMSP token created' });
+        })
         .catch(e => { console.error('[emspTokens] create', e); res.status(500).json({ status: 500, error: 'Failed to create eMSP token' }); });
 };
 
 exports.update = function (req, res) {
-    mdl.updateMdl({ id: req.params.id, ...(req.body || {}) })
-        .then(() => res.status(200).json({ status: 200, message: 'eMSP token updated' }))
+    const body = req.body || {};
+    mdl.updateMdl({ id: req.params.id, ...body })
+        .then(() => {
+            const ctx = audit.reqCtx(req);
+            audit.writeAudit({ userId: ctx.userId, action: 'emsp_token_update', entityType: 'emsp_token', entityId: req.params.id, newVal: { type: body.type }, ip: ctx.ip, userAgent: ctx.userAgent });
+            res.status(200).json({ status: 200, message: 'eMSP token updated' });
+        })
         .catch(e => { console.error('[emspTokens] update', e); res.status(500).json({ status: 500, error: 'Failed to update eMSP token' }); });
 };
 
 exports.delete = function (req, res) {
     mdl.deleteMdl({ id: req.params.id })
-        .then(() => res.status(200).json({ status: 200, message: 'eMSP token deleted' }))
+        .then(() => {
+            const ctx = audit.reqCtx(req);
+            audit.writeAudit({ userId: ctx.userId, action: 'emsp_token_delete', entityType: 'emsp_token', entityId: req.params.id, ip: ctx.ip, userAgent: ctx.userAgent });
+            res.status(200).json({ status: 200, message: 'eMSP token deleted' });
+        })
         .catch(e => { console.error('[emspTokens] delete', e); res.status(500).json({ status: 500, error: 'Failed to delete eMSP token' }); });
 };

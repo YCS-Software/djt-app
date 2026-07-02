@@ -16,10 +16,31 @@ export interface OwnerConnector {
   connector_id: number;
   station_id: number;
   machine_id: number;
+  code?: string | null;
   type: string;
   name: string;
   power: string | null;
   is_available: boolean;
+}
+
+export interface ConnectorQr {
+  token: string;
+  connector: {
+    connector_id: number;
+    code: string | null;
+    type: string;
+    name: string;
+    power: string | null;
+    is_available: boolean;
+    machine_id: number;
+    machine_name: string;
+    machine_type: string;
+    station_name: string;
+    ocpp_id: string | null;
+    ws_url: string | null;
+    price_per_kwh: number;
+    configured: boolean;
+  };
 }
 
 export interface PowerOption {
@@ -305,6 +326,11 @@ export const ownerService = {
 
   getMachineQr: async (machineId: number): Promise<MachineQr> => {
     const res = await apiClient.get<{ data: MachineQr }>(`/owner/machines/${machineId}/qr`, AUTH);
+    return res.data;
+  },
+
+  getConnectorQr: async (connectorId: number): Promise<ConnectorQr> => {
+    const res = await apiClient.get<{ data: ConnectorQr }>(`/owner/connectors/${connectorId}/qr`, AUTH);
     return res.data;
   },
 

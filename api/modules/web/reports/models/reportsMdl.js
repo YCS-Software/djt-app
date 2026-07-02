@@ -15,7 +15,7 @@ const cntxtDtls = "reportsMdl";
 exports.listMdl = function() {
     const QRY_TO_EXEC = `SELECT s.sttn_id AS id, s.sttn_nm_tx AS station, s.cty_tx AS city, COUNT(se.sssn_id) AS sessions, COALESCE(SUM(se.enrgy_cnsmd_kwh),0) AS energyKwh, COALESCE(SUM(se.ttl_cst_amt),0) AS revenue FROM sttn_lst_t s LEFT JOIN sssn_lst_t se ON se.sttn_id=s.sttn_id AND se.sttus_cd='completed' GROUP BY s.sttn_id, s.sttn_nm_tx, s.cty_tx ORDER BY revenue DESC`;
 
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, [], cntxtDtls);
 };
 
 /*****************************************************************************
@@ -25,9 +25,10 @@ exports.listMdl = function() {
 ******************************************************************************/
 exports.getByIdMdl = function(data) {
     const id = parseInt(data.id, 10) || 0;
-    const QRY_TO_EXEC = `SELECT * FROM ( SELECT s.sttn_id AS id, s.sttn_nm_tx AS station, s.cty_tx AS city, COUNT(se.sssn_id) AS sessions, COALESCE(SUM(se.enrgy_cnsmd_kwh),0) AS energyKwh, COALESCE(SUM(se.ttl_cst_amt),0) AS revenue FROM sttn_lst_t s LEFT JOIN sssn_lst_t se ON se.sttn_id=s.sttn_id AND se.sttus_cd='completed' GROUP BY s.sttn_id, s.sttn_nm_tx, s.cty_tx ORDER BY revenue DESC ) q WHERE q.id = ${id}`;
+    const QRY_TO_EXEC = `SELECT * FROM ( SELECT s.sttn_id AS id, s.sttn_nm_tx AS station, s.cty_tx AS city, COUNT(se.sssn_id) AS sessions, COALESCE(SUM(se.enrgy_cnsmd_kwh),0) AS energyKwh, COALESCE(SUM(se.ttl_cst_amt),0) AS revenue FROM sttn_lst_t s LEFT JOIN sssn_lst_t se ON se.sttn_id=s.sttn_id AND se.sttus_cd='completed' GROUP BY s.sttn_id, s.sttn_nm_tx, s.cty_tx ORDER BY revenue DESC ) q WHERE q.id = ?`;
 
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
+    const PARAMS = [id];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
 };
 
 /*****************************************************************************
@@ -116,14 +117,19 @@ exports.generateReportMdl = function(data) {
     if (!def.build) return Promise.resolve([]);
 
     let w = '';
+    const PARAMS = [];
+    // def.dateCol / def.filterField are identifiers from the static REPORT_DEFS
+    // (never user input) so they stay inline; user values are bound via `?`.
     if (def.dateCol && isDate(data.startDate) && isDate(data.endDate)) {
-        w += ` AND DATE(${def.dateCol}) BETWEEN '${data.startDate}' AND '${data.endDate}'`;
+        w += ` AND DATE(${def.dateCol}) BETWEEN ? AND ?`;
+        PARAMS.push(data.startDate, data.endDate);
     }
     if (def.filterField && data.filter) {
-        w += ` AND ${def.filterField} = '${esc(data.filter)}'`;
+        w += ` AND ${def.filterField} = ?`;
+        PARAMS.push(String(data.filter));
     }
 
     const sql = def.build(w);
     if (!sql) return Promise.resolve([]);
-    return dbutil.execQuery(sqldb.MySQLConPool, sql, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, sql, PARAMS, cntxtDtls);
 };

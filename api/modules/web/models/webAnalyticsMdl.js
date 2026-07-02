@@ -16,7 +16,7 @@ const sqldb = require(appRoot + '/config/db.config');
 const dbutil = require(appRoot + '/utils/db.utils');
 const cntxtDtls = "webAnalyticsMdl";
 
-const run = (qry) => dbutil.execQuery(sqldb.MySQLConPool, qry, cntxtDtls);
+const run = (qry, params) => dbutil.execQuery(sqldb.MySQLConPool, qry, params || [], cntxtDtls);
 
 // Session statuses treated as "failed/rejected".
 const FAILED_STATUSES = "('failed','rejected','cancelled','error','aborted')";
@@ -83,7 +83,8 @@ exports.getUptimeMdl = function(o) {
 ******************************************************************************/
 exports.getChargeTimeSeriesMdl = function(o) {
     const { seriesDays, partnerId } = opt(o);
-    const days = (parseInt(seriesDays, 10) || 7) - 1;
+    // INTERVAL n DAY cannot be bound; inline a validated non-negative integer.
+    const days = Math.max(0, (parseInt(seriesDays, 10) || 7) - 1);
     const QRY = `
         SELECT DATE_FORMAT(strt_ts, '%Y-%m-%d') AS period,
                COALESCE(AVG(durn_mnts_nbr), 0) / 60 AS value
@@ -100,7 +101,8 @@ exports.getChargeTimeSeriesMdl = function(o) {
 ******************************************************************************/
 exports.getConsumptionSeriesMdl = function(o) {
     const { seriesDays, partnerId } = opt(o);
-    const days = (parseInt(seriesDays, 10) || 7) - 1;
+    // INTERVAL n DAY cannot be bound; inline a validated non-negative integer.
+    const days = Math.max(0, (parseInt(seriesDays, 10) || 7) - 1);
     const QRY = `
         SELECT DATE_FORMAT(strt_ts, '%Y-%m-%d') AS period,
                COALESCE(SUM(enrgy_cnsmd_kwh), 0) AS value
@@ -117,7 +119,8 @@ exports.getConsumptionSeriesMdl = function(o) {
 ******************************************************************************/
 exports.getFailedSeriesMdl = function(o) {
     const { seriesDays, partnerId } = opt(o);
-    const days = (parseInt(seriesDays, 10) || 7) - 1;
+    // INTERVAL n DAY cannot be bound; inline a validated non-negative integer.
+    const days = Math.max(0, (parseInt(seriesDays, 10) || 7) - 1);
     const QRY = `
         SELECT DATE_FORMAT(i_ts, '%Y-%m-%d') AS period,
                COUNT(*) AS value

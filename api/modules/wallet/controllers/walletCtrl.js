@@ -6,6 +6,7 @@
 const std = require(appRoot + '/utils/standardMessages');
 const df = require(appRoot + '/utils/dateFormatUtil');
 const walletMdl = require('../models/walletMdl');
+const audit = require(appRoot + '/utils/auditUtil');
 const cntxtDtls = "walletCtrl";
 
 /*****************************************************************************
@@ -220,6 +221,17 @@ function processAddMoney(wallet, userId, amount, currentBalance, payment_method,
                 throw new Error(`Final wallet balance mismatch: expected ${balanceAfter}, got ${finalBalance}`);
             }
             
+            const _ctx = audit.reqCtx(req);
+            audit.writeAudit({
+                userId: _ctx.userId,
+                action: 'wallet_add',
+                entityType: 'wallet',
+                entityId: wallet.wllt_id,
+                newVal: { amount: parseFloat(amount) },
+                ip: _ctx.ip,
+                userAgent: _ctx.userAgent
+            });
+
             // Return success only after all operations are verified
             return df.formatSucessRes(req, res, {
                 transaction_id: transactionInsertId,
@@ -296,6 +308,17 @@ function processAddMoneyForNewWallet(wallet, userId, amount, payment_method, pay
             throw new Error(`Wallet balance mismatch: expected ${balanceAfter}, got ${actualWalletBalance}`);
         }
         
+        const _ctx = audit.reqCtx(req);
+        audit.writeAudit({
+            userId: _ctx.userId,
+            action: 'wallet_add',
+            entityType: 'wallet',
+            entityId: wallet.wllt_id,
+            newVal: { amount: parseFloat(amount) },
+            ip: _ctx.ip,
+            userAgent: _ctx.userAgent
+        });
+
         // Return success only after all operations are verified
         return df.formatSucessRes(req, res, {
             transaction_id: transactionInsertId,
@@ -418,6 +441,16 @@ exports.transferMoney = function(req, res) {
                 });
             })
             .then(function(transactionResults) {
+                const _ctx = audit.reqCtx(req);
+                audit.writeAudit({
+                    userId: _ctx.userId,
+                    action: 'wallet_deduct',
+                    entityType: 'wallet',
+                    entityId: senderWallet.wllt_id,
+                    newVal: { amount: parseFloat(amount) },
+                    ip: _ctx.ip,
+                    userAgent: _ctx.userAgent
+                });
                 return df.formatSucessRes(req, res, {
                     transaction_id: transactionResults.insertId,
                     amount: parseFloat(amount),

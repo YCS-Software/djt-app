@@ -14,5 +14,5 @@ const cntxtDtls = "liveSessionsMdl";
 ******************************************************************************/
 exports.listMdl = function () {
     const QRY = `SELECT s.sssn_id AS id, st.sttn_nm_tx AS stationName, u.nm_tx AS driverName, s.enrgy_cnsmd_kwh AS energy, s.prgrss_pct AS progress, s.strt_ts AS startTime, s.sttus_cd AS status FROM sssn_lst_t s LEFT JOIN sttn_lst_t st ON st.sttn_id=s.sttn_id LEFT JOIN usr_lst_t u ON u.usr_id=s.usr_id WHERE s.sttus_cd='active' ORDER BY s.sssn_id DESC`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, [], cntxtDtls);
 };

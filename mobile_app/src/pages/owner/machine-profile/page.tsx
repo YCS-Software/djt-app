@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ownerService } from '../../../services/api';
 import type { MachineProfile } from '../../../services/api/ownerService';
-import MachineQrModal from '../../../components/MachineQrModal';
+import ConnectorQrModal from '../../../components/ConnectorQrModal';
 import {
   ArrowLeft, Power, Plug, Zap, Loader2, IndianRupee, Receipt, Clock, BarChart3, Tag, Activity,
   Hash, Wifi, WifiOff, Copy, Check, Cpu, Building2, CalendarDays, TrendingUp, TrendingDown, Settings, QrCode,
@@ -43,7 +43,7 @@ export default function MachineProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState('');
-  const [showQr, setShowQr] = useState(false);
+  const [qrConnectorId, setQrConnectorId] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -116,9 +116,7 @@ export default function MachineProfilePage() {
           </span>
           <span className={`owner-mstatus owner-status-${m.status}`}>{MACHINE_STATUS[m.status] || m.status}</span>
         </div>
-        <button className="owner-btn owner-btn-primary owner-btn-block owner-qr-cta" onClick={() => setShowQr(true)}>
-          <QrCode size={16} /> Download QR code
-        </button>
+        <p className="owner-field-hint owner-qr-cta">Each connector below has its own QR — tap the QR icon to download it.</p>
       </div>
 
       {/* Performance — Today */}
@@ -278,12 +276,15 @@ export default function MachineProfilePage() {
             <div key={c.connector_id} className="owner-info-row">
               <span className="owner-info-icon"><Plug size={15} /></span>
               <div className="owner-info-main">
-                <div className="owner-info-value">{c.name || c.type}</div>
+                <div className="owner-info-value">{c.code || c.name || c.type}</div>
                 <div className="owner-info-label">{c.type}{c.power ? ` · ${c.power}` : ''}</div>
               </div>
               <span className={`owner-chip ${c.is_available ? 'owner-status-available' : 'owner-status-in_use'}`}>
                 {c.is_available ? 'Available' : 'In use'}
               </span>
+              <button className="owner-conn-qr-btn lg" title="Connector QR" onClick={() => setQrConnectorId(c.connector_id)}>
+                <QrCode size={15} />
+              </button>
             </div>
           ))}
         </div>
@@ -291,7 +292,7 @@ export default function MachineProfilePage() {
 
       <div className="owner-bottom-space" />
 
-      {showQr && <MachineQrModal machineId={m.machine_id} onClose={() => setShowQr(false)} />}
+      {qrConnectorId != null && <ConnectorQrModal connectorId={qrConnectorId} onClose={() => setQrConnectorId(null)} />}
     </div>
   );
 }

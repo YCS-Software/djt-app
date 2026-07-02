@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { X, AlertTriangle, Loader2 } from 'lucide-react';
+import { useBackHandler } from '../services/backHandler';
 import './QrScanModal.css';
 
 const READER_ID = 'djt-qr-reader';
@@ -19,6 +20,9 @@ export default function QrScanModal({ onResult, onClose }: { onResult: (token: s
   const [notice, setNotice] = useState('');
   const [starting, setStarting] = useState(true);
 
+  // Hardware Back closes the scanner (and stops the camera via unmount) (F7)
+  useBackHandler(true, onClose);
+
   useEffect(() => {
     let cancelled = false;
     const scanner = new Html5Qrcode(READER_ID, { verbose: false });
@@ -27,7 +31,11 @@ export default function QrScanModal({ onResult, onClose }: { onResult: (token: s
     const onDecoded = (text: string) => {
       if (handledRef.current) return;
       const value = (text || '').trim();
-      if (!value.startsWith(TOKEN_PREFIX)) {
+      // Accept the signed app token (preferred) OR a sticker/QR that encodes the
+      // charger ws-url or a bare DJT OCPP id — the server resolves all three.
+      const isToken = value.startsWith(TOKEN_PREFIX);
+      const isWsOrOcpp = /\/ocpp\/[^/?#\s]+/i.test(value) || /^DJT-\d+-CP\d+-[A-Za-z0-9]+$/i.test(value);
+      if (!isToken && !isWsOrOcpp) {
         setNotice('Not a DJT charger code — scan the QR on the machine');
         return;
       }

@@ -7,23 +7,55 @@ const sqldb = require(appRoot + '/config/db.config');
 const sql = sqldb.sql;
 
 /**
- * Execute a single SQL query
+ * Execute a single SQL query, optionally with bind parameters.
+ *
+ * SECURITY: pass user-supplied values through `params` (an array bound to `?`
+ * placeholders in `Qry`) rather than concatenating them into the SQL string.
+ * The underlying pool uses prepared statements (mysql2 `execute`), which both
+ * prevents SQL injection and disallows stacked/multi statements.
+ *
  * @param {Object} ConPool - Connection pool object
- * @param {String} Qry - SQL query string
- * @param {Function} callback - Optional callback function
- * @returns {Promise} - Promise resolving to query results
+ * @param {String} Qry - SQL query string (use `?` placeholders for values)
+ * @param {Array}  [params] - Bind parameter values for the `?` placeholders.
+ *                            For backwards compatibility a legacy context string
+ *                            or a callback function may still be passed here and
+ *                            is treated as "no params".
+ * @param {String|Function} [cntxtDtls] - Calling-context label used in error
+ *                            logs (e.g. the model name). A callback function may
+ *                            also be passed here for legacy callers.
+ * @returns {Promise} - Promise resolving to query results (when no callback)
  */
-const execQuery = function(ConPool, Qry, callback) {
+const execQuery = function(ConPool, Qry, params, cntxtDtls) {
+    // Backwards compatibility:
+    //  - execQuery(ConPool, Qry, callback)
+    //  - execQuery(ConPool, Qry, contextString)            (legacy: 3rd arg was context)
+    //  - execQuery(ConPool, Qry, params, callback)
+    //  - execQuery(ConPool, Qry, params, contextString)    (current convention)
+    let callback;
+    if (typeof params === 'function') {
+        callback = params;
+        params = undefined;
+    }
+    if (typeof cntxtDtls === 'function') {
+        callback = cntxtDtls;
+        cntxtDtls = undefined;
+    }
+    // A non-array, non-callback 3rd arg is a legacy context string.
+    if (cntxtDtls === undefined && typeof params === 'string') {
+        cntxtDtls = params;
+    }
+    const values = Array.isArray(params) ? params : undefined;
+    const ctx = cntxtDtls ? `[${cntxtDtls}] ` : '';
     const queryType = Qry.trim().split(' ')[0].toUpperCase();
-    
+
     if (callback && typeof callback === "function") {
         // Callback-based execution
-        ConPool.query(Qry)
+        ConPool.query(Qry, values)
             .then(rows => {
                 callback(false, rows);
             })
             .catch(err => {
-                console.error(`[DB] Connection error (${queryType}):`, err);
+                console.error(`${ctx}[DB] Connection error (${queryType}):`, err);
                 callback(true, null);
             });
     } else {
@@ -32,35 +64,35 @@ const execQuery = function(ConPool, Qry, callback) {
             // Check for DDL statements
             if (containsDDL(Qry)) {
                 console.error('[DB] DDL Statement found in query. Rejecting for security reasons.');
-                reject({ 
-                    err_status: 600, 
-                    err_message: 'DDL Statement not allowed' 
+                reject({
+                    err_status: 600,
+                    err_message: 'DDL Statement not allowed'
                 });
                 return;
             }
-            
+
             try {
                 const qry_str = removeExtraSpacesExceptWithinQuotes(Qry);
                 const operation = getOperationFromSQL(qry_str);
-                
+
                 // Execute the query
-                ConPool.query(Qry)
+                ConPool.query(Qry, values)
                     .then(rows => {
                         resolve(rows);
                     })
                     .catch(err => {
-                        console.error('[DB] Query error:', err);
-                        console.error('[DB] Failed query:', Qry.substring(0, 200));
-                        reject({ 
-                            err_status: 700, 
-                            err_message: err.message || 'Database query error' 
+                        console.error(`${ctx}[DB] Query error:`, err);
+                        console.error(`${ctx}[DB] Failed query:`, Qry.substring(0, 200));
+                        reject({
+                            err_status: 700,
+                            err_message: err.message || 'Database query error'
                         });
                     });
             } catch (err) {
-                console.error('[DB] Error processing query:', err);
-                reject({ 
-                    err_status: 700, 
-                    err_message: 'Error processing query: ' + (err.message || err) 
+                console.error(`${ctx}[DB] Error processing query:`, err);
+                reject({
+                    err_status: 700,
+                    err_message: 'Error processing query: ' + (err.message || err)
                 });
             }
         });

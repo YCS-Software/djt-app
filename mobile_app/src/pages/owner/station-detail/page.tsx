@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ownerService } from '../../../services/api';
 import type { OwnerStation, OwnerMachine, PowerOption, AddMachineResult, StationAnalytics } from '../../../services/api/ownerService';
 import Dropdown from '../../../components/Dropdown';
-import MachineQrModal from '../../../components/MachineQrModal';
+import ConnectorQrModal from '../../../components/ConnectorQrModal';
 import {
   ArrowLeft, Cpu, Plug, PlusCircle, MapPin, Zap, Loader2, X, IndianRupee, Star, Power,
   Copy, Check, Wifi, WifiOff, CheckCircle2, Hash, RefreshCw,
@@ -59,13 +59,13 @@ export default function StationDetailPage({ mode = 'manage' }: { mode?: 'profile
 
   // modals
   const [machineModal, setMachineModal] = useState(false);
-  const [qrMachineId, setQrMachineId] = useState<number | null>(null);
+  const [qrConnectorId, setQrConnectorId] = useState<number | null>(null);
   const [connectorFor, setConnectorFor] = useState<OwnerMachine | null>(null);
   const [addedMachine, setAddedMachine] = useState<AddMachineResult | null>(null);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState('');
 
-  const [mForm, setMForm] = useState<{ name: string; machine_type: string; mchn_pwr_id: string; serial_no: string }>({ name: '', machine_type: '', mchn_pwr_id: '', serial_no: '' });
+  const [mForm, setMForm] = useState<{ name: string; machine_type: string; mchn_pwr_id: string; serial_no: string; connector_count: number }>({ name: '', machine_type: '', mchn_pwr_id: '', serial_no: '', connector_count: 2 });
   const [cForm, setCForm] = useState({ connector_type: 'CCS2', power: '', name: '' });
 
   const load = async () => {
@@ -133,7 +133,7 @@ export default function StationDetailPage({ mode = 'manage' }: { mode?: 'profile
   };
 
   const openMachineModal = () => {
-    setMForm({ name: `Charger ${machines.length + 1}`, machine_type: '', mchn_pwr_id: '', serial_no: '' });
+    setMForm({ name: `Charger ${machines.length + 1}`, machine_type: '', mchn_pwr_id: '', serial_no: '', connector_count: 2 });
     setError('');
     if (powerOptions.length === 0 && !powerLoading) loadPowerOptions();
     setMachineModal(true);
@@ -150,7 +150,7 @@ export default function StationDetailPage({ mode = 'manage' }: { mode?: 'profile
         name: mForm.name.trim(),
         serial_no: mForm.serial_no.trim() || undefined,
         mchn_pwr_id: Number(mForm.mchn_pwr_id),
-        connector_count: 2,
+        connector_count: mForm.connector_count,
       });
       setMachineModal(false);
       setAddedMachine(result); // show OCPP id + WS URL panel
@@ -499,14 +499,14 @@ export default function StationDetailPage({ mode = 'manage' }: { mode?: 'profile
               <div className="owner-connectors">
                 {(m.connectors || []).map((c) => (
                   <span key={c.connector_id} className="owner-connector-pill">
-                    <Plug size={11} /> {c.type}{c.power ? ` · ${c.power}` : ''}
+                    <Plug size={11} /> {c.code || c.type}{c.power ? ` · ${c.power}` : ''}
+                    <button className="owner-conn-qr-btn" title="Connector QR" onClick={() => setQrConnectorId(c.connector_id)}>
+                      <QrCode size={12} />
+                    </button>
                   </span>
                 ))}
                 <button className="owner-add-connector" onClick={() => setConnectorFor(m)}>
                   <PlusCircle size={13} /> Connector
-                </button>
-                <button className="owner-qr-mini" onClick={() => setQrMachineId(m.machine_id)}>
-                  <QrCode size={13} /> QR
                 </button>
               </div>
             </div>
@@ -569,12 +569,29 @@ export default function StationDetailPage({ mode = 'manage' }: { mode?: 'profile
             </div>
 
             <div className="owner-field">
+              <label><Plug size={12} /> Number of connectors *</label>
+              <div className="owner-seg">
+                {[1, 2].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    className={`owner-seg-btn${mForm.connector_count === n ? ' active' : ''}`}
+                    onClick={() => setMForm({ ...mForm, connector_count: n })}
+                  >
+                    {n} connector{n > 1 ? 's' : ''}
+                  </button>
+                ))}
+              </div>
+              <p className="owner-field-hint">Each connector gets its own code &amp; QR (1–2 per machine).</p>
+            </div>
+
+            <div className="owner-field">
               <label>Serial no. <span className="owner-optional">(optional)</span></label>
               <input className="owner-input" value={mForm.serial_no} onChange={(e) => setMForm({ ...mForm, serial_no: e.target.value })} placeholder="Manufacturer serial" />
             </div>
 
             <div className="owner-note">
-              <CheckCircle2 size={14} /> OCPP ID, WebSocket URL &amp; <strong>2 connectors</strong> are generated automatically.
+              <CheckCircle2 size={14} /> OCPP ID &amp; WebSocket URL are auto-generated. <strong>{mForm.connector_count} connector{mForm.connector_count > 1 ? 's' : ''}</strong> will be created, each with its own code &amp; QR.
             </div>
 
             <button className="owner-btn owner-btn-primary owner-btn-block" onClick={submitMachine} disabled={saving}>
@@ -610,8 +627,13 @@ export default function StationDetailPage({ mode = 'manage' }: { mode?: 'profile
               </button>
             </div>
 
-            <button className="owner-btn owner-btn-ghost owner-btn-block" onClick={() => { const id = addedMachine.machine_id; setAddedMachine(null); setQrMachineId(id); }}>
-              <QrCode size={16} /> Download QR code
+            <button className="owner-btn owner-btn-ghost owner-btn-block" onClick={() => {
+              const mm = machines.find((x) => x.machine_id === addedMachine.machine_id);
+              const cid = mm?.connectors?.[0]?.connector_id;
+              setAddedMachine(null);
+              if (cid) setQrConnectorId(cid);
+            }}>
+              <QrCode size={16} /> Connector QR codes
             </button>
             <button className="owner-btn owner-btn-primary owner-btn-block" onClick={() => setAddedMachine(null)}>Done</button>
           </div>
@@ -653,8 +675,8 @@ export default function StationDetailPage({ mode = 'manage' }: { mode?: 'profile
         </div>
       )}
 
-      {/* Machine QR download modal */}
-      {qrMachineId != null && <MachineQrModal machineId={qrMachineId} onClose={() => setQrMachineId(null)} />}
+      {/* Connector QR download modal (per connector) */}
+      {qrConnectorId != null && <ConnectorQrModal connectorId={qrConnectorId} onClose={() => setQrConnectorId(null)} />}
     </div>
   );
 }

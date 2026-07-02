@@ -4,6 +4,7 @@ const std = require(appRoot + '/utils/standardMessages');
 const config = require(appRoot + '/config/config');
 const df = require(appRoot + '/utils/dateFormatUtil');
 const authAppMdl = require('../models/authAppMdl');
+const audit = require(appRoot + '/utils/auditUtil');
 const cntxtDtls = "authAppCtrl";
 
 // JWT secret/expiry used for the web admin email+password flow.
@@ -72,7 +73,18 @@ exports.sendOTP = function(req, res) {
                 // Log OTP for development
                 console.log(`\n📱 OTP for ${phonenumber}: ${otp}`);
                 console.log(`⏰ Expires in: ${expiryMinutes} minutes\n`);
-                
+
+                const ctx = audit.reqCtx(req);
+                audit.writeAudit({
+                    userId: user.usr_id,
+                    action: 'otp_sent',
+                    entityType: 'user',
+                    entityId: user.usr_id,
+                    newVal: { phone: '******' + phonenumber.slice(-4), otpID: otpResults.insertId },
+                    ip: ctx.ip,
+                    userAgent: ctx.userAgent
+                });
+
                 return df.formatSucessRes(req, res, {
                     otpID: otpResults.insertId,
                     usr_id: user.usr_id,
@@ -136,7 +148,17 @@ exports.sendSignupOTP = function(req, res) {
                 // Log OTP for development
                 console.log(`\n📱 Signup OTP for ${phonenumber}: ${otp}`);
                 console.log(`⏰ Expires in: ${expiryMinutes} minutes\n`);
-                
+
+                const ctx = audit.reqCtx(req);
+                audit.writeAudit({
+                    userId: null,
+                    action: 'otp_sent',
+                    entityType: 'user',
+                    newVal: { phone: '******' + phonenumber.slice(-4), otpID: otpResults.insertId },
+                    ip: ctx.ip,
+                    userAgent: ctx.userAgent
+                });
+
                 return df.formatSucessRes(req, res, {
                     otpID: otpResults.insertId,
                     usr_id: null,
@@ -213,6 +235,17 @@ exports.verifyOTP = function(req, res) {
                                 { expiresIn: config.jwt.expiresIn || '30d' }
                             );
                             
+                            const ctx = audit.reqCtx(req);
+                            audit.writeAudit({
+                                userId: user.usr_id,
+                                action: 'login',
+                                entityType: 'user',
+                                entityId: user.usr_id,
+                                newVal: { method: 'otp', userType: user.usr_typ_cd },
+                                ip: ctx.ip,
+                                userAgent: ctx.userAgent
+                            });
+
                             return res.json({
                                 status: std.message["SUCCESS"].code,
                                 message: 'Login successful',
@@ -311,6 +344,15 @@ exports.login = function(req, res) {
             const user = results && results.length > 0 ? results[0] : null;
 
             if (!user || !user.pswd_hash_tx) {
+                const ctx = audit.reqCtx(req);
+                audit.writeAudit({
+                    userId: null,
+                    action: 'login_failed',
+                    entityType: 'user',
+                    newVal: { email: email, reason: 'user not found' },
+                    ip: ctx.ip,
+                    userAgent: ctx.userAgent
+                });
                 return res.status(std.message["UNAUTHORIZED"].code).json({
                     status: std.message["UNAUTHORIZED"].code,
                     error: 'Invalid email or password',
@@ -321,6 +363,15 @@ exports.login = function(req, res) {
             // SHA1 (hex) comparison — matches pswd_hash_tx storage.
             const hash = crypto.createHash('sha1').update(password).digest('hex');
             if (hash !== user.pswd_hash_tx) {
+                const ctx = audit.reqCtx(req);
+                audit.writeAudit({
+                    userId: null,
+                    action: 'login_failed',
+                    entityType: 'user',
+                    newVal: { email: email, reason: 'invalid password' },
+                    ip: ctx.ip,
+                    userAgent: ctx.userAgent
+                });
                 return res.status(std.message["UNAUTHORIZED"].code).json({
                     status: std.message["UNAUTHORIZED"].code,
                     error: 'Invalid email or password',
@@ -345,6 +396,17 @@ exports.login = function(req, res) {
 
             const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_EXPIRES_IN });
             const refreshToken = jwt.sign(payload, JWT_SECRET, { expiresIn: REFRESH_EXPIRES_IN });
+
+            const ctx = audit.reqCtx(req);
+            audit.writeAudit({
+                userId: user.usr_id,
+                action: 'login',
+                entityType: 'user',
+                entityId: user.usr_id,
+                newVal: { method: 'password', console: 'web' },
+                ip: ctx.ip,
+                userAgent: ctx.userAgent
+            });
 
             return res.status(std.message["SUCCESS"].code).json({
                 status: std.message["SUCCESS"].code,
@@ -434,6 +496,16 @@ exports.refresh = function(req, res) {
         };
 
         const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_EXPIRES_IN });
+
+        const ctx = audit.reqCtx(req);
+        audit.writeAudit({
+            userId: decoded.userId,
+            action: 'token_refresh',
+            entityType: 'user',
+            entityId: decoded.userId,
+            ip: ctx.ip,
+            userAgent: ctx.userAgent
+        });
 
         return res.status(std.message["SUCCESS"].code).json({
             status: std.message["SUCCESS"].code,

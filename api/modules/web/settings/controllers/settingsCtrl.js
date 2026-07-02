@@ -7,6 +7,7 @@
  */
 
 const mdl = require('../models/settingsMdl');
+const audit = require(appRoot + '/utils/auditUtil');
 
 exports.getByScope = function(req, res) {
     const scope = req.params.scope || '';
@@ -31,7 +32,11 @@ exports.saveByScope = function(req, res) {
     const body = req.body || {};
     const entries = Object.keys(body).map(k => ({ scope, key: k, value: body[k] }));
     Promise.all(entries.map(e => mdl.saveByScopeMdl(e)))
-        .then(() => res.status(200).json({ status: 200, message: 'Settings saved' }))
+        .then(() => {
+            const ctx = audit.reqCtx(req);
+            audit.writeAudit({ userId: ctx.userId, action: 'setting_update', entityType: 'setting', newVal: { scope: scope, keys: Object.keys(body) }, ip: ctx.ip, userAgent: ctx.userAgent });
+            res.status(200).json({ status: 200, message: 'Settings saved' });
+        })
         .catch(e => {
             console.error('[settings] saveByScope', e);
             res.status(500).json({ status: 500, error: 'Failed to save settings' });
