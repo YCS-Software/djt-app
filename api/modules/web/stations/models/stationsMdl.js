@@ -30,3 +30,18 @@ exports.getByIdMdl = function(data) {
     console.log('[getByIdMdl] Query:', QRY_TO_EXEC);
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
 };
+
+/*****************************************************************************
+* Function      : createMdl
+* Description   : Register a charger/machine (mchn_lst_t) at a station.
+* Arguments     : data { stationId, name, serial, ocppId, type, power,
+*                        connectors, status }
+******************************************************************************/
+exports.createMdl = function(data) {
+    const esc = (v) => sqldb.MySQLConPool.escape(v == null ? '' : v);
+    const sttnId = parseInt(data.stationId, 10) || 0;
+    const connectors = parseInt(data.connectors, 10) || 1;
+    const QRY = `INSERT INTO mchn_lst_t (sttn_id, mchn_nm_tx, mchn_srl_no_tx, ocpp_id_tx, mchn_typ_cd, max_pwr_tx, ttl_cnntrs_nbr, sttus_cd, a_in, i_ts)
+        VALUES (${sttnId}, ${esc(data.name)}, ${esc(data.serial)}, ${esc(data.ocppId)}, ${esc(data.type || 'DC')}, ${esc(data.power)}, ${connectors}, ${esc(data.status || 'available')}, 1, NOW())`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+};

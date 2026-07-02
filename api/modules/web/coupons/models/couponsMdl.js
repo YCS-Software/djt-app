@@ -29,3 +29,18 @@ exports.getByIdMdl = function(data) {
 
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, cntxtDtls);
 };
+
+/*****************************************************************************
+* Function      : createMdl
+* Description   : Insert a discount offer / promo code into offr_lst_t.
+* Arguments     : data { code, title, discountType, discountValue, minAmount,
+*                        startDate, endDate, maxUses }
+******************************************************************************/
+exports.createMdl = function(data) {
+    const esc = (v) => sqldb.MySQLConPool.escape(v == null ? '' : v);
+    const num = (v) => (v === '' || v == null || isNaN(Number(v)) ? 'NULL' : Number(v));
+    const dte = (v) => (v ? sqldb.MySQLConPool.escape(v) : 'NULL');
+    const QRY = `INSERT INTO offr_lst_t (offr_cd, ttl_tx, dscnt_typ_cd, dscnt_vl, mn_trxn_amt, strt_dte, end_dte, mx_uses_nbr, a_in, i_ts)
+        VALUES (${esc(data.code)}, ${esc(data.title)}, ${esc(data.discountType || 'percentage')}, ${num(data.discountValue)}, ${num(data.minAmount)}, ${dte(data.startDate)}, ${dte(data.endDate)}, ${num(data.maxUses)}, 1, NOW())`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY, cntxtDtls);
+};

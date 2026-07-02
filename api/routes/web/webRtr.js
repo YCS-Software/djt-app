@@ -50,6 +50,9 @@ router.use('/coupons', require('./couponsRtr'));
 router.use('/reports', require('./reportsRtr'));
 router.use('/disputes', require('./disputesRtr'));
 router.use('/stations', require('./stationsRtr'));
+// Charging sessions (real sssn_lst_t data) and tariffs (no backing table yet).
+router.use('/sessions', require('./sessionsRtr'));
+router.use('/tariffs', require('./tariffsRtr'));
 // Bulk remote commands resolve at POST /web/stations/bulk-remote
 router.use('/stations', require('./bulkRemoteRtr'));
 

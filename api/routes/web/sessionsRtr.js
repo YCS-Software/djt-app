@@ -1,9 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const ctrl = require('../../modules/web/coupons/controllers/couponsCtrl');
+const ctrl = require('../../modules/web/sessions/controllers/sessionsCtrl');
 
 router.get('/', ctrl.list);
 router.get('/:id', ctrl.get);
-router.post('/', ctrl.create);
 
 module.exports = router;

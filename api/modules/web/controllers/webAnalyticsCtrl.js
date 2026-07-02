@@ -46,20 +46,43 @@ const avg = (series) => {
 ******************************************************************************/
 exports.getAnalytics = function(req, res) {
     const fnm = "getAnalytics";
-    const days = parseInt(req.query.days, 10) || 7;
+
+    // ── Dashboard filters ────────────────────────────────────────────────────
+    // Time Range: 'today' | '7d' | '30d' | 'all' (numeric ?days= also honored).
+    // seriesDays = x-axis buckets for the charts; windowDays = date window for
+    // aggregate session KPIs (>= 36500 means all-time / no date filter).
+    const range = String(req.query.range || '').toLowerCase();
+    let windowDays;
+    let seriesDays;
+    if (range === 'today') { windowDays = 1; seriesDays = 1; }
+    else if (range === '7d') { windowDays = 7; seriesDays = 7; }
+    else if (range === '30d') { windowDays = 30; seriesDays = 30; }
+    else if (range === 'all') { windowDays = 36500; seriesDays = 30; }
+    else {
+        const d = parseInt(req.query.days, 10);
+        windowDays = seriesDays = (Number.isFinite(d) && d > 0) ? d : 7;
+    }
+
+    // Partner Organization: owner user id, or null for "All Organizations".
+    const rawPartner = req.query.partnerId;
+    const partnerId = rawPartner && String(rawPartner).toLowerCase() !== 'all'
+        ? (parseInt(rawPartner, 10) || null)
+        : null;
+
+    const opts = { seriesDays: seriesDays, windowDays: windowDays, partnerId: partnerId };
 
     Promise.all([
-        mdl.getSummaryMdl(),
-        mdl.getUptimeMdl(),
-        mdl.getChargeTimeSeriesMdl({ days: days }),
-        mdl.getConsumptionSeriesMdl({ days: days }),
-        mdl.getFailedSeriesMdl({ days: days }),
-        mdl.getSessionCountMdl(),
-        mdl.getChargerDowntimeMdl(),
-        mdl.getStationsStatusMdl()
+        mdl.getSummaryMdl(opts),
+        mdl.getUptimeMdl(opts),
+        mdl.getChargeTimeSeriesMdl(opts),
+        mdl.getConsumptionSeriesMdl(opts),
+        mdl.getFailedSeriesMdl(opts),
+        mdl.getSessionCountMdl(opts),
+        mdl.getChargerDowntimeMdl(opts),
+        mdl.getStationsStatusMdl(opts)
     ])
     .then(function([summaryRows, uptimeRows, chargeRows, consRows, failRows, scRows, dtRows, statusRows]) {
-        const skeleton = lastNDays(days);
+        const skeleton = lastNDays(seriesDays);
         const s = (summaryRows && summaryRows[0]) || {};
         const sc = (scRows && scRows[0]) || {};
         const dt = (dtRows && dtRows[0]) || {};
