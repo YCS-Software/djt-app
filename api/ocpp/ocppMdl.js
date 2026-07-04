@@ -79,6 +79,40 @@ exports.setConnectorAvailabilityMdl = function(machineId, isAvailable) {
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
 };
 
+// --- Per-connector status (drives per-connector plug-in/out) ---
+
+// All active connectors of a machine, in OCPP connectorId order (1-based).
+exports.getMachineConnectorsMdl = function(machineId) {
+    const QRY_TO_EXEC = `SELECT cnntr_id, cnntr_cd_tx FROM cnntr_lst_t
+        WHERE mchn_id = ? AND a_in = 1 ORDER BY cnntr_id ASC`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, [numVal(machineId)], cntxtDtls);
+};
+
+// Update ONE connector's status + availability (from its StatusNotification).
+exports.updateConnectorStatusMdl = function(connectorId, statusCode, isAvailable) {
+    const QRY_TO_EXEC = `UPDATE cnntr_lst_t SET cnntr_sttus_cd = ?, is_avlbl_in = ?
+        WHERE cnntr_id = ?`;
+    const PARAMS = [escVal(statusCode), isAvailable ? 1 : 0, numVal(connectorId)];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+// Roll the machine's status up from its connectors (any faulted → faulted,
+// any occupied/charging → in_use, else available). Keeps machine badge sane.
+exports.recalcMachineStatusMdl = function(machineId) {
+    const QRY_TO_EXEC = `
+        UPDATE mchn_lst_t m
+        SET m.sttus_cd = (
+            SELECT CASE
+                WHEN SUM(c.cnntr_sttus_cd = 'faulted') > 0 THEN 'faulted'
+                WHEN SUM(c.cnntr_sttus_cd IN ('occupied', 'charging', 'reserved')) > 0 THEN 'in_use'
+                ELSE 'available'
+            END
+            FROM cnntr_lst_t c WHERE c.mchn_id = m.mchn_id AND c.a_in = 1
+        ), m.u_ts = NOW()
+        WHERE m.mchn_id = ? AND m.sttus_cd NOT IN ('maintenance', 'offline')`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, [numVal(machineId)], cntxtDtls);
+};
+
 // Resolve an OCPP idToken to an app user.
 // Demo mapping: the idToken value matches a user's phone number, or a numeric user id.
 exports.getUserByIdTokenMdl = function(token) {
@@ -122,6 +156,32 @@ exports.getSessionByOcppTxnMdl = function(ocppTxnId) {
         ORDER BY sssn_id DESC LIMIT 1`;
     const PARAMS = [escVal(ocppTxnId)];
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+// A recent app-initiated session on this connector that hasn't been linked to an
+// OCPP transaction yet — so a RemoteStart's TransactionEvent updates it instead
+// of creating a duplicate. Matches active sessions started in the last 5 minutes.
+exports.getUnlinkedSessionForConnectorMdl = function(connectorId) {
+    const QRY_TO_EXEC = `SELECT * FROM sssn_lst_t
+        WHERE cnntr_id = ? AND a_in = 1 AND sttus_cd = 'active'
+          AND (ocpp_txn_id_tx IS NULL OR ocpp_txn_id_tx = '')
+          AND i_ts >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+        ORDER BY sssn_id DESC LIMIT 1`;
+    const PARAMS = [numVal(connectorId)];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+// Link an existing session to the charger's OCPP transaction id.
+exports.attachOcppTxnMdl = function(sessionId, ocppTxnId) {
+    const QRY_TO_EXEC = `UPDATE sssn_lst_t SET ocpp_txn_id_tx = ?, u_ts = NOW() WHERE sssn_id = ?`;
+    const PARAMS = [escVal(ocppTxnId), numVal(sessionId)];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+// Station owner (for splitting the settlement when a charger ends a prepaid txn).
+exports.getStationOwnerMdl = function(stationId) {
+    const QRY_TO_EXEC = `SELECT ownr_usr_id FROM sttn_lst_t WHERE sttn_id = ? LIMIT 1`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, [numVal(stationId)], cntxtDtls);
 };
 
 // Live progress update during a transaction

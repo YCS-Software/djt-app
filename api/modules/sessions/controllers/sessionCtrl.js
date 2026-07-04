@@ -14,25 +14,67 @@ const ocppServer = require(appRoot + '/api/ocpp/ocppServer');
 const ledgerService = require(appRoot + '/api/modules/ledger/services/ledgerService');
 const cntxtDtls = "sessionCtrl";
 
+const config = require(appRoot + '/config/config');
+
 // A charger is "online" only while it holds a live OCPP WebSocket to us.
 function isChargerOnline(ocppId) {
     return !!(ocppId && ocppServer.getConnection(ocppId));
 }
 
+// Command the charger to START a transaction on a specific EVSE (real relay ON).
+// Returns { attempted, accepted, message }. Only attempts when remote control is
+// enabled and the charger holds a live socket.
+async function remoteStartCharger(ocppId, evseId, userId) {
+    if (!config.ocpp || config.ocpp.remoteControl === false) return { attempted: false };
+    const conn = ocppServer.getConnection(ocppId);
+    if (!conn) return { attempted: false }; // offline is guarded before we reach here
+    try {
+        const result = await ocppServer.sendCall(conn, 'RequestStartTransaction', {
+            remoteStartId: Math.floor(Date.now() % 100000),
+            idToken: { idToken: String(userId), type: 'Central' },
+            evseId: Number(evseId) || 1,
+        });
+        const accepted = !!(result && result.status === 'Accepted');
+        return {
+            attempted: true,
+            accepted,
+            message: accepted ? null
+                : (result && result.statusInfo && result.statusInfo.additionalInfo)
+                || 'The charger did not accept the start request. Please try again.',
+        };
+    } catch (e) {
+        return { attempted: true, accepted: false, message: 'The charger did not respond. Please try again.' };
+    }
+}
+
+// Command the charger to STOP a transaction (real relay OFF). Best-effort.
+async function remoteStopCharger(ocppId, transactionId) {
+    if (!config.ocpp || config.ocpp.remoteControl === false) return { attempted: false };
+    const conn = ocppServer.getConnection(ocppId);
+    if (!conn || !transactionId) return { attempted: false };
+    try {
+        const result = await ocppServer.sendCall(conn, 'RequestStopTransaction', { transactionId: String(transactionId) });
+        return { attempted: true, accepted: !!(result && result.status === 'Accepted') };
+    } catch (e) {
+        return { attempted: true, accepted: false };
+    }
+}
+
 /**
- * Derive a human connector state from live OCPP-updated fields:
+ * Derive a human connector state from THIS connector's live status
+ * (cnntr_sttus_cd, set per-connector from OCPP StatusNotification):
  *  offline   – charger not connected to the CSMS socket
- *  faulted / unavailable – charger error / maintenance
- *  charging  – an active transaction is metering on this machine
+ *  faulted / unavailable – connector error / reserved / out of service
+ *  charging  – this connector is charging (or its session is active)
  *  plugged   – cable connected (Occupied) but not yet charging
  *  unplugged – online and free (Available)
  */
-function deriveConnectorState(online, mchnStatus, sssnStatus) {
+function deriveConnectorState(online, connStatus, sssnStatus) {
     if (!online) return 'offline';
-    if (mchnStatus === 'faulted') return 'faulted';
-    if (mchnStatus === 'maintenance') return 'unavailable';
-    if (sssnStatus === 'active' && mchnStatus === 'in_use') return 'charging';
-    if (mchnStatus === 'in_use') return 'plugged';
+    if (connStatus === 'faulted') return 'faulted';
+    if (connStatus === 'unavailable' || connStatus === 'reserved') return 'unavailable';
+    if (connStatus === 'charging' || sssnStatus === 'active') return 'charging';
+    if (connStatus === 'occupied') return 'plugged';
     return 'unplugged';
 }
 
@@ -57,10 +99,13 @@ exports.getMachineStatus = function(req, res) {
                 });
             }
             const online = isChargerOnline(m.ocpp_id_tx);
+            // machine-level fallback: map machine status into a connector status
+            const asConn = m.mchn_sttus === 'in_use' ? 'occupied'
+                : m.mchn_sttus === 'maintenance' ? 'unavailable' : m.mchn_sttus;
             return df.formatSucessRes(req, res, {
                 machine_online: online,
                 machine_status: m.mchn_sttus,
-                connector_state: deriveConnectorState(online, m.mchn_sttus, null),
+                connector_state: deriveConnectorState(online, asConn, null),
                 available_connectors: Number(m.available_connectors) || 0,
                 total_connectors: Number(m.total_connectors) || 0
             }, cntxtDtls, fnm, {});
@@ -103,12 +148,50 @@ exports.getSessionLive = function(req, res) {
                 energy_consumed: energy,
                 current_cost: cost,
                 progress: Number(r.prgrss_pct) || 0,
-                connector_state: deriveConnectorState(online, r.mchn_sttus, r.sssn_sttus),
+                // per-connector: use THIS session's connector status
+                connector_state: deriveConnectorState(online, r.cnntr_sttus_cd, r.sssn_sttus),
                 machine_online: online
             }, cntxtDtls, fnm, {});
         })
         .catch(function(error) {
             console.error('[sessionCtrl] getSessionLive error:', error);
+            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+        });
+};
+
+/**
+ * GET /sessions/connector/:connectorId/status
+ * Live status of ONE connector (the exact plug the customer scanned) — drives
+ * the per-connector "plug in" gate on the customer app.
+ */
+exports.getConnectorStatus = function(req, res) {
+    const fnm = "getConnectorStatus";
+    const connectorId = parseInt(req.params.connectorId);
+    if (!connectorId) {
+        return res.status(std.message["BAD_REQUEST"].code).json({
+            status: std.message["BAD_REQUEST"].code, message: 'Connector ID is required', data: null
+        });
+    }
+    sessionMdl.getConnectorLiveMdl({ connectorId })
+        .then(function(rows) {
+            const c = rows && rows[0];
+            if (!c) {
+                return res.status(std.message["NOT_FOUND"].code).json({
+                    status: std.message["NOT_FOUND"].code, message: 'Connector not found', data: null
+                });
+            }
+            const online = isChargerOnline(c.ocpp_id_tx);
+            return df.formatSucessRes(req, res, {
+                connector_id: c.cnntr_id,
+                code: c.cnntr_cd_tx || null,
+                type: c.cnntr_typ_cd,
+                connector_status: c.cnntr_sttus_cd,
+                connector_state: deriveConnectorState(online, c.cnntr_sttus_cd, null),
+                machine_online: online
+            }, cntxtDtls, fnm, {});
+        })
+        .catch(function(error) {
+            console.error('[sessionCtrl] getConnectorStatus error:', error);
             return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
         });
 };
@@ -188,7 +271,8 @@ exports.scanQr = function(req, res) {
                         type: r.cnntr_typ_cd,
                         name: r.cnntr_nm_tx,
                         power: r.pwr_tx,
-                        is_available: r.is_avlbl_in === 1
+                        is_available: r.is_avlbl_in === 1,
+                        status: r.cnntr_sttus_cd || 'available'
                     };
                 });
 
@@ -238,7 +322,9 @@ exports.scanQr = function(req, res) {
                     price_per_kwh: parseFloat(head.prce_per_kwh_amt) || 0
                 },
                 connector: available,
-                connectors: connectors
+                connectors: connectors,
+                // live state of the scanned connector (drives the plug gate immediately)
+                connector_state: deriveConnectorState(online, available.status, null)
             }, cntxtDtls, fnm, {});
         })
         .catch(function(error) {
@@ -372,6 +458,36 @@ exports.startSession = function(req, res) {
                                     return sessionMdl.updatePaymentStatusMdl({ sessionId: sessionId, status: 'paid', transactionId: null });
                                 })
                                 .then(function() {
+                                    // REAL OCPP: command the charger to start (relay ON). If it
+                                    // rejects/times out, refund the whole hold + cancel the session.
+                                    return sessionMdl.getConnectorOcppInfoMdl({ connectorId: connector_id })
+                                        .then(function(coRows) {
+                                            const co = coRows && coRows[0];
+                                            const chargerOcppId = (co && co.ocpp_id_tx) || (qr_code && extractOcppId(qr_code)) || null;
+                                            const evseId = (co && co.ordinal) || 1;
+                                            return remoteStartCharger(chargerOcppId, evseId, userId);
+                                        })
+                                        .then(function(rs) {
+                                            if (rs && rs.attempted && !rs.accepted) {
+                                                return ledgerService.chargingCancel({
+                                                    userId: userId, sessionId: sessionId, holdAmount: totalAmountToDeduct,
+                                                    audit: { actnCd: 'charging_refund', userId: userId, ip: _ctx.ip, userAgent: _ctx.userAgent },
+                                                })
+                                                .then(function() { return sessionMdl.cancelSessionMdl({ sessionId: sessionId }); })
+                                                .then(function() {
+                                                    audit.writeAudit({
+                                                        userId: _ctx.userId, action: 'session_start_rejected', entityType: 'session', entityId: sessionId,
+                                                        newVal: { reason: rs.message, refunded: totalAmountToDeduct }, ip: _ctx.ip, userAgent: _ctx.userAgent
+                                                    });
+                                                    const err = new Error(rs.message || 'Charging could not be started');
+                                                    err._userMessage = true;
+                                                    throw err;
+                                                });
+                                            }
+                                            return null;
+                                        });
+                                })
+                                .then(function() {
                                     return sessionMdl.startSessionMdl({ sessionId: sessionId });
                                 })
                                 .then(function() {
@@ -448,6 +564,16 @@ exports.stopSession = async function(req, res) {
                 status: session.sttus_cd,
                 already_stopped: true
             }, cntxtDtls, fnm, { message: 'Session already stopped' });
+        }
+
+        // REAL OCPP: command the charger to stop (relay OFF). Best-effort — the
+        // settlement below proceeds from the metered energy regardless of ack timing.
+        if (session.ocpp_txn_id_tx) {
+            try {
+                const coRows = await sessionMdl.getConnectorOcppInfoMdl({ connectorId: session.cnntr_id });
+                const ocppId = coRows && coRows[0] && coRows[0].ocpp_id_tx;
+                await remoteStopCharger(ocppId, session.ocpp_txn_id_tx);
+            } catch (e) { console.error('[sessionCtrl] remoteStop error:', e.message); }
         }
 
         const price = parseFloat(session.prce_per_kwh_amt) || 0;

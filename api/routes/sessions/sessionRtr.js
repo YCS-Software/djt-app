@@ -28,6 +28,9 @@ router.get('/history', sessionCtrl.getSessionHistory);
 // GET /api/sessions/machine/:machineId/status - Live charger state (pre-charge plug gate)
 router.get('/machine/:machineId/status', sessionCtrl.getMachineStatus);
 
+// GET /api/sessions/connector/:connectorId/status - Live per-connector state (plug gate)
+router.get('/connector/:connectorId/status', sessionCtrl.getConnectorStatus);
+
 // GET /api/sessions/:sessionId/live - Live session meter + connector state (during charge)
 router.get('/:sessionId/live', sessionCtrl.getSessionLive);
 

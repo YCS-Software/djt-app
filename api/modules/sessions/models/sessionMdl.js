@@ -184,7 +184,7 @@ exports.getMachineScanInfoMdl = function(data) {
     const QRY_TO_EXEC = `
         SELECT m.mchn_id, m.mchn_nm_tx, m.ocpp_id_tx, m.mchn_typ_cd, m.max_pwr_tx, m.sttus_cd AS mchn_sttus_cd,
                st.sttn_id, st.sttn_nm_tx, st.addr_tx, st.prce_per_kwh_amt, st.sttn_cd,
-               c.cnntr_id, c.cnntr_cd_tx, c.cnntr_typ_cd, c.cnntr_nm_tx, c.pwr_tx, c.is_avlbl_in
+               c.cnntr_id, c.cnntr_cd_tx, c.cnntr_typ_cd, c.cnntr_nm_tx, c.pwr_tx, c.is_avlbl_in, c.cnntr_sttus_cd
         FROM mchn_lst_t m
         INNER JOIN sttn_lst_t st ON m.sttn_id = st.sttn_id
         LEFT JOIN cnntr_lst_t c ON c.mchn_id = m.mchn_id AND c.a_in = 1
@@ -209,7 +209,7 @@ exports.getMachineScanInfoByOcppMdl = function(data) {
     const QRY_TO_EXEC = `
         SELECT m.mchn_id, m.mchn_nm_tx, m.ocpp_id_tx, m.mchn_typ_cd, m.max_pwr_tx, m.sttus_cd AS mchn_sttus_cd,
                st.sttn_id, st.sttn_nm_tx, st.addr_tx, st.prce_per_kwh_amt, st.sttn_cd,
-               c.cnntr_id, c.cnntr_cd_tx, c.cnntr_typ_cd, c.cnntr_nm_tx, c.pwr_tx, c.is_avlbl_in
+               c.cnntr_id, c.cnntr_cd_tx, c.cnntr_typ_cd, c.cnntr_nm_tx, c.pwr_tx, c.is_avlbl_in, c.cnntr_sttus_cd
         FROM mchn_lst_t m
         INNER JOIN sttn_lst_t st ON m.sttn_id = st.sttn_id
         LEFT JOIN cnntr_lst_t c ON c.mchn_id = m.mchn_id AND c.a_in = 1
@@ -241,6 +241,53 @@ exports.getMachineLiveByIdMdl = function(data) {
 };
 
 /*****************************************************************************
+* Function      : getConnectorOcppInfoMdl
+* Description   : Connector -> its charger OCPP id + 1-based ordinal (= evseId),
+*                 for sending RequestStart/StopTransaction to the right EVSE.
+* Arguments     : data object with connectorId
+******************************************************************************/
+exports.getConnectorOcppInfoMdl = function(data) {
+    const connectorId = parseInt(data.connectorId) || 0;
+    const QRY_TO_EXEC = `
+        SELECT c.cnntr_id, c.mchn_id, m.ocpp_id_tx,
+               (SELECT COUNT(*) FROM cnntr_lst_t x WHERE x.mchn_id = c.mchn_id AND x.a_in = 1 AND x.cnntr_id <= c.cnntr_id) AS ordinal
+        FROM cnntr_lst_t c
+        INNER JOIN mchn_lst_t m ON c.mchn_id = m.mchn_id
+        WHERE c.cnntr_id = ? AND c.a_in = 1
+        LIMIT 1`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, [connectorId], cntxtDtls);
+};
+
+/*****************************************************************************
+* Function      : cancelSessionMdl
+* Description   : Mark a session cancelled (e.g. charger rejected RemoteStart)
+* Arguments     : data object with sessionId
+******************************************************************************/
+exports.cancelSessionMdl = function(data) {
+    const QRY_TO_EXEC = `UPDATE sssn_lst_t SET sttus_cd = 'cancelled', end_ts = NOW()
+        WHERE sssn_id = ?`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, [parseInt(data.sessionId) || 0], cntxtDtls);
+};
+
+/*****************************************************************************
+* Function      : getConnectorLiveMdl
+* Description   : One connector's live status + its charger's OCPP id (for the
+*                 per-connector plug gate on the customer app)
+* Arguments     : data object with connectorId
+******************************************************************************/
+exports.getConnectorLiveMdl = function(data) {
+    const QRY_TO_EXEC = `
+        SELECT c.cnntr_id, c.cnntr_cd_tx, c.cnntr_typ_cd, c.is_avlbl_in, c.cnntr_sttus_cd,
+               m.mchn_id, m.ocpp_id_tx, m.sttus_cd AS mchn_sttus
+        FROM cnntr_lst_t c
+        INNER JOIN mchn_lst_t m ON c.mchn_id = m.mchn_id
+        WHERE c.cnntr_id = ? AND c.a_in = 1
+        LIMIT 1`;
+    const PARAMS = [parseInt(data.connectorId) || 0];
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+/*****************************************************************************
 * Function      : getSessionLiveInfoMdl
 * Description   : Live session + machine/connector status for the charging poll
 * Arguments     : data object with sessionId, userId
@@ -250,7 +297,7 @@ exports.getSessionLiveInfoMdl = function(data) {
         SELECT s.sssn_id, s.usr_id, s.sttus_cd AS sssn_sttus, s.enrgy_cnsmd_kwh, s.ttl_cst_amt,
                s.prgrss_pct, s.prce_per_kwh_amt,
                m.mchn_id, m.ocpp_id_tx, m.sttus_cd AS mchn_sttus,
-               c.cnntr_id, c.is_avlbl_in
+               c.cnntr_id, c.is_avlbl_in, c.cnntr_sttus_cd
         FROM sssn_lst_t s
         INNER JOIN cnntr_lst_t c ON s.cnntr_id = c.cnntr_id
         INNER JOIN mchn_lst_t m ON c.mchn_id = m.mchn_id

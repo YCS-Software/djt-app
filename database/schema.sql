@@ -224,6 +224,7 @@ CREATE TABLE cnntr_lst_t (
     cnntr_nm_tx VARCHAR(50),
     pwr_tx VARCHAR(20) COMMENT 'Power rating',
     is_avlbl_in TINYINT(1) DEFAULT 1,
+    cnntr_sttus_cd VARCHAR(20) DEFAULT 'available' COMMENT 'available, occupied, charging, reserved, faulted, unavailable',
     a_in TINYINT(1) DEFAULT 1,
     i_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (sttn_id) REFERENCES sttn_lst_t(sttn_id) ON DELETE CASCADE,

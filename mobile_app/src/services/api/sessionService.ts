@@ -126,6 +126,15 @@ export const sessionService = {
     return response.data;
   },
 
+  /** Live state of ONE connector (the exact plug scanned) — per-connector gate. */
+  getConnectorStatus: async (connectorId: number): Promise<ConnectorLiveStatus> => {
+    const response = await apiClient.get<{ data: ConnectorLiveStatus }>(
+      `/sessions/connector/${connectorId}/status`,
+      { requiresAuth: true },
+    );
+    return response.data;
+  },
+
   /** Live session meter + connector state during charging. */
   getSessionLive: async (sessionId: number): Promise<SessionLive> => {
     const response = await apiClient.get<{ data: SessionLive }>(
@@ -145,6 +154,15 @@ export interface MachineLiveStatus {
   connector_state: ConnectorState;
   available_connectors: number;
   total_connectors: number;
+}
+
+export interface ConnectorLiveStatus {
+  connector_id: number;
+  code: string | null;
+  type: string;
+  connector_status: string;
+  connector_state: ConnectorState;
+  machine_online: boolean;
 }
 
 export interface SessionLive {
@@ -186,4 +204,6 @@ export interface ScanResult {
   };
   connector: ScanConnector;
   connectors: ScanConnector[];
+  /** live state of the scanned connector (per-connector plug gate) */
+  connector_state?: ConnectorState;
 }

@@ -31,7 +31,12 @@ module.exports = {
     // Public base a charge point uses to reach the OCPP WebSocket server.
     // Full URL becomes: <wsBaseUrl>/ocpp/<chargePointId>
     // Override with OCPP_WS_BASE_URL (e.g. ws://203.0.113.10:8080 or wss://ocpp.djthaika.com)
-    wsBaseUrl: process.env.OCPP_WS_BASE_URL || `ws://localhost:${process.env.PORT || 5000}`
+    wsBaseUrl: process.env.OCPP_WS_BASE_URL || `ws://localhost:${process.env.PORT || 5000}`,
+    // Real command-and-control: when true, "Start" sends RequestStartTransaction
+    // to the charger and requires an Accepted reply (else the hold is refunded),
+    // and "Stop" sends RequestStopTransaction. Set OCPP_REMOTE_CONTROL=false to
+    // fall back to DB-only sessions (for chargers that don't support remote start).
+    remoteControl: process.env.OCPP_REMOTE_CONTROL !== 'false'
   },
   
   // CORS settings

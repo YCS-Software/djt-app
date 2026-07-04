@@ -92,7 +92,6 @@ export default function Charging() {
   const [showScanner, setShowScanner] = useState(false);
 
   // Live charger / connector state (real-time, OCPP-driven)
-  const [machineId, setMachineId] = useState<number | null>(null);
   const [machineDetails, setMachineDetails] = useState<{ name: string; type: string; power: string; connectorType: string } | null>(null);
   const [connectorState, setConnectorState] = useState<ConnectorState>('unplugged');
   const [machineOnline, setMachineOnline] = useState(true);
@@ -301,14 +300,15 @@ export default function Charging() {
     return () => clearInterval(interval);
   }, [isCharging, paused, unitsConsumed, unitsPurchased, handleStopCharging]);
 
-  // Pre-charge: poll the live charger state while on the station-details screen
-  // so the "plug in" gate reflects reality (F: status + plug detection).
+  // Pre-charge: poll the SCANNED CONNECTOR's live state while on station-details
+  // so the "plug in" gate reflects exactly that plug (per-connector).
   useEffect(() => {
-    if (state !== 'station-details' || !machineId) return;
+    const connectorId = stationInfo?.connector_id;
+    if (state !== 'station-details' || !connectorId) return;
     let active = true;
     const poll = async () => {
       try {
-        const s = await sessionService.getMachineStatus(machineId);
+        const s = await sessionService.getConnectorStatus(connectorId);
         if (!active) return;
         setConnectorState(s.connector_state);
         setMachineOnline(s.machine_online);
@@ -317,7 +317,7 @@ export default function Charging() {
     poll();
     const id = setInterval(poll, 4000);
     return () => { active = false; clearInterval(id); };
-  }, [state, machineId]);
+  }, [state, stationInfo?.connector_id]);
 
   // During charge: poll the live session meter + connector state. Drives real
   // energy/cost, pause-on-unplug, and server-side completion.
@@ -412,11 +412,13 @@ export default function Charging() {
         connectorType: result.connector.type,
       });
       setMachineOnline(result.machine.online);
-      // Initial connector state (refined immediately by live polling below)
+      // Live state of the SCANNED connector (per-connector). Server already
+      // computed it; fall back to the machine hint if absent.
       setConnectorState(
-        !result.machine.online ? 'offline'
+        result.connector_state
+          ? result.connector_state
+          : !result.machine.online ? 'offline'
           : result.machine.status === 'faulted' ? 'faulted'
-          : result.machine.status === 'maintenance' ? 'unavailable'
           : result.machine.status === 'in_use' ? 'plugged'
           : 'unplugged'
       );
@@ -491,7 +493,9 @@ export default function Charging() {
       }
     } catch (error: any) {
       console.error('Error starting charging session:', error);
-      await notify(error.message || 'Failed to start charging session. Please try again.');
+      // On a rejected/failed start the server refunds the hold — resync the balance.
+      await fetchWalletBalance().catch(() => {});
+      await notify(error.message || 'Charging could not be started. Please try again.');
     } finally {
       setLoading(false);
     }
