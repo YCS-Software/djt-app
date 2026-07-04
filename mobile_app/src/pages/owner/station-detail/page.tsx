@@ -496,18 +496,34 @@ export default function StationDetailPage({ mode = 'manage' }: { mode?: 'profile
                 </div>
               </div>
 
-              <div className="owner-connectors">
-                {(m.connectors || []).map((c) => (
-                  <span key={c.connector_id} className="owner-connector-pill">
-                    <Plug size={11} /> {c.code || c.type}{c.power ? ` · ${c.power}` : ''}
-                    <button className="owner-conn-qr-btn" title="Connector QR" onClick={() => setQrConnectorId(c.connector_id)}>
-                      <QrCode size={12} />
-                    </button>
-                  </span>
-                ))}
-                <button className="owner-add-connector" onClick={() => setConnectorFor(m)}>
-                  <PlusCircle size={13} /> Connector
-                </button>
+              <div className="owner-conn-section">
+                <div className="owner-conn-head">
+                  <span className="owner-conn-head-title"><Plug size={12} /> Connectors</span>
+                  <span className="owner-conn-count">{(m.connectors || []).length}</span>
+                </div>
+                <div className="owner-conn-list">
+                  {(m.connectors || []).map((c, i) => (
+                    <div key={c.connector_id} className="owner-conn-card">
+                      <div className="owner-conn-card-ic"><Plug size={16} /></div>
+                      <div className="owner-conn-card-main">
+                        <div className="owner-conn-card-code">{c.code || `Connector ${i + 1}`}</div>
+                        <div className="owner-conn-card-sub">
+                          <span>{c.type}{c.power ? ` · ${c.power}` : ''}</span>
+                          <span className={`owner-conn-avail ${c.is_available ? 'ok' : 'busy'}`}>
+                            <span className="owner-conn-avail-dot" /> {c.is_available ? 'Available' : 'In use'}
+                          </span>
+                        </div>
+                      </div>
+                      <button className="owner-conn-qr-cta" title="Download connector QR" onClick={() => setQrConnectorId(c.connector_id)}>
+                        <QrCode size={17} />
+                        <span>QR</span>
+                      </button>
+                    </div>
+                  ))}
+                  <button className="owner-conn-add" onClick={() => setConnectorFor(m)}>
+                    <PlusCircle size={15} /> Add connector
+                  </button>
+                </div>
               </div>
             </div>
             );

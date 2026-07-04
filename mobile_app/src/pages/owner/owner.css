@@ -403,10 +403,21 @@ select.owner-input { appearance: none; }
 .owner-summary-stats small { color: var(--o-text-dim); font-weight: 500; font-size: 0.72rem; }
 
 /* Machine cards */
-.owner-machine-list { display: flex; flex-direction: column; gap: 0.7rem; }
-.owner-machine-card { background: var(--o-card); border: 1px solid var(--o-border); border-radius: 15px; padding: 0.85rem; }
-.owner-machine-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.7rem; }
-.owner-machine-icon { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: rgba(56, 189, 248, 0.12); color: var(--o-cyan); flex: none; }
+.owner-machine-list { display: flex; flex-direction: column; gap: 0.8rem; }
+.owner-machine-card {
+  background:
+    linear-gradient(180deg, rgba(56, 189, 248, 0.05), rgba(56, 189, 248, 0) 42%),
+    var(--o-card);
+  border: 1px solid var(--o-border); border-radius: 16px; padding: 0.9rem 0.9rem 0.95rem;
+  box-shadow: 0 1px 2px rgba(2, 8, 18, 0.3);
+  transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
+}
+.owner-machine-card:hover { border-color: var(--o-border-hi); box-shadow: 0 10px 26px rgba(2, 8, 18, 0.35); }
+.owner-machine-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem; }
+.owner-machine-icon {
+  width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: none;
+  background: var(--o-grad); color: #06121A; box-shadow: 0 4px 12px var(--o-cyan-glow);
+}
 .owner-machine-info { flex: 1; min-width: 0; }
 .owner-machine-name { font-weight: 700; font-size: 0.92rem; }
 .owner-machine-meta { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; font-size: 0.72rem; color: var(--o-text-dim); }
@@ -421,6 +432,54 @@ select.owner-input { appearance: none; }
 .owner-connector-pill { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; font-weight: 600; padding: 0.28rem 0.55rem; border-radius: 9px; background: rgba(94, 234, 212, 0.12); color: var(--o-teal); }
 .owner-add-connector { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; font-weight: 600; padding: 0.28rem 0.55rem; border-radius: 9px; background: transparent; border: 1px dashed var(--o-border-hi); color: var(--o-cyan); cursor: pointer; }
 .owner-add-connector:hover { background: var(--o-cyan-glow); }
+
+/* Connector section — professional per-connector cards with a focused QR CTA */
+.owner-conn-section { margin-top: 0.85rem; padding-top: 0.8rem; border-top: 1px dashed var(--o-border); }
+.owner-conn-head { display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.55rem; }
+.owner-conn-head-title { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--o-text-dim); }
+.owner-conn-head-title svg { color: var(--o-teal); }
+.owner-conn-count { font-size: 0.68rem; font-weight: 800; color: var(--o-cyan); background: var(--o-cyan-glow); padding: 0.06rem 0.42rem; border-radius: 999px; }
+
+.owner-conn-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.owner-conn-card {
+  display: flex; align-items: center; gap: 0.6rem;
+  background: rgba(7, 18, 33, 0.55); border: 1px solid var(--o-border);
+  border-radius: 12px; padding: 0.55rem 0.6rem;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.owner-conn-card:hover { border-color: var(--o-border-hi); background: rgba(7, 18, 33, 0.75); }
+.owner-conn-card-ic {
+  width: 34px; height: 34px; border-radius: 10px; flex: none; display: grid; place-items: center;
+  background: rgba(94, 234, 212, 0.14); color: var(--o-teal); border: 1px solid rgba(94, 234, 212, 0.22);
+}
+.owner-conn-card-main { flex: 1; min-width: 0; }
+.owner-conn-card-code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.8rem; font-weight: 700; color: var(--o-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.owner-conn-card-sub { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.12rem; font-size: 0.7rem; color: var(--o-text-dim); }
+.owner-conn-avail { display: inline-flex; align-items: center; gap: 0.28rem; font-weight: 700; font-size: 0.66rem; padding: 0.08rem 0.4rem; border-radius: 999px; }
+.owner-conn-avail-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.owner-conn-avail.ok { color: var(--o-green); background: rgba(52, 211, 153, 0.14); }
+.owner-conn-avail.busy { color: var(--o-cyan); background: rgba(56, 189, 248, 0.14); }
+
+/* The focused QR action per connector */
+.owner-conn-qr-cta {
+  flex: none; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.05rem;
+  width: 52px; padding: 0.4rem 0; border-radius: 11px; cursor: pointer; font-family: inherit;
+  font-size: 0.6rem; font-weight: 800; letter-spacing: 0.04em; color: #06121A;
+  background: var(--o-grad); border: none; box-shadow: 0 4px 12px var(--o-cyan-glow);
+  transition: transform 150ms ease, box-shadow 200ms ease;
+}
+.owner-conn-qr-cta:hover { transform: translateY(-1px); box-shadow: 0 8px 18px var(--o-cyan-glow); }
+.owner-conn-qr-cta:active { transform: translateY(0) scale(0.97); }
+
+.owner-conn-add {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; width: 100%;
+  font-size: 0.78rem; font-weight: 700; padding: 0.5rem; border-radius: 11px; cursor: pointer; font-family: inherit;
+  background: transparent; border: 1px dashed var(--o-border-hi); color: var(--o-cyan); transition: background 160ms ease;
+}
+.owner-conn-add:hover { background: var(--o-cyan-glow); }
 
 /* Empty / loading */
 .owner-empty { text-align: center; padding: 2.2rem 1rem; background: var(--o-card); border: 1px dashed var(--o-border); border-radius: 16px; }
