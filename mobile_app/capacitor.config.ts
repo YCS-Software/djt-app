@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.ycssoftware.djtapp',
+  appId: 'com.djthaika.ev',
   appName: 'DJT HAIKA',
   webDir: 'out',
   server: {

@@ -15,9 +15,10 @@
     "android:sync": "npx cap sync android",
     "android:open": "npx cap open android",
     "android:build": "npm run build && npx cap sync android",
-    "android:build:dev": "npm run build:dev && npx cap sync android && cd android && ./gradlew assembleDevelopmentDebug",
-    "android:build:staging": "npm run build:staging && npx cap sync android && cd android && ./gradlew assembleStagingRelease",
-    "android:build:prod": "npm run build:prod && npx cap sync android && cd android && ./gradlew assembleProductionRelease"
+    "android:build:dev": "npm run build:dev && npx cap sync android && cd android && .\\gradlew.bat assembleDebug",
+    "android:build:staging": "npm run build:staging && npx cap sync android && cd android && .\\gradlew.bat assembleRelease",
+    "android:build:prod": "npm run build:prod && npx cap sync android && cd android && .\\gradlew.bat bundleRelease",
+    "android:build:prod:apk": "npm run build:prod && npx cap sync android && cd android && .\\gradlew.bat assembleRelease"
   },
   "dependencies": {
     "@capacitor-community/text-to-speech": "^6.1.0",

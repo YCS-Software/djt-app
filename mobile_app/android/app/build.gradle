@@ -21,7 +21,7 @@ android {
         }
     }
     defaultConfig {
-        applicationId "com.ycssoftware.djtapp"
+        applicationId "com.djthaika.ev"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 16
@@ -63,14 +63,10 @@ dependencies {
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
 }
-apply plugin: 'com.google.gms.google-services'
 apply from: 'capacitor.build.gradle'
 
-try {
-    def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
-        apply plugin: 'com.google.gms.google-services'
-    }
-} catch(Exception e) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
-}
+// Firebase / google-services disabled: the google-services.json is registered for the
+// old package (com.ycssoftware.djtapp) and the app now ships as com.djthaika.ev.
+// Re-enable by registering com.djthaika.ev in Firebase, adding the updated
+// google-services.json, and restoring the apply lines below.
+// apply plugin: 'com.google.gms.google-services'
