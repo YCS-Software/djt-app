@@ -1193,3 +1193,5 @@
 .charge-pause-banner strong { display: block; font-size: 0.9rem; }
 .charge-pause-banner span { display: block; font-size: 0.78rem; opacity: 0.85; }
 @keyframes pause-slide { from { transform: translateY(-8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.charge-spin { animation: charge-spin 0.9s linear infinite; }
+@keyframes charge-spin { to { transform: rotate(360deg); } }

@@ -21,7 +21,8 @@ import {
   Plug,
   Wifi,
   WifiOff,
-  PauseCircle
+  PauseCircle,
+  Loader2
 } from 'lucide-react';
 import { Toast } from '@capacitor/toast';
 import { stationService } from '../../services/api/stationService';
@@ -35,15 +36,19 @@ import './charging.css';
 
 // UI metadata for each live connector state (label, colour tone, gate message)
 const CONNECTOR_UI: Record<ConnectorState, { label: string; tone: string; msg: string }> = {
-  charging:    { label: 'Charging',           tone: 'green',  msg: '' },
-  plugged:     { label: 'Connector plugged',  tone: 'cyan',   msg: '' },
-  unplugged:   { label: 'Not plugged in',     tone: 'amber',  msg: 'Please plug the connector into your vehicle, then tap Start.' },
-  offline:     { label: 'Charger offline',    tone: 'red',    msg: 'This charger is offline right now. Please try another.' },
-  faulted:     { label: 'Charger faulted',    tone: 'red',    msg: 'This charger reported a fault. Please try another charger.' },
-  unavailable: { label: 'Under maintenance',  tone: 'violet', msg: 'This charger is under maintenance. Please try another.' },
+  charging:       { label: 'Charging',           tone: 'green',  msg: '' },
+  suspended_ev:   { label: 'Paused by vehicle',  tone: 'amber',  msg: 'Your vehicle paused charging (e.g. battery full or on hold). It will resume automatically.' },
+  suspended_evse: { label: 'Paused by charger',  tone: 'amber',  msg: 'The charger paused charging temporarily. It will resume automatically.' },
+  plugged:        { label: 'Connector plugged',  tone: 'cyan',   msg: '' },
+  unplugged:      { label: 'Not plugged in',     tone: 'amber',  msg: 'Please plug the connector into your vehicle, then tap Start.' },
+  offline:        { label: 'Charger offline',    tone: 'red',    msg: 'This charger is offline right now. Please try another.' },
+  faulted:        { label: 'Charger faulted',    tone: 'red',    msg: 'This charger reported a fault. Please try another charger.' },
+  unavailable:    { label: 'Under maintenance',  tone: 'violet', msg: 'This charger is under maintenance. Please try another.' },
 };
 // States from which charging may NOT start
 const BLOCKING_STATES: ConnectorState[] = ['offline', 'faulted', 'unavailable'];
+// Mid-session states that mean energy is NOT flowing (freeze the live view).
+const PAUSED_STATES: ConnectorState[] = ['unplugged', 'offline', 'faulted', 'unavailable', 'suspended_ev', 'suspended_evse'];
 
 type ChargingState = 'idle' | 'scanning' | 'station-details' | 'charging' | 'completed';
 
@@ -96,6 +101,11 @@ export default function Charging() {
   const [connectorState, setConnectorState] = useState<ConnectorState>('unplugged');
   const [machineOnline, setMachineOnline] = useState(true);
   const [paused, setPaused] = useState(false);
+  // True once the charger has ACTUALLY reported it is charging (StatusNotification
+  // 'Charging'). Until then the session is only "accepted/starting", not charging.
+  const [chargeConfirmed, setChargeConfirmed] = useState(false);
+  // True when the charger accepted the start but never began charging in time.
+  const [startTimedOut, setStartTimedOut] = useState(false);
   const serverDriven = useRef(false); // true once the server reports real meter data
 
   useEffect(() => {
@@ -146,6 +156,7 @@ export default function Charging() {
       setUnitsConsumed(s.energy_consumed || 0);
       setPrepaidAmount(prepaid);
       setIsCharging(false); // frozen on resume; user can Stop & get refunded for the unused
+      setChargeConfirmed(true); // already an in-progress session; don't flash "Starting…"
       setState('charging');
     } catch (e) {
       console.error('Error resuming active session:', e);
@@ -276,29 +287,17 @@ export default function Charging() {
     }
   }, [currentSessionId, unitsConsumed, unitsPurchased, stationInfo, fetchWalletBalance]);
 
-  // Charging timer (local fallback simulation). Pauses when the connector is
-  // unplugged/offline, and stands down entirely once the server reports real
-  // meter data (serverDriven) so live OCPP values take over.
+  // Elapsed-time display ONLY. A real OCPP session is driven entirely by the
+  // charger's live meter (see the session-live poll below). We must NOT simulate
+  // energy here: a client-side "reached purchased units" would auto-Stop the REAL
+  // transaction and cut charging seconds after it starts, before the vehicle even
+  // ramps up (root cause of "vehicle parks / not charging"). Energy/auto-stop are
+  // now driven strictly by metered data from the charger.
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isCharging && !paused && !serverDriven.current && unitsConsumed < unitsPurchased) {
-      interval = setInterval(() => {
-        setChargingTime(prev => prev + 1);
-        setUnitsConsumed(prev => {
-          const next = prev + 0.1;
-          if (next >= unitsPurchased) {
-            // Charging reached 100% - automatically stop session
-            setIsCharging(false);
-            // Call stopSession API automatically when 100% complete
-            handleStopCharging();
-            return unitsPurchased;
-          }
-          return next;
-        });
-      }, 500);
-    }
+    if (!isCharging || paused) return;
+    const interval = setInterval(() => setChargingTime(prev => prev + 1), 1000);
     return () => clearInterval(interval);
-  }, [isCharging, paused, unitsConsumed, unitsPurchased, handleStopCharging]);
+  }, [isCharging, paused]);
 
   // Pre-charge: poll the SCANNED CONNECTOR's live state while on station-details
   // so the "plug in" gate reflects exactly that plug (per-connector).
@@ -335,10 +334,17 @@ export default function Charging() {
         setConnectorState(live.connector_state);
         setMachineOnline(live.machine_online);
 
-        const isPaused = ['unplugged', 'offline', 'faulted', 'unavailable'].includes(live.connector_state);
+        // Validate the REAL machine state: only mark charging once the charger says so.
+        if (live.connector_state === 'charging') {
+          setChargeConfirmed(true);
+          setStartTimedOut(false);
+        }
+        const isPaused = PAUSED_STATES.includes(live.connector_state);
         setPaused(isPaused);
 
-        // Real meter data from the charger takes over from the simulation
+        // Real metered energy from the charger drives live progress (and the
+        // consumed figure used at Stop). Requires the charger to send MeterValues;
+        // with none, this stays 0 and the driver stops manually. NEVER a fake timer.
         if (live.energy_consumed > 0) {
           serverDriven.current = true;
           setUnitsConsumed(live.energy_consumed);
@@ -359,6 +365,15 @@ export default function Charging() {
     return () => { active = false; clearInterval(id); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, currentSessionId]);
+
+  // Exception watchdog: the charger accepted the start but never reported
+  // 'Charging'. After a grace period, surface a warning so the driver can
+  // re-seat the connector / check the vehicle instead of waiting forever.
+  useEffect(() => {
+    if (state !== 'charging' || chargeConfirmed) { setStartTimedOut(false); return; }
+    const t = setTimeout(() => setStartTimedOut(true), 45000);
+    return () => clearTimeout(t);
+  }, [state, chargeConfirmed]);
 
   // Open the live camera scanner
   const handleScanQR = () => {
@@ -496,6 +511,10 @@ export default function Charging() {
         setUnitsConsumed(0);
         setChargingTime(0);
         setIsCharging(true);
+        // Start request was ACCEPTED — not charging yet. The screen shows
+        // "Starting…" until the charger confirms StatusNotification(Charging).
+        setChargeConfirmed(false);
+        setStartTimedOut(false);
         setState('charging');
         setPrepaidAmount(totalAmount); // Store prepaid amount
         
@@ -529,6 +548,8 @@ export default function Charging() {
     setConnectorState('unplugged');
     setMachineOnline(true);
     setPaused(false);
+    setChargeConfirmed(false);
+    setStartTimedOut(false);
     serverDriven.current = false;
 
     // Refresh wallet balance
@@ -545,6 +566,13 @@ export default function Charging() {
     if (unitsPurchased === 0) return 0;
     return (unitsConsumed / unitsPurchased) * 100;
   };
+
+  // Charging screen phase, driven by the REAL machine state:
+  //  starting  – RemoteStart accepted, charger hasn't confirmed Charging yet
+  //  paused    – connector unplugged/offline/faulted/suspended mid-session
+  //  charging  – charger confirmed energy is flowing
+  const chargingPhase: 'starting' | 'paused' | 'charging' =
+    paused ? 'paused' : chargeConfirmed ? 'charging' : 'starting';
 
   return (
     <div className="charging-page">
@@ -906,7 +934,29 @@ export default function Charging() {
         {/* CHARGING STATE */}
         {state === 'charging' && stationInfo && (
           <div className="charging-state">
-            {/* Pause banner when the connector is disconnected / charger drops */}
+            {/* Starting: request accepted, charger has not confirmed charging yet */}
+            {chargingPhase === 'starting' && !startTimedOut && (
+              <div className="charge-pause-banner">
+                <Loader2 size={20} className="charge-spin" />
+                <div>
+                  <strong>Starting…</strong>
+                  <span>Start request accepted — waiting for the charger to begin. Keep the connector firmly plugged in.</span>
+                </div>
+              </div>
+            )}
+
+            {/* Exception: accepted but never started charging within the grace period */}
+            {chargingPhase === 'starting' && startTimedOut && (
+              <div className="charge-pause-banner">
+                <AlertCircle size={20} />
+                <div>
+                  <strong>Charging hasn't started</strong>
+                  <span>The charger accepted the request but hasn't begun. Re-seat the connector or check the vehicle. You can Stop to get a full refund.</span>
+                </div>
+              </div>
+            )}
+
+            {/* Pause banner when the connector is disconnected / suspended / charger drops */}
             {paused && (
               <div className="charge-pause-banner">
                 <PauseCircle size={20} />
@@ -916,6 +966,8 @@ export default function Charging() {
                     {connectorState === 'unplugged' ? 'Connector unplugged — re-plug to resume.'
                       : connectorState === 'offline' ? 'Charger went offline — it will resume when reconnected.'
                       : connectorState === 'faulted' ? 'Charger reported a fault. Please contact the operator.'
+                      : connectorState === 'suspended_ev' ? 'Your vehicle paused charging — it will resume automatically.'
+                      : connectorState === 'suspended_evse' ? 'The charger paused charging — it will resume automatically.'
                       : 'Charger temporarily unavailable.'}
                   </span>
                 </div>
@@ -924,10 +976,16 @@ export default function Charging() {
 
             <section className="charging-active-card">
               <div className="charging-status">
-                <div className={`status-icon ${paused ? 'paused' : 'charging'}`}>
-                  {paused ? <PauseCircle size={32} /> : <Zap size={32} />}
+                <div className={`status-icon ${chargingPhase === 'charging' ? 'charging' : 'paused'}`}>
+                  {chargingPhase === 'charging' ? <Zap size={32} />
+                    : chargingPhase === 'starting' ? <Loader2 size={32} className="charge-spin" />
+                    : <PauseCircle size={32} />}
                 </div>
-                <h2 className="status-title">{paused ? 'Charging Paused' : 'Charging in Progress'}</h2>
+                <h2 className="status-title">
+                  {chargingPhase === 'charging' ? 'Charging in Progress'
+                    : chargingPhase === 'starting' ? 'Starting…'
+                    : 'Charging Paused'}
+                </h2>
                 <p className="status-subtitle">{stationInfo.name}</p>
                 <span className={`charge-conn-chip tone-${CONNECTOR_UI[connectorState].tone}`}>
                   <span className="ms-dot" /> {CONNECTOR_UI[connectorState].label}

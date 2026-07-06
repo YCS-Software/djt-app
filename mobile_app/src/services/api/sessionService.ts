@@ -145,8 +145,16 @@ export const sessionService = {
   },
 };
 
-/** offline | faulted | unavailable | charging | plugged | unplugged */
-export type ConnectorState = 'offline' | 'faulted' | 'unavailable' | 'charging' | 'plugged' | 'unplugged';
+/** live per-connector state derived from the charger's OCPP StatusNotification */
+export type ConnectorState =
+  | 'offline'
+  | 'faulted'
+  | 'unavailable'
+  | 'charging'
+  | 'suspended_ev'    // charger ready, vehicle paused charging
+  | 'suspended_evse'  // vehicle ready, charger paused charging
+  | 'plugged'
+  | 'unplugged';
 
 export interface MachineLiveStatus {
   machine_online: boolean;
