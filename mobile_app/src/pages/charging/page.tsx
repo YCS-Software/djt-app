@@ -57,6 +57,8 @@ interface StationInfo {
   name: string;
   chargerId: string;
   connector_id: number;
+  connectorName?: string | null;
+  connectorCode?: string | null;
   pricePerUnit: number;
   address: string;
   power: string;
@@ -95,6 +97,9 @@ export default function Charging() {
 
   // QR scanner
   const [showScanner, setShowScanner] = useState(false);
+
+  // Confirm before stopping an in-progress charge
+  const [showStopConfirm, setShowStopConfirm] = useState(false);
 
   // Live charger / connector state (real-time, OCPP-driven)
   const [machineDetails, setMachineDetails] = useState<{ name: string; type: string; power: string; connectorType: string } | null>(null);
@@ -428,6 +433,8 @@ export default function Charging() {
         name: result.station.name,
         chargerId: result.machine.ocpp_id || result.station.code || `CHG-${result.station.station_id}`,
         connector_id: result.connector.connector_id,
+        connectorName: result.connector.name || null,
+        connectorCode: result.connector.code || null,
         pricePerUnit: result.station.price_per_kwh,
         address: result.station.address,
         power: result.machine.power || result.connector.power || '—',
@@ -550,6 +557,7 @@ export default function Charging() {
     setPaused(false);
     setChargeConfirmed(false);
     setStartTimedOut(false);
+    setShowStopConfirm(false);
     serverDriven.current = false;
 
     // Refresh wallet balance
@@ -934,17 +942,6 @@ export default function Charging() {
         {/* CHARGING STATE */}
         {state === 'charging' && stationInfo && (
           <div className="charging-state">
-            {/* Starting: request accepted, charger has not confirmed charging yet */}
-            {chargingPhase === 'starting' && !startTimedOut && (
-              <div className="charge-pause-banner">
-                <Loader2 size={20} className="charge-spin" />
-                <div>
-                  <strong>Starting…</strong>
-                  <span>Start request accepted — waiting for the charger to begin. Keep the connector firmly plugged in.</span>
-                </div>
-              </div>
-            )}
-
             {/* Exception: accepted but never started charging within the grace period */}
             {chargingPhase === 'starting' && startTimedOut && (
               <div className="charge-pause-banner">
@@ -987,9 +984,19 @@ export default function Charging() {
                     : 'Charging Paused'}
                 </h2>
                 <p className="status-subtitle">{stationInfo.name}</p>
-                <span className={`charge-conn-chip tone-${CONNECTOR_UI[connectorState].tone}`}>
-                  <span className="ms-dot" /> {CONNECTOR_UI[connectorState].label}
-                </span>
+                <div className="charge-chip-row">
+                  {(stationInfo.connectorName || stationInfo.connectorCode) && (
+                    <span className="charge-conn-chip tone-cyan">
+                      <Plug size={12} /> {stationInfo.connectorName || stationInfo.connectorCode}
+                    </span>
+                  )}
+                  <span className={`charge-conn-chip tone-${CONNECTOR_UI[connectorState].tone}`}>
+                    <span className="ms-dot" /> {CONNECTOR_UI[connectorState].label}
+                  </span>
+                </div>
+                {chargingPhase === 'starting' && !startTimedOut && (
+                  <p className="charge-hint"><Loader2 size={13} className="charge-spin" /> Waiting for the charger to begin — keep the connector plugged in.</p>
+                )}
               </div>
 
               <div className="progress-section">
@@ -1025,7 +1032,7 @@ export default function Charging() {
                 <div className="stat-item">
                   <Battery size={20} />
                   <div className="stat-content">
-                    <span className="stat-value">{unitsConsumed.toFixed(1)}/{unitsPurchased}</span>
+                    <span className="stat-value">{unitsConsumed.toFixed(2)}/{unitsPurchased}</span>
                     <span className="stat-label">Units</span>
                   </div>
                 </div>
@@ -1039,13 +1046,13 @@ export default function Charging() {
                 <div className="stat-item">
                   <IndianRupee size={20} />
                   <div className="stat-content">
-                    <span className="stat-value">₹{(unitsConsumed * (stationInfo?.pricePerUnit || 0)).toFixed(0)}</span>
+                    <span className="stat-value">₹{(unitsConsumed * (stationInfo?.pricePerUnit || 0)).toFixed(2)}</span>
                     <span className="stat-label">Cost</span>
                   </div>
                 </div>
               </div>
 
-              <button className="stop-btn" onClick={handleStopCharging}>
+              <button className="stop-btn" onClick={() => setShowStopConfirm(true)}>
                 <Square size={20} />
                 <span>Stop Charging</span>
               </button>
@@ -1126,6 +1133,30 @@ export default function Charging() {
 
       {showScanner && (
         <QrScanModal onResult={handleScanToken} onClose={() => setShowScanner(false)} />
+      )}
+
+      {/* Confirm before stopping the charge (stop only happens on confirm) */}
+      {showStopConfirm && (
+        <div className="stop-confirm-overlay" onClick={() => setShowStopConfirm(false)}>
+          <div className="stop-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="stop-confirm-icon"><AlertCircle size={38} /></div>
+            <h3 className="stop-confirm-title">Stop charging?</h3>
+            <p className="stop-confirm-text">
+              Charging will end now. Any unused prepaid amount is refunded to your wallet.
+            </p>
+            <div className="stop-confirm-actions">
+              <button className="scb-cancel" onClick={() => setShowStopConfirm(false)}>
+                Keep Charging
+              </button>
+              <button
+                className="scb-confirm"
+                onClick={() => { setShowStopConfirm(false); handleStopCharging(); }}
+              >
+                <Square size={18} /> Stop
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

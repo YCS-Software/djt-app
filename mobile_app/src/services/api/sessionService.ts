@@ -185,6 +185,7 @@ export interface SessionLive {
 
 export interface ScanConnector {
   connector_id: number;
+  code?: string | null;
   type: string;
   name: string;
   power: string | null;
