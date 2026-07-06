@@ -174,6 +174,15 @@ exports.getUnlinkedSessionForConnectorMdl = function(connectorId) {
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
 };
 
+// The active session on a connector (linked or not) — used to attribute
+// MeterValues that arrive with transactionId=0 (clock-aligned samples).
+exports.getActiveSessionForConnectorMdl = function(connectorId) {
+    const QRY_TO_EXEC = `SELECT * FROM sssn_lst_t
+        WHERE cnntr_id = ? AND a_in = 1 AND sttus_cd = 'active'
+        ORDER BY sssn_id DESC LIMIT 1`;
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, [numVal(connectorId)], cntxtDtls);
+};
+
 // Link an existing session to the charger's OCPP transaction id.
 exports.attachOcppTxnMdl = function(sessionId, ocppTxnId) {
     const QRY_TO_EXEC = `UPDATE sssn_lst_t SET ocpp_txn_id_tx = ?, u_ts = NOW() WHERE sssn_id = ?`;

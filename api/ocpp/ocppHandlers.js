@@ -62,20 +62,41 @@ async function ensureMachine(ctx) {
     return m || null;
 }
 
-// Pull the Energy.Active.Import.Register reading (in kWh) from a meterValue array
+// Flatten every sampledValue across ALL meterValue[] entries. Real chargers often
+// split each measurand into its OWN meterValue[] element (energy, SoC, voltage,
+// current, temperature…), so we must scan them all — not just the last entry.
+function flattenSamples(meterValues) {
+    if (!Array.isArray(meterValues)) return [];
+    const out = [];
+    for (const mv of meterValues) {
+        const samples = (mv && mv.sampledValue) || [];
+        for (const s of samples) out.push(s);
+    }
+    return out;
+}
+
+// Pull the Energy.Active.Import.Register reading (in kWh) from a meterValue array.
+// Searches all entries for the energy register (measurand match preferred; a
+// sample with no measurand defaults to that register per spec).
 function extractRegisterKwh(meterValues) {
-    if (!Array.isArray(meterValues) || meterValues.length === 0) return null;
-    const last = meterValues[meterValues.length - 1];
-    const samples = (last && last.sampledValue) || [];
-    // Prefer the energy register; fall back to the first sample
-    let s = samples.find((x) => !x.measurand || x.measurand === 'Energy.Active.Import.Register');
-    if (!s) s = samples[0];
+    const all = flattenSamples(meterValues);
+    if (!all.length) return null;
+    let s = all.filter((x) => x.measurand === 'Energy.Active.Import.Register').pop()
+         || all.filter((x) => !x.measurand).pop();
     if (!s) return null;
     let val = Number(s.value);
     if (isNaN(val)) return null;
     const unit = (s.unitOfMeasure && s.unitOfMeasure.unit) || s.unit || 'Wh';
-    if (unit === 'Wh') val = val / 1000; // -> kWh
+    if (unit === 'Wh') val = val / 1000; // -> kWh (kWh passes through)
     return val;
+}
+
+// Battery State of Charge (%) if the vehicle/charger reports it, else null.
+function extractSoc(meterValues) {
+    const s = flattenSamples(meterValues).filter((x) => x.measurand === 'SoC').pop();
+    if (!s) return null;
+    const v = Number(s.value);
+    return isNaN(v) ? null : v;
 }
 
 // energy (kWh) consumed in this transaction so far, using a start baseline
@@ -263,24 +284,42 @@ const handlers = {
 
     /* ---------------------------------------------------------------- */
     async MeterValues(payload, ctx) {
-        // Live meter values during a transaction. OCPP 1.6 tags these with the
-        // integer transactionId; use it to update the linked session's energy/cost.
+        // Live meter values during a transaction.
         const machine = await ensureMachine(ctx);
         if (!machine) return {};
-        const txnId = payload.transactionId != null ? String(payload.transactionId) : null;
         const reg = extractRegisterKwh(payload.meterValue);
-        if (reg == null || !txnId) {
-            console.log(`[OCPP][1.6][MeterValues] ${ctx.conn.ocppId} ignored (txnId=${txnId} register=${reg})`);
+        if (reg == null) {
+            console.log(`[OCPP][1.6][MeterValues] ${ctx.conn.ocppId} ignored (no energy register in payload)`);
             return {};
         }
 
-        const sRows = await ctx.ocppMdl.getSessionByOcppTxnMdl(txnId);
-        const session = sRows && sRows[0];
+        // Resolve the session: prefer the txn id the charger echoes; but some
+        // chargers send clock-aligned MeterValues with transactionId=0 — fall back
+        // to the active session on THIS connector so those samples still count.
+        const rawTxn = payload.transactionId;
+        let session = null;
+        if (rawTxn != null && String(rawTxn) !== '0') {
+            const sRows = await ctx.ocppMdl.getSessionByOcppTxnMdl(String(rawTxn));
+            session = sRows && sRows[0];
+        }
         if (!session) {
-            console.log(`[OCPP][1.6][MeterValues] ${ctx.conn.ocppId} txn=${txnId} — no linked session`);
+            const connOrdinal = Number(payload.connectorId) || 1;
+            const conns = await ctx.ocppMdl.getMachineConnectorsMdl(machine.mchn_id);
+            const targetConn = conns[connOrdinal - 1] || conns[0];
+            if (targetConn) {
+                const sRows = await ctx.ocppMdl.getActiveSessionForConnectorMdl(targetConn.cnntr_id);
+                session = sRows && sRows[0];
+            }
+        }
+        if (!session) {
+            console.log(`[OCPP][1.6][MeterValues] ${ctx.conn.ocppId} txn=${rawTxn} — no active session on connector`);
             return {};
         }
-        const energy = consumedKwh(txnId, reg);
+
+        // Baseline/cap are keyed by the session's real OCPP txn id (set at
+        // StartTransaction), NOT the possibly-zero payload transactionId.
+        const txnKey = session.ocpp_txn_id_tx ? String(session.ocpp_txn_id_tx) : 'sess-' + session.sssn_id;
+        const energy = consumedKwh(txnKey, reg);
         const price = parseFloat(session.prce_per_kwh_amt) || ctx.conn.pricePerKwh || 0;
         const cost = +(energy * price).toFixed(2);
         // Prepaid units = the held amount (ttl_cst_amt) / price. Progress is measured
@@ -290,16 +329,17 @@ const handlers = {
         const progress = purchasedUnits > 0
             ? Math.min(99, Math.round((energy / purchasedUnits) * 100))
             : Math.min(99, Math.round((energy / 30) * 100));
+        const soc = extractSoc(payload.meterValue);
         await ctx.ocppMdl.updateOcppSessionProgressMdl({ sessionId: session.sssn_id, energyKwh: energy, cost, progress });
-        console.log(`[OCPP][1.6][MeterValues] ${ctx.conn.ocppId} txn=${txnId} session#${session.sssn_id} register=${reg}kWh energy=${energy}/${purchasedUnits}kWh cost=₹${cost} progress=${progress}%`);
+        console.log(`[OCPP][1.6][MeterValues] ${ctx.conn.ocppId} session#${session.sssn_id} register=${reg}kWh energy=${energy.toFixed(3)}/${purchasedUnits}kWh cost=₹${cost} progress=${progress}%${soc != null ? ` soc=${soc}%` : ''}`);
 
         // PREPAID CAP: once the driver's purchased units are consumed, stop the
         // transaction server-side (authoritative). Fire-and-forget RemoteStop; the
         // charger's StopTransaction then finalizes + settles from the real meter.
-        if (purchasedUnits > 0 && energy >= purchasedUnits && !capStopRequested.has(txnId) && ctx.sendCall) {
-            capStopRequested.add(txnId);
-            console.log(`[OCPP][1.6] prepaid cap reached (${energy} >= ${purchasedUnits} kWh) — auto-stopping txn=${txnId}`);
-            ctx.sendCall(ctx.conn, 'RemoteStopTransaction', { transactionId: Number(txnId) || txnId })
+        if (purchasedUnits > 0 && energy >= purchasedUnits && session.ocpp_txn_id_tx && !capStopRequested.has(txnKey) && ctx.sendCall) {
+            capStopRequested.add(txnKey);
+            console.log(`[OCPP][1.6] prepaid cap reached (${energy.toFixed(3)} >= ${purchasedUnits} kWh) — auto-stopping txn=${session.ocpp_txn_id_tx}`);
+            ctx.sendCall(ctx.conn, 'RemoteStopTransaction', { transactionId: Number(session.ocpp_txn_id_tx) || session.ocpp_txn_id_tx })
                 .catch((e) => console.error('[OCPP] cap RemoteStop failed:', e.message));
         }
         return {};
