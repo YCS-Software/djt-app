@@ -582,6 +582,13 @@ export default function Charging() {
   const chargingPhase: 'starting' | 'paused' | 'charging' =
     paused ? 'paused' : chargeConfirmed ? 'charging' : 'starting';
 
+  // ACTUAL metered figures from the charger — shown as-is, even if consumption
+  // overshot the purchased units (that's the real energy delivered). Refund only
+  // applies when actual cost is below the prepaid amount (early stop).
+  const chargePrice = stationInfo?.pricePerUnit || 0;
+  const actualCost = unitsConsumed * chargePrice;
+  const refundAmount = prepaidAmount > actualCost ? Math.round((prepaidAmount - actualCost) * 100) / 100 : 0;
+
   return (
     <div className="charging-page">
       {/* Header */}
@@ -1076,7 +1083,7 @@ export default function Charging() {
                 </div>
                 <div className="summary-row">
                   <span className="summary-label">Units Charged</span>
-                  <span className="summary-value">{unitsConsumed.toFixed(1)} Units</span>
+                  <span className="summary-value">{unitsConsumed.toFixed(2)} Units</span>
                 </div>
                 <div className="summary-row">
                   <span className="summary-label">Duration</span>
@@ -1089,23 +1096,23 @@ export default function Charging() {
                 </div>
                 <div className="summary-row">
                   <span className="summary-label">Charged Amount</span>
-                  <span className="summary-value">₹{(unitsConsumed * stationInfo.pricePerUnit).toFixed(2)}</span>
+                  <span className="summary-value">₹{actualCost.toFixed(2)}</span>
                 </div>
-                {prepaidAmount > (unitsConsumed * stationInfo.pricePerUnit) && (
+                {refundAmount > 0 && (
                   <div className="summary-row refund-row">
                     <span className="summary-label">
                       <Wallet size={16} style={{ display: 'inline-block', marginRight: '0.5rem', verticalAlign: 'middle' }} />
                       Refund Amount
                     </span>
                     <span className="summary-value refund-value">
-                      ₹{(prepaidAmount - (unitsConsumed * stationInfo.pricePerUnit)).toFixed(2)}
+                      ₹{refundAmount.toFixed(2)}
                     </span>
                   </div>
                 )}
                 <div className="summary-divider"></div>
                 <div className="summary-row total">
                   <span className="summary-label">Total Charged</span>
-                  <span className="summary-value">₹{(unitsConsumed * stationInfo.pricePerUnit).toFixed(2)}</span>
+                  <span className="summary-value">₹{actualCost.toFixed(2)}</span>
                 </div>
               </div>
 

@@ -366,6 +366,10 @@ async function finalizeAndSettle(ctx, session, energy, cost) {
     const { ocppMdl } = ctx;
     if (session.sttus_cd !== 'active') return;
 
+    // Record the ACTUAL metered energy/cost from the charger (even if it overshot
+    // the purchased units — that's the real energy delivered). The ledger below
+    // still only moves what's actually available (escrow caps consumed to the
+    // hold), but the session row reflects true consumption.
     await ocppMdl.finalizeOcppSessionMdl({ sessionId: session.sssn_id, energyKwh: energy, cost });
 
     // Prepaid (app-initiated, escrow held) vs charger-initiated (post-pay).
