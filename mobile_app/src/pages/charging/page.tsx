@@ -310,9 +310,12 @@ export default function Charging() {
       try {
         const s = await sessionService.getConnectorStatus(connectorId);
         if (!active) return;
+        console.log(`[PLUG] connector#${connectorId} status poll → state='${s.connector_state}' online=${s.machine_online} (raw connector_status='${(s as any).connector_status}')`);
         setConnectorState(s.connector_state);
         setMachineOnline(s.machine_online);
-      } catch { /* keep last known state */ }
+      } catch (e: any) {
+        console.log(`[PLUG] connector#${connectorId} status poll FAILED:`, e?.message || e);
+      }
     };
     poll();
     const id = setInterval(poll, 4000);
@@ -328,6 +331,7 @@ export default function Charging() {
       try {
         const live = await sessionService.getSessionLive(currentSessionId);
         if (!active) return;
+        console.log(`[PLUG] session#${currentSessionId} live poll → state='${live.connector_state}' online=${live.machine_online} energy=${live.energy_consumed} status='${live.status}'`);
         setConnectorState(live.connector_state);
         setMachineOnline(live.machine_online);
 
@@ -358,6 +362,7 @@ export default function Charging() {
 
   // Open the live camera scanner
   const handleScanQR = () => {
+    console.log('[QR] Scan button clicked — opening scanner modal');
     setShowScanner(true);
   };
 
@@ -372,10 +377,19 @@ export default function Charging() {
 
   // Called with the validated token / charger code from the scanner — resolve it server-side
   const handleScanToken = async (token: string) => {
+    console.log('[QR] handleScanToken received token:', token);
     setShowScanner(false);
     setState('scanning');
     try {
+      console.log('[QR] calling resolveScan…');
       const result = await sessionService.resolveScan(token);
+      console.log('[PLUG] resolveScan →', JSON.stringify({
+        connector_id: result.connector?.connector_id,
+        connector_state: result.connector_state,
+        machine_online: result.machine?.online,
+        machine_status: result.machine?.status,
+        configured: result.machine?.configured,
+      }));
 
       if (!result.connector || !result.connector.connector_id) {
         await notify('This charger has no connectors configured. Please try another.');
@@ -404,7 +418,6 @@ export default function Charging() {
         power: result.machine.power || result.connector.power || '—',
       });
       // Live machine/connector context for the status card + plug gate
-      setMachineId(result.machine.machine_id);
       setMachineDetails({
         name: result.machine.name,
         type: result.machine.machine_type,
@@ -426,7 +439,7 @@ export default function Charging() {
       setPaused(false);
       setState('station-details');
     } catch (error: any) {
-      console.error('Error resolving QR:', error);
+      console.error('[QR] Error resolving QR:', error, error?.message, error?.kind);
       await notify(error?.message || 'Could not read this charger QR. Please try again.');
       setState('idle');
     }
@@ -512,7 +525,6 @@ export default function Charging() {
     setCurrentSessionId(null);
     setPrepaidAmount(0);
     // reset live charger context
-    setMachineId(null);
     setMachineDetails(null);
     setConnectorState('unplugged');
     setMachineOnline(true);

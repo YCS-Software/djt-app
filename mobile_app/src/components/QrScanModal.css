@@ -1,18 +1,23 @@
+/* Fullscreen scanner. IMPORTANT: html5-qrcode decodes the camera frame at the
+   on-screen viewfinder's CSS-pixel size, not the native stream resolution. A
+   small viewfinder downscales a dense QR below the decoder's resolution limit,
+   so the camera "scans" forever without ever decoding. Making the viewfinder
+   as large as possible (fullscreen) is what makes dense QRs decode reliably. */
 .qs-overlay {
   position: fixed; inset: 0; z-index: 120;
-  background: rgba(4, 9, 18, 0.78); backdrop-filter: blur(4px);
-  display: flex; align-items: center; justify-content: center; padding: 1rem;
+  background: #04111f;
+  display: flex; align-items: stretch; justify-content: center; padding: 0;
   animation: qs-fade 180ms ease;
 }
 @keyframes qs-fade { from { opacity: 0; } to { opacity: 1; } }
 
 .qs-modal {
-  width: 100%; max-width: 420px;
-  background: #0D1E32; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 20px;
-  padding: 1rem; color: #E8F0F7;
+  width: 100%; height: 100%; max-width: 640px;
+  background: #0D1E32; border: none; border-radius: 0;
+  padding: 0.9rem; color: #E8F0F7; display: flex; flex-direction: column;
   font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
-.qs-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.9rem; }
+.qs-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem; flex: 0 0 auto; }
 .qs-head h3 { font-size: 1.05rem; font-weight: 700; margin: 0; }
 .qs-close {
   display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px;
@@ -20,25 +25,28 @@
   color: #9FBBD4; cursor: pointer;
 }
 
+/* Fills all remaining vertical space → largest possible decode canvas. */
 .qs-frame {
-  position: relative; width: 100%; aspect-ratio: 1 / 1; border-radius: 16px; overflow: hidden;
+  position: relative; flex: 1 1 auto; width: 100%; min-height: 0;
+  border-radius: 16px; overflow: hidden;
   background: #04111f; border: 1px solid rgba(255, 255, 255, 0.1);
 }
 .qs-reader { width: 100%; height: 100%; }
 .qs-reader video { width: 100% !important; height: 100% !important; object-fit: cover; }
+/* Alignment guide only — scanning is full-frame, so this is just a hint. */
 .qs-frame::after {
-  content: ''; position: absolute; inset: 16%; border: 2px solid rgba(94, 234, 212, 0.85);
-  border-radius: 14px; box-shadow: 0 0 0 100vmax rgba(4, 17, 31, 0.35); pointer-events: none;
+  content: ''; position: absolute; inset: 12%; border: 2px solid rgba(94, 234, 212, 0.85);
+  border-radius: 14px; pointer-events: none;
 }
 .qs-loading {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 0.5rem;
   color: #9FBBD4; font-size: 0.88rem;
 }
-.qs-hint { text-align: center; font-size: 0.82rem; color: #9FBBD4; margin: 0.7rem 0 0.4rem; }
+.qs-hint { text-align: center; font-size: 0.82rem; color: #9FBBD4; margin: 0.7rem 0 0.2rem; flex: 0 0 auto; }
 
 .qs-alert {
   display: flex; align-items: center; gap: 0.5rem; padding: 0.7rem 0.85rem; border-radius: 12px;
-  font-size: 0.84rem; margin-top: 0.6rem;
+  font-size: 0.84rem; margin-top: 0.6rem; flex: 0 0 auto;
 }
 .qs-alert-error { background: rgba(248, 113, 113, 0.12); border: 1px solid rgba(248, 113, 113, 0.4); color: #FCA5A5; }
 .qs-alert-warn { background: rgba(251, 191, 36, 0.12); border: 1px solid rgba(251, 191, 36, 0.4); color: #FCD34D; }

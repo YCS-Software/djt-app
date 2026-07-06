@@ -13,6 +13,9 @@ import './QrScanModal.css';
 const READER_ID = 'djt-qr-reader';
 const TOKEN_PREFIX = 'DJTEV1.';
 
+// Tagged logger so you can filter the Chrome DevTools console by "[QR]".
+const qlog = (...a: unknown[]) => console.log('[QR]', ...a);
+
 export default function QrScanModal({ onResult, onClose }: { onResult: (token: string) => void; onClose: () => void }) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const handledRef = useRef(false);
@@ -25,44 +28,117 @@ export default function QrScanModal({ onResult, onClose }: { onResult: (token: s
 
   useEffect(() => {
     let cancelled = false;
+    qlog('modal mounted — initializing scanner');
+    // NOTE: we deliberately do NOT enable experimentalFeatures.useBarCodeDetectorIfSupported.
+    // On this Samsung WebView (and others) that native path processes frames but
+    // never returns a successful decode — verified via device logs: 300+ frames
+    // processed, zero decodes. The bundled zxing JS decoder decodes reliably; the
+    // large qrbox below gives the alignment tolerance we want.
     const scanner = new Html5Qrcode(READER_ID, { verbose: false });
     scannerRef.current = scanner;
 
     const onDecoded = (text: string) => {
-      if (handledRef.current) return;
+      qlog('DECODED raw value:', JSON.stringify(text));
+      if (handledRef.current) { qlog('…ignored (already handled)'); return; }
       const value = (text || '').trim();
       // Accept the signed app token (preferred) OR a sticker/QR that encodes the
       // charger ws-url or a bare DJT OCPP id — the server resolves all three.
       const isToken = value.startsWith(TOKEN_PREFIX);
       const isWsOrOcpp = /\/ocpp\/[^/?#\s]+/i.test(value) || /^DJT-\d+-CP\d+-[A-Za-z0-9]+$/i.test(value);
+      qlog('classify →', { isToken, isWsOrOcpp });
       if (!isToken && !isWsOrOcpp) {
+        qlog('REJECTED — not a DJT charger code');
         setNotice('Not a DJT charger code — scan the QR on the machine');
         return;
       }
+      qlog('ACCEPTED — handing token to app:', value);
       handledRef.current = true;
       stop().finally(() => onResult(value));
     };
 
-    scanner
-      .start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 240, height: 240 } }, onDecoded, () => {})
-      .then(() => { if (!cancelled) setStarting(false); })
-      .catch((e: any) => {
+    // Per-frame "no QR found" callback. html5-qrcode calls this many times a
+    // second while the camera runs — throttle to prove the scan loop is ALIVE
+    // (if you never see this line, the camera never started).
+    let lastTick = 0;
+    let frames = 0;
+    const onScanFailure = () => {
+      frames++;
+      const t = Date.now();
+      if (t - lastTick > 2000) {
+        lastTick = t;
+        qlog(`scanning… camera live, ${frames} frames processed, still searching for a QR`);
+      }
+    };
+
+    // High-resolution + continuous autofocus. A low-res or out-of-focus frame
+    // makes a dense QR unreadable no matter how well aimed — the usual reason a
+    // live camera "scans" forever without decoding. These rich constraints MUST
+    // go through `videoConstraints` (html5-qrcode requires the first start() arg
+    // to have exactly one key), and the validator allows all of these.
+    const HI_RES = {
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+      // `advanced`/focusMode aren't in the TS DOM types but Android Chrome honours them.
+      advanced: [{ focusMode: 'continuous' }],
+    };
+
+    // Log what camera we actually got (resolution/focus) — a tiny resolution here
+    // explains a persistent no-decode.
+    const logTrack = () => {
+      try {
+        const s = (scanner as any).getRunningTrackSettings?.();
+        if (s) qlog('camera track settings:', JSON.stringify({ w: s.width, h: s.height, fps: s.frameRate, facing: s.facingMode }));
+        // The DECODE canvas is capped at the on-screen video size (CSS px) — log
+        // it to confirm the fullscreen viewfinder gives us enough resolution.
+        const v = document.querySelector(`#${READER_ID} video`) as HTMLVideoElement | null;
+        if (v) qlog(`viewfinder (decode canvas ceiling) ${v.clientWidth}x${v.clientHeight} css-px`);
+      } catch { /* not fatal */ }
+    };
+
+    // Start the camera. First arg = single-key selector (required, but ignored
+    // once videoConstraints is supplied); videoConstraints carries the real
+    // request. NOTE: no `qrbox` → html5-qrcode scans the FULL frame, so aim no
+    // longer has to be pixel-perfect (this was the "100% precision" pain point).
+    const startWith = (selector: object, video: object) =>
+      scanner.start(selector as any, { fps: 10, videoConstraints: video as any }, onDecoded, onScanFailure);
+
+    (async () => {
+      try {
+        qlog('starting camera with facingMode=environment…');
+        await startWith({ facingMode: 'environment' }, { facingMode: 'environment', ...HI_RES });
+        if (!cancelled) { qlog('camera STARTED ok (environment)'); logTrack(); setStarting(false); }
+      } catch (e1: any) {
+        qlog('environment start FAILED:', String(e1?.message || e1));
         if (cancelled) return;
-        setStarting(false);
-        const msg = String(e?.message || e);
-        setError(/permission|notallowed/i.test(msg)
-          ? 'Camera permission denied. Allow camera access to scan.'
-          : 'Unable to start the camera on this device.');
-      });
+        // Fallback: enumerate cameras and try the last device explicitly.
+        try {
+          const cams = await Html5Qrcode.getCameras();
+          qlog('enumerated cameras:', cams.map((c) => ({ id: c.id, label: c.label })));
+          if (!cams.length) throw new Error('no cameras found');
+          const back = cams[cams.length - 1];
+          qlog('retrying with deviceId:', back.id, back.label);
+          await startWith({ deviceId: back.id }, { deviceId: { exact: back.id }, ...HI_RES });
+          if (!cancelled) { qlog('camera STARTED ok (deviceId fallback)'); logTrack(); setStarting(false); }
+        } catch (e2: any) {
+          if (cancelled) return;
+          const msg = String(e2?.message || e1?.message || e2 || e1);
+          qlog('camera start FAILED (both attempts):', msg);
+          setStarting(false);
+          setError(/permission|notallowed|denied/i.test(msg)
+            ? 'Camera permission denied. Allow camera access to scan.'
+            : 'Unable to start the camera on this device.');
+        }
+      }
+    })();
 
     const stop = async () => {
       try {
-        if (scanner.isScanning) await scanner.stop();
+        if (scanner.isScanning) { qlog('stopping camera'); await scanner.stop(); }
         scanner.clear();
-      } catch { /* already stopped */ }
+      } catch (e) { qlog('stop() ignored error:', String((e as any)?.message || e)); }
     };
 
-    return () => { cancelled = true; stop(); };
+    return () => { qlog('modal unmounting — stopping camera'); cancelled = true; stop(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
