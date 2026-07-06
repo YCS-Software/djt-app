@@ -2,7 +2,9 @@
    on-screen viewfinder's CSS-pixel size, not the native stream resolution. A
    small viewfinder downscales a dense QR below the decoder's resolution limit,
    so the camera "scans" forever without ever decoding. Making the viewfinder
-   as large as possible (fullscreen) is what makes dense QRs decode reliably. */
+   as large as possible (fullscreen) is what makes dense QRs decode reliably.
+   All overlays below are purely decorative (pointer-events:none) — the decoder
+   reads raw <video> frames, so none of this affects scanning. */
 .qs-overlay {
   position: fixed; inset: 0; z-index: 120;
   background: #04111f;
@@ -13,37 +15,88 @@
 
 .qs-modal {
   width: 100%; height: 100%; max-width: 640px;
-  background: #0D1E32; border: none; border-radius: 0;
+  background:
+    radial-gradient(120% 60% at 50% -10%, rgba(94, 234, 212, 0.10), transparent 60%),
+    linear-gradient(180deg, #0D1E32 0%, #091626 100%);
+  border: none; border-radius: 0;
   padding: 0.9rem; color: #E8F0F7; display: flex; flex-direction: column;
   font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
-.qs-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem; flex: 0 0 auto; }
-.qs-head h3 { font-size: 1.05rem; font-weight: 700; margin: 0; }
-.qs-close {
-  display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px;
-  background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #9FBBD4; cursor: pointer;
-}
 
-/* Fills all remaining vertical space → largest possible decode canvas. */
+/* ---- header ---- */
+.qs-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.85rem; flex: 0 0 auto; }
+.qs-title { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+.qs-title-icon {
+  display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; flex: 0 0 auto;
+  background: linear-gradient(135deg, rgba(94, 234, 212, 0.22), rgba(94, 234, 212, 0.06));
+  border: 1px solid rgba(94, 234, 212, 0.38); color: #5EEAD4;
+}
+.qs-title h3 { font-size: 1.06rem; font-weight: 700; margin: 0; line-height: 1.1; letter-spacing: 0.1px; }
+.qs-sub { font-size: 0.72rem; color: #7C99B5; margin: 2px 0 0; font-weight: 500; }
+.qs-close {
+  display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #B7CCE0; cursor: pointer; transition: background 140ms ease, color 140ms ease;
+}
+.qs-close:active { background: rgba(255, 255, 255, 0.16); color: #fff; }
+
+/* ---- viewfinder (fills remaining space → largest decode canvas) ---- */
 .qs-frame {
   position: relative; flex: 1 1 auto; width: 100%; min-height: 0;
-  border-radius: 16px; overflow: hidden;
-  background: #04111f; border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px; overflow: hidden;
+  background: #04111f; border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.45);
 }
 .qs-reader { width: 100%; height: 100%; }
 .qs-reader video { width: 100% !important; height: 100% !important; object-fit: cover; }
-/* Alignment guide only — scanning is full-frame, so this is just a hint. */
-.qs-frame::after {
-  content: ''; position: absolute; inset: 12%; border: 2px solid rgba(94, 234, 212, 0.85);
-  border-radius: 14px; pointer-events: none;
-}
-.qs-loading {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 0.5rem;
-  color: #9FBBD4; font-size: 0.88rem;
-}
-.qs-hint { text-align: center; font-size: 0.82rem; color: #9FBBD4; margin: 0.7rem 0 0.2rem; flex: 0 0 auto; }
 
+/* Decorative aiming overlay — full-frame scanning still applies, this is a guide. */
+.qs-guide { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.qs-window {
+  position: relative; width: min(72%, 300px); aspect-ratio: 1; border-radius: 20px;
+  /* darken everything OUTSIDE the window to focus the eye (cutout effect) */
+  box-shadow: 0 0 0 100vmax rgba(4, 14, 26, 0.46);
+}
+.qs-corner { position: absolute; width: 30px; height: 30px; border: 3px solid #5EEAD4; }
+.qs-corner.tl { top: -2px; left: -2px; border-right: 0; border-bottom: 0; border-top-left-radius: 16px; }
+.qs-corner.tr { top: -2px; right: -2px; border-left: 0; border-bottom: 0; border-top-right-radius: 16px; }
+.qs-corner.bl { bottom: -2px; left: -2px; border-right: 0; border-top: 0; border-bottom-left-radius: 16px; }
+.qs-corner.br { bottom: -2px; right: -2px; border-left: 0; border-top: 0; border-bottom-right-radius: 16px; }
+
+/* sweeping scan line */
+.qs-scanline {
+  position: absolute; left: 7%; right: 7%; height: 2px; top: 10%;
+  background: linear-gradient(90deg, transparent, rgba(94, 234, 212, 0.95), transparent);
+  box-shadow: 0 0 14px 2px rgba(94, 234, 212, 0.65);
+  border-radius: 2px;
+  animation: qs-scan 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes qs-scan {
+  0%   { top: 10%; opacity: 0.25; }
+  50%  { top: 88%; opacity: 1; }
+  100% { top: 10%; opacity: 0.25; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qs-scanline { animation: none; top: 50%; opacity: 0.8; }
+}
+
+.qs-loading {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 0.55rem;
+  color: #C4D6E8; font-size: 0.9rem; font-weight: 500;
+  background: rgba(4, 14, 26, 0.35); backdrop-filter: blur(1.5px);
+}
+
+/* ---- hint pill ---- */
+.qs-hint {
+  align-self: center; display: inline-flex; align-items: center; gap: 0.45rem;
+  text-align: center; font-size: 0.8rem; color: #AFC6DC; font-weight: 500;
+  margin: 0.75rem 0 0.2rem; padding: 0.5rem 0.95rem;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 999px; flex: 0 0 auto;
+}
+.qs-hint svg { color: #5EEAD4; flex: 0 0 auto; }
+
+/* ---- alerts ---- */
 .qs-alert {
   display: flex; align-items: center; gap: 0.5rem; padding: 0.7rem 0.85rem; border-radius: 12px;
   font-size: 0.84rem; margin-top: 0.6rem; flex: 0 0 auto;

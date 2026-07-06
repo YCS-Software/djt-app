@@ -6,7 +6,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { X, AlertTriangle, Loader2 } from 'lucide-react';
+import { X, AlertTriangle, Loader2, ScanLine, QrCode } from 'lucide-react';
 import { useBackHandler } from '../services/backHandler';
 import './QrScanModal.css';
 
@@ -146,7 +146,13 @@ export default function QrScanModal({ onResult, onClose }: { onResult: (token: s
     <div className="qs-overlay" onClick={onClose}>
       <div className="qs-modal" onClick={(e) => e.stopPropagation()}>
         <div className="qs-head">
-          <h3>Scan charger QR</h3>
+          <div className="qs-title">
+            <span className="qs-title-icon"><ScanLine size={18} /></span>
+            <div>
+              <h3>Scan charger QR</h3>
+              <p className="qs-sub">Align the code within the frame</p>
+            </div>
+          </div>
           <button className="qs-close" onClick={onClose} aria-label="Close"><X size={18} /></button>
         </div>
 
@@ -156,9 +162,20 @@ export default function QrScanModal({ onResult, onClose }: { onResult: (token: s
           <>
             <div className="qs-frame">
               <div id={READER_ID} className="qs-reader" />
+              {/* Decorative aiming guide — pointer-events:none, does not affect the
+                  full-frame decode (html5-qrcode reads raw <video> frames). */}
+              <div className="qs-guide" aria-hidden="true">
+                <div className="qs-window">
+                  <span className="qs-corner tl" />
+                  <span className="qs-corner tr" />
+                  <span className="qs-corner bl" />
+                  <span className="qs-corner br" />
+                  <span className="qs-scanline" />
+                </div>
+              </div>
               {starting && <div className="qs-loading"><Loader2 className="qs-spin" size={22} /> Starting camera…</div>}
             </div>
-            <p className="qs-hint">Point the camera at the QR code on the charger.</p>
+            <p className="qs-hint"><QrCode size={14} /> Point the camera at the QR code on the charger.</p>
             {notice && <div className="qs-alert qs-alert-warn"><AlertTriangle size={16} /> <span>{notice}</span></div>}
           </>
         )}
