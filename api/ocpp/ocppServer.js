@@ -83,7 +83,9 @@ async function handleCall(conn, frame) {
         return;
     }
     try {
-        const ctx = { conn, registry, ocppMdl, nowIso, OcppError };
+        // sendCall is exposed so handlers can issue CSMS->CP commands (e.g. the
+        // MeterValues handler stops a transaction once the prepaid cap is reached).
+        const ctx = { conn, registry, ocppMdl, nowIso, OcppError, sendCall };
         const responsePayload = (await handler(payload || {}, ctx)) || {};
         // Audit the outbound response (CSMS -> CP)
         logMsg(conn, { direction: 'out', messageType: 'CALLRESULT', messageId: id, action, payload: responsePayload });

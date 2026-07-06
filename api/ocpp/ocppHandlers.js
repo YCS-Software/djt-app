@@ -14,6 +14,11 @@ const ledgerService = require('../modules/ledger/services/ledgerService');
 // transactionId -> starting meter register (kWh) for delta energy calculation
 const txnBaselines = new Map();
 
+// transactionIds we've already asked the charger to stop because the driver's
+// prepaid units were fully consumed — prevents sending RemoteStop on every
+// subsequent MeterValues while the charger winds down.
+const capStopRequested = new Set();
+
 const HEARTBEAT_INTERVAL = 300; // seconds
 
 // OCPP 1.6 requires the CSMS to assign an INTEGER transactionId in the
@@ -248,6 +253,7 @@ const handlers = {
         if (session.cnntr_id) await ocppMdl.updateConnectorStatusMdl(session.cnntr_id, 'occupied', false);
         if (machine) await ocppMdl.recalcMachineStatusMdl(machine.mchn_id);
         txnBaselines.delete(txnKey);
+        capStopRequested.delete(txnKey);
 
         await finalizeAndSettle(ctx, session, energy, cost);
 
@@ -277,9 +283,25 @@ const handlers = {
         const energy = consumedKwh(txnId, reg);
         const price = parseFloat(session.prce_per_kwh_amt) || ctx.conn.pricePerKwh || 0;
         const cost = +(energy * price).toFixed(2);
-        const progress = Math.min(99, Math.round((energy / 30) * 100));
+        // Prepaid units = the held amount (ttl_cst_amt) / price. Progress is measured
+        // against what the driver actually bought, not a nominal fill.
+        const prepaid = parseFloat(session.ttl_cst_amt) || 0;
+        const purchasedUnits = price > 0 ? prepaid / price : 0;
+        const progress = purchasedUnits > 0
+            ? Math.min(99, Math.round((energy / purchasedUnits) * 100))
+            : Math.min(99, Math.round((energy / 30) * 100));
         await ctx.ocppMdl.updateOcppSessionProgressMdl({ sessionId: session.sssn_id, energyKwh: energy, cost, progress });
-        console.log(`[OCPP][1.6][MeterValues] ${ctx.conn.ocppId} txn=${txnId} session#${session.sssn_id} register=${reg}kWh energy=${energy}kWh cost=₹${cost} progress=${progress}%`);
+        console.log(`[OCPP][1.6][MeterValues] ${ctx.conn.ocppId} txn=${txnId} session#${session.sssn_id} register=${reg}kWh energy=${energy}/${purchasedUnits}kWh cost=₹${cost} progress=${progress}%`);
+
+        // PREPAID CAP: once the driver's purchased units are consumed, stop the
+        // transaction server-side (authoritative). Fire-and-forget RemoteStop; the
+        // charger's StopTransaction then finalizes + settles from the real meter.
+        if (purchasedUnits > 0 && energy >= purchasedUnits && !capStopRequested.has(txnId) && ctx.sendCall) {
+            capStopRequested.add(txnId);
+            console.log(`[OCPP][1.6] prepaid cap reached (${energy} >= ${purchasedUnits} kWh) — auto-stopping txn=${txnId}`);
+            ctx.sendCall(ctx.conn, 'RemoteStopTransaction', { transactionId: Number(txnId) || txnId })
+                .catch((e) => console.error('[OCPP] cap RemoteStop failed:', e.message));
+        }
         return {};
     },
 
