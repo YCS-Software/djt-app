@@ -82,19 +82,29 @@ async function remoteStopCharger(ocppId, transactionId) {
 }
 
 /**
- * Derive a human connector state from THIS connector's live status
- * (cnntr_sttus_cd, set per-connector from OCPP StatusNotification):
- *  offline   – charger not connected to the CSMS socket
- *  faulted / unavailable – connector error / reserved / out of service
- *  charging  – this connector is charging (or its session is active)
- *  plugged   – cable connected (Occupied) but not yet charging
- *  unplugged – online and free (Available)
+ * Derive a human connector state from THIS connector's REAL live status
+ * (cnntr_sttus_cd, set per-connector from the charger's OCPP StatusNotification).
+ * This intentionally reflects the machine's own reported state and does NOT treat
+ * an active app session as "charging" — an accepted RemoteStart is not charging
+ * until the charger sends StatusNotification(Charging).
+ *  offline        – charger not connected to the CSMS socket
+ *  faulted        – connector error
+ *  unavailable    – reserved / out of service / maintenance
+ *  charging       – energy actually flowing (StatusNotification 'Charging')
+ *  suspended_ev   – charger ready, vehicle paused it (SuspendedEV)
+ *  suspended_evse – vehicle ready, charger paused it (SuspendedEVSE)
+ *  plugged        – cable connected (Preparing/Occupied) but not charging yet
+ *  unplugged      – online and free (Available)
+ * `sssnStatus` is accepted for signature compatibility but no longer forces a
+ * state — the machine's own status is authoritative.
  */
-function deriveConnectorState(online, connStatus, sssnStatus) {
+function deriveConnectorState(online, connStatus, sssnStatus) { // eslint-disable-line no-unused-vars
     if (!online) return 'offline';
     if (connStatus === 'faulted') return 'faulted';
     if (connStatus === 'unavailable' || connStatus === 'reserved') return 'unavailable';
-    if (connStatus === 'charging' || sssnStatus === 'active') return 'charging';
+    if (connStatus === 'suspended_ev') return 'suspended_ev';
+    if (connStatus === 'suspended_evse') return 'suspended_evse';
+    if (connStatus === 'charging') return 'charging';
     if (connStatus === 'occupied') return 'plugged';
     return 'unplugged';
 }

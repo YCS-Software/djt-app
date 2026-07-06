@@ -27,12 +27,15 @@ function nextTransactionId() {
 }
 
 // Map OCPP 1.6 StatusNotification.status -> our per-CONNECTOR status enum.
+// NOTE: 'Charging' is the ONLY status that means energy is actually flowing —
+// the app gates its "Charging in Progress" screen on it. Suspended states are
+// kept distinct so the app can show "paused by vehicle / charger".
 const CONNECTOR_STATUS_MAP = {
     Available: 'available',
-    Preparing: 'occupied',
-    Charging: 'charging',
-    SuspendedEV: 'occupied',
-    SuspendedEVSE: 'occupied',
+    Preparing: 'occupied',      // cable plugged, not charging yet
+    Charging: 'charging',       // energy actually flowing
+    SuspendedEV: 'suspended_ev',      // charger ready, vehicle paused it
+    SuspendedEVSE: 'suspended_evse',  // vehicle ready, charger paused it
     Finishing: 'occupied',
     Reserved: 'reserved',
     Unavailable: 'unavailable',
@@ -191,9 +194,13 @@ const handlers = {
         const existing = unlinked && unlinked[0];
         if (existing) {
             await ocppMdl.attachOcppTxnMdl(existing.sssn_id, txnKey);
-            await ocppMdl.updateConnectorStatusMdl(connectorId, 'charging', false);
+            // Do NOT force 'charging' here — StartTransaction only means the
+            // transaction was CREATED, not that energy is flowing. The connector's
+            // live status is owned by StatusNotification (Charging / SuspendedEV /
+            // …), so the app only shows "Charging in Progress" once the machine
+            // actually confirms it. Just refresh the machine badge.
             await ocppMdl.recalcMachineStatusMdl(machine.mchn_id);
-            console.log(`[OCPP][1.6] StartTransaction txn=${txnId} linked to app session#${existing.sssn_id} (connector ${connectorId})`);
+            console.log(`[OCPP][1.6] StartTransaction txn=${txnId} linked to app session#${existing.sssn_id} (connector ${connectorId}) — awaiting StatusNotification(Charging)`);
             return { transactionId: txnId, idTagInfo: { status: 'Accepted' } };
         }
 
@@ -210,9 +217,9 @@ const handlers = {
             sessionCode, userId: user.usr_id, stationId: machine.sttn_id,
             connectorId, pricePerKwh: conn.pricePerKwh, ocppTxnId: txnKey,
         });
-        await ocppMdl.updateConnectorStatusMdl(connectorId, 'charging', false);
+        // Connector live status is owned by StatusNotification (see note above).
         await ocppMdl.recalcMachineStatusMdl(machine.mchn_id);
-        console.log(`[OCPP][1.6] StartTransaction txn=${txnId} session#${res.insertId} user#${user.usr_id} @ ${conn.ocppId}`);
+        console.log(`[OCPP][1.6] StartTransaction txn=${txnId} session#${res.insertId} user#${user.usr_id} @ ${conn.ocppId} — awaiting StatusNotification(Charging)`);
         return { transactionId: txnId, idTagInfo: { status: 'Accepted' } };
     },
 
