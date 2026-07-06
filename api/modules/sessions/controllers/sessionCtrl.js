@@ -21,41 +21,62 @@ function isChargerOnline(ocppId) {
     return !!(ocppId && ocppServer.getConnection(ocppId));
 }
 
-// Command the charger to START a transaction on a specific EVSE (real relay ON).
+// Command the charger to START a transaction (OCPP 1.6 RemoteStartTransaction —
+// real relay ON). `evseId` is the 1-based connector ordinal (= 1.6 connectorId).
 // Returns { attempted, accepted, message }. Only attempts when remote control is
 // enabled and the charger holds a live socket.
 async function remoteStartCharger(ocppId, evseId, userId) {
     if (!config.ocpp || config.ocpp.remoteControl === false) return { attempted: false };
     const conn = ocppServer.getConnection(ocppId);
-    if (!conn) return { attempted: false }; // offline is guarded before we reach here
+    if (!conn) {
+        console.log(`[sessionCtrl][1.6] RemoteStartTransaction skipped — ${ocppId} not connected`);
+        return { attempted: false }; // offline is guarded before we reach here
+    }
+    // The app has already validated + held funds for this driver. If the charger
+    // has AuthorizeRemoteTxRequests=true it will send an Authorize right after the
+    // RemoteStart — that must be accepted regardless of the now-reduced wallet
+    // balance. Flag it so the Authorize handler doesn't re-check the balance.
+    conn.pendingRemoteAuth = { idTag: String(userId), until: Date.now() + 120000 };
+    const connectorId = Number(evseId) || 1;
     try {
-        const result = await ocppServer.sendCall(conn, 'RequestStartTransaction', {
-            remoteStartId: Math.floor(Date.now() % 100000),
-            idToken: { idToken: String(userId), type: 'Central' },
-            evseId: Number(evseId) || 1,
+        console.log(`[sessionCtrl][1.6] -> RemoteStartTransaction ${ocppId} connectorId=${connectorId} idTag=${userId}`);
+        const result = await ocppServer.sendCall(conn, 'RemoteStartTransaction', {
+            connectorId,
+            idTag: String(userId),
         });
         const accepted = !!(result && result.status === 'Accepted');
+        console.log(`[sessionCtrl][1.6] <- RemoteStartTransaction ${ocppId} status=${result && result.status} accepted=${accepted}`);
         return {
             attempted: true,
             accepted,
             message: accepted ? null
-                : (result && result.statusInfo && result.statusInfo.additionalInfo)
-                || 'The charger did not accept the start request. Please try again.',
+                : 'The charger did not accept the start request. Please try again.',
         };
     } catch (e) {
+        console.log(`[sessionCtrl][1.6] RemoteStartTransaction ${ocppId} FAILED: ${e.message}`);
         return { attempted: true, accepted: false, message: 'The charger did not respond. Please try again.' };
     }
 }
 
-// Command the charger to STOP a transaction (real relay OFF). Best-effort.
+// Command the charger to STOP a transaction (OCPP 1.6 RemoteStopTransaction —
+// real relay OFF). Best-effort; takes the integer transactionId.
 async function remoteStopCharger(ocppId, transactionId) {
     if (!config.ocpp || config.ocpp.remoteControl === false) return { attempted: false };
     const conn = ocppServer.getConnection(ocppId);
-    if (!conn || !transactionId) return { attempted: false };
+    if (!conn || !transactionId) {
+        console.log(`[sessionCtrl][1.6] RemoteStopTransaction skipped — ${ocppId} connected=${!!conn} txn=${transactionId}`);
+        return { attempted: false };
+    }
     try {
-        const result = await ocppServer.sendCall(conn, 'RequestStopTransaction', { transactionId: String(transactionId) });
-        return { attempted: true, accepted: !!(result && result.status === 'Accepted') };
+        console.log(`[sessionCtrl][1.6] -> RemoteStopTransaction ${ocppId} transactionId=${transactionId}`);
+        const result = await ocppServer.sendCall(conn, 'RemoteStopTransaction', {
+            transactionId: Number(transactionId) || transactionId,
+        });
+        const accepted = !!(result && result.status === 'Accepted');
+        console.log(`[sessionCtrl][1.6] <- RemoteStopTransaction ${ocppId} status=${result && result.status} accepted=${accepted}`);
+        return { attempted: true, accepted };
     } catch (e) {
+        console.log(`[sessionCtrl][1.6] RemoteStopTransaction ${ocppId} FAILED: ${e.message}`);
         return { attempted: true, accepted: false };
     }
 }

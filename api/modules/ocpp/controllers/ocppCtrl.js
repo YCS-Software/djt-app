@@ -53,13 +53,11 @@ exports.remoteStart = function(req, res) {
     const conn = ocppServer.getConnection(ocppId);
     if (!conn) return badRequest(res, 'Charge point is not connected');
 
-    const payload = {
-        remoteStartId: Math.floor(Date.now() % 100000),
-        idToken: { idToken: String(idToken), type: 'Central' },
-    };
-    if (data.evse_id) payload.evseId = Number(data.evse_id);
+    // OCPP 1.6 RemoteStartTransaction: { idTag, connectorId? }
+    const payload = { idTag: String(idToken) };
+    if (data.connector_id || data.evse_id) payload.connectorId = Number(data.connector_id || data.evse_id);
 
-    ocppServer.sendCall(conn, 'RequestStartTransaction', payload)
+    ocppServer.sendCall(conn, 'RemoteStartTransaction', payload)
         .then((result) => df.formatSucessRes(req, res, { result }, cntxtDtls, fnm, { message: 'Remote start sent' }))
         .catch((error) => df.formatErrorRes(res, error, cntxtDtls, fnm, {}));
 };
@@ -75,7 +73,8 @@ exports.remoteStop = function(req, res) {
     const conn = ocppServer.getConnection(ocppId);
     if (!conn) return badRequest(res, 'Charge point is not connected');
 
-    ocppServer.sendCall(conn, 'RequestStopTransaction', { transactionId: String(transactionId) })
+    // OCPP 1.6 RemoteStopTransaction: { transactionId } (integer)
+    ocppServer.sendCall(conn, 'RemoteStopTransaction', { transactionId: Number(transactionId) || transactionId })
         .then((result) => df.formatSucessRes(req, res, { result }, cntxtDtls, fnm, { message: 'Remote stop sent' }))
         .catch((error) => df.formatErrorRes(res, error, cntxtDtls, fnm, {}));
 };

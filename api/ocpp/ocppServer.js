@@ -1,8 +1,8 @@
 /**
- * OCPP 2.0.1 WebSocket server (CSMS side)
+ * OCPP 1.6J WebSocket server (CSMS side)
  *
  * Charge points connect to:  ws://<host>:<port>/ocpp/<chargePointId>
- * with subprotocol "ocpp2.0.1". Messages use the OCPP-J framing:
+ * with subprotocol "ocpp1.6". Messages use the OCPP-J framing:
  *   CALL       [2, messageId, action, payload]
  *   CALLRESULT [3, messageId, payload]
  *   CALLERROR  [4, messageId, errorCode, errorDescription, errorDetails]
@@ -154,7 +154,10 @@ function attachOcpp(server) {
     const wss = new WebSocketServer({
         server,
         path: undefined, // accept any path; we validate /ocpp/ ourselves
-        handleProtocols: (protocols) => (protocols.has('ocpp2.0.1') ? 'ocpp2.0.1' : false),
+        // Confirm the OCPP 1.6J subprotocol so the charger completes its handshake.
+        // (Some 1.6 chargers tolerate an unconfirmed subprotocol, but confirming it
+        // is correct and avoids version-mismatch disconnects.)
+        handleProtocols: (protocols) => (protocols.has('ocpp1.6') ? 'ocpp1.6' : false),
     });
 
     wss.on('connection', (ws, req) => {
@@ -176,6 +179,9 @@ function attachOcpp(server) {
         const conn = {
             ocppId,
             ws,
+            // Negotiated OCPP subprotocol ('ocpp1.6' or '' if the charger left it
+            // unconfirmed). Recorded for diagnostics.
+            protocol: ws.protocol || '',
             machineId: null,
             stationId: null,
             pricePerKwh: 0,
@@ -187,8 +193,8 @@ function attachOcpp(server) {
         };
         registry.set(ocppId, conn);
         // Diagnostics: what subprotocol(s) the charger offered vs what we negotiated,
-        // plus its firmware user-agent. A charger that offers e.g. "ocpp1.6" will show
-        // negotiated_subprotocol = null here (this server only speaks ocpp2.0.1).
+        // plus its firmware user-agent. A charger that does NOT offer "ocpp1.6" will
+        // show negotiated_subprotocol = null here (this server speaks ocpp1.6).
         const offeredProtocols = req.headers['sec-websocket-protocol'] || null;
         const userAgent = req.headers['user-agent'] || null;
         console.log(`[OCPP] Charge point connected: ${ocppId} (${registry.size} online) ` +
@@ -208,7 +214,7 @@ function attachOcpp(server) {
             if (registry.get(ocppId) === conn && conn.lastSeen <= conn.connectedAt) {
                 console.warn(`[OCPP] ${ocppId}: no OCPP message within 15s of connect (offered=[${offeredProtocols || '-'}])`);
                 logMsg(conn, { direction: 'sys', messageType: 'ERROR', errorCode: 'NoBootNotification',
-                    errorDesc: `No OCPP message received within 15s of connect — likely OCPP version/subprotocol mismatch (server speaks ocpp2.0.1; charger offered [${offeredProtocols || 'none'}])` });
+                    errorDesc: `No OCPP message received within 15s of connect — likely OCPP version/subprotocol mismatch (server speaks ocpp1.6; charger offered [${offeredProtocols || 'none'}])` });
             }
         }, 15000);
 
@@ -237,7 +243,7 @@ function attachOcpp(server) {
         });
     });
 
-    console.log('🔌 OCPP 2.0.1 WebSocket server attached at /ocpp/<chargePointId>');
+    console.log('🔌 OCPP 1.6J WebSocket server attached at /ocpp/<chargePointId>');
     return wss;
 }
 

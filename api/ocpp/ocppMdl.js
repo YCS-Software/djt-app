@@ -1,6 +1,6 @@
 /**
  * OCPP Model
- * DB operations for the OCPP 2.0.1 layer: machine lookup/state, idToken->user
+ * DB operations for the OCPP 1.6 layer: machine lookup/state, idTag->user
  * resolution, and charger-initiated charging sessions.
  */
 
@@ -159,11 +159,14 @@ exports.getSessionByOcppTxnMdl = function(ocppTxnId) {
 };
 
 // A recent app-initiated session on this connector that hasn't been linked to an
-// OCPP transaction yet — so a RemoteStart's TransactionEvent updates it instead
-// of creating a duplicate. Matches active sessions started in the last 5 minutes.
+// OCPP transaction yet — so a RemoteStart's StartTransaction links to it instead
+// of creating a duplicate. Matches sessions from the last 5
+// minutes that are still 'initiated' (RemoteStart accepted, not yet flipped to
+// 'active') OR already 'active' — the charger's StartTransaction can arrive in
+// either window.
 exports.getUnlinkedSessionForConnectorMdl = function(connectorId) {
     const QRY_TO_EXEC = `SELECT * FROM sssn_lst_t
-        WHERE cnntr_id = ? AND a_in = 1 AND sttus_cd = 'active'
+        WHERE cnntr_id = ? AND a_in = 1 AND sttus_cd IN ('active', 'initiated')
           AND (ocpp_txn_id_tx IS NULL OR ocpp_txn_id_tx = '')
           AND i_ts >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
         ORDER BY sssn_id DESC LIMIT 1`;
@@ -184,16 +187,17 @@ exports.getStationOwnerMdl = function(stationId) {
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, [numVal(stationId)], cntxtDtls);
 };
 
-// Live progress update during a transaction
+// Live progress update during a transaction. Updates ONLY energy + progress —
+// deliberately NOT ttl_cst_amt, which holds the prepaid amount that the app reads
+// back as the escrow hold at Stop. The live consumed cost is derived from energy ×
+// price by the readers; the final cost is written at Stop by finalizeOcppSessionMdl.
 exports.updateOcppSessionProgressMdl = function(data) {
     const QRY_TO_EXEC = `UPDATE sssn_lst_t SET
         enrgy_cnsmd_kwh = ?,
-        ttl_cst_amt = ?,
         prgrss_pct = ?
         WHERE sssn_id = ?`;
     const PARAMS = [
         numVal(data.energyKwh, 0),
-        numVal(data.cost, 0),
         numVal(data.progress, 0),
         numVal(data.sessionId),
     ];

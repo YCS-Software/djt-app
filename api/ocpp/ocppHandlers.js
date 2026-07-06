@@ -1,11 +1,11 @@
 /**
- * OCPP 2.0.1 message handlers (CP -> CSMS).
+ * OCPP 1.6J message handlers (CP -> CSMS).
  * Each handler: async (payload, ctx) -> responsePayload
  *   ctx = { conn, registry, ocppMdl, nowIso, OcppError }
  *
  * Implemented core flow:
  *   BootNotification, Heartbeat, StatusNotification, Authorize,
- *   TransactionEvent (Started/Updated/Ended -> wallet debit), MeterValues.
+ *   StartTransaction / StopTransaction (-> settle), MeterValues.
  */
 
 const walletMdl = require('../modules/wallet/models/walletMdl');
@@ -16,26 +16,25 @@ const txnBaselines = new Map();
 
 const HEARTBEAT_INTERVAL = 300; // seconds
 
-// Map OCPP connector status -> our machine status enum
-const STATUS_MAP = {
-    Available: 'available',
-    Occupied: 'in_use',
-    Reserved: 'in_use',
-    Unavailable: 'maintenance',
-    Faulted: 'faulted',
-};
+// OCPP 1.6 requires the CSMS to assign an INTEGER transactionId in the
+// StartTransaction response. Monotonic int32 seeded from the clock; the charger
+// echoes it in MeterValues / StopTransaction so we match the session by it
+// (stored as text in ocpp_txn_id_tx).
+let TXN_SEQ = Math.floor(Date.now() / 1000) % 2000000000;
+function nextTransactionId() {
+    TXN_SEQ = (TXN_SEQ + 1) % 2147483647;
+    return TXN_SEQ;
+}
 
-// Map OCPP connectorStatus -> our per-CONNECTOR status enum. Covers OCPP 1.6
-// (Preparing/Charging/SuspendedEV…) and 2.0.1 (Available/Occupied/…) statuses.
+// Map OCPP 1.6 StatusNotification.status -> our per-CONNECTOR status enum.
 const CONNECTOR_STATUS_MAP = {
     Available: 'available',
     Preparing: 'occupied',
-    Occupied: 'occupied',
-    Reserved: 'reserved',
     Charging: 'charging',
     SuspendedEV: 'occupied',
     SuspendedEVSE: 'occupied',
     Finishing: 'occupied',
+    Reserved: 'reserved',
     Unavailable: 'unavailable',
     Faulted: 'faulted',
 };
@@ -105,181 +104,225 @@ const handlers = {
     /* ---------------------------------------------------------------- */
     async StatusNotification(payload, ctx) {
         const machine = await ensureMachine(ctx);
-        if (machine) {
-            // OCPP StatusNotification is PER CONNECTOR: { connectorId, connectorStatus }.
-            // Resolve the machine's Nth connector (1-based) and update ONLY that one.
-            const connectorId = Number(payload.connectorId) || Number(payload.evseId) || 1;
-            const connStatus = CONNECTOR_STATUS_MAP[payload.connectorStatus] || 'available';
-            const isAvailable = payload.connectorStatus === 'Available';
+        // OCPP 1.6 StatusNotification is PER CONNECTOR: { connectorId, status, errorCode }.
+        // e.g. "Preparing" when the cable is plugged into the vehicle -> 'occupied',
+        // which the customer app reads as "plugged in".
+        const rawStatus = payload.status;
+        const connectorId = Number(payload.connectorId) || 1;
+        const connStatus = CONNECTOR_STATUS_MAP[rawStatus] || 'available';
+        const isAvailable = rawStatus === 'Available';
+        console.log(`[OCPP][StatusNotification] ${ctx.conn.ocppId} conn#${connectorId} raw='${rawStatus}' -> mapped='${connStatus}' isAvailable=${isAvailable} (payload keys: ${Object.keys(payload).join(',')})`);
 
-            const conns = await ctx.ocppMdl.getMachineConnectorsMdl(machine.mchn_id);
-            const target = conns[connectorId - 1] || conns[0];
-            if (target) {
-                await ctx.ocppMdl.updateConnectorStatusMdl(target.cnntr_id, connStatus, isAvailable);
-                // Recompute the machine badge from all its connectors.
-                await ctx.ocppMdl.recalcMachineStatusMdl(machine.mchn_id);
-                console.log(`[OCPP] StatusNotification ${ctx.conn.ocppId} connector#${connectorId} -> ${payload.connectorStatus} (${connStatus})`);
-            }
+        if (!machine) {
+            console.warn(`[OCPP][StatusNotification] no machine bound for ${ctx.conn.ocppId} — status ignored`);
+            return {};
+        }
+        // Resolve the machine's Nth connector (1-based) and update ONLY that one.
+        const conns = await ctx.ocppMdl.getMachineConnectorsMdl(machine.mchn_id);
+        const target = conns[connectorId - 1] || conns[0];
+        if (target) {
+            await ctx.ocppMdl.updateConnectorStatusMdl(target.cnntr_id, connStatus, isAvailable);
+            // Recompute the machine badge from all its connectors.
+            await ctx.ocppMdl.recalcMachineStatusMdl(machine.mchn_id);
+            console.log(`[OCPP][StatusNotification] updated connector cnntr_id=${target.cnntr_id} -> '${connStatus}' for machine ${machine.mchn_id}`);
+        } else {
+            console.warn(`[OCPP][StatusNotification] machine ${machine.mchn_id} has no connector at index ${connectorId - 1}`);
         }
         return {};
     },
 
     /* ---------------------------------------------------------------- */
     async Authorize(payload, ctx) {
-        const token = payload && payload.idToken ? payload.idToken.idToken : null;
-        if (!token) return { idTokenInfo: { status: 'Invalid' } };
+        // OCPP 1.6: { idTag } request, { idTagInfo: { status } } response.
+        const token = payload && payload.idTag;
+        if (!token) return { idTagInfo: { status: 'Invalid' } };
 
         const rows = await ctx.ocppMdl.getUserByIdTokenMdl(token);
         const user = rows && rows[0];
-        if (!user) return { idTokenInfo: { status: 'Invalid' } };
+        if (!user) {
+            console.warn(`[OCPP][1.6][Authorize] ${ctx.conn.ocppId} idTag='${token}' -> Invalid (no user)`);
+            return { idTagInfo: { status: 'Invalid' } };
+        }
+        ctx.conn.authorizedUser = user;
 
+        // App-initiated remote start already authorized + prepaid this driver (funds
+        // held in escrow). Accept without re-checking the now-reduced wallet balance.
+        const pending = ctx.conn.pendingRemoteAuth;
+        if (pending && pending.idTag === String(token) && pending.until > Date.now()) {
+            console.log(`[OCPP][1.6][Authorize] ${ctx.conn.ocppId} idTag='${token}' user#${user.usr_id} -> Accepted (prepaid remote start)`);
+            return { idTagInfo: { status: 'Accepted' } };
+        }
+
+        // Walk-up / post-pay: require a positive balance. (1.6 has no 'NoCredit'
+        // status — 'Blocked' is the closest standard value.)
         const wRows = await walletMdl.getUserWalletMdl({ userId: user.usr_id });
         const balance = wRows && wRows[0] ? parseFloat(wRows[0].blnce_amt) || 0 : 0;
-        ctx.conn.authorizedUser = user;
-        if (balance <= 0) return { idTokenInfo: { status: 'NoCredit' } };
-        return { idTokenInfo: { status: 'Accepted' } };
+        const status = balance <= 0 ? 'Blocked' : 'Accepted';
+        console.log(`[OCPP][1.6][Authorize] ${ctx.conn.ocppId} idTag='${token}' user#${user.usr_id} balance=₹${balance} -> ${status}`);
+        return { idTagInfo: { status } };
     },
 
-    /* ---------------------------------------------------------------- */
-    async TransactionEvent(payload, ctx) {
+    /* ================================================================ */
+    /* OCPP 1.6 transaction messages */
+    /* ================================================================ */
+
+    // OCPP 1.6 StartTransaction: the CSMS assigns the integer transactionId and
+    // returns it. Reconciles with an app session (RemoteStart) or creates a
+    // charger-initiated one, keyed on 1.6's connectorId + meterStart.
+    async StartTransaction(payload, ctx) {
         const { conn, ocppMdl } = ctx;
-        const txnId = payload.transactionInfo && payload.transactionInfo.transactionId;
         const machine = await ensureMachine(ctx);
-        if (!machine || !txnId) {
-            return {}; // nothing we can attach to
-        }
+        if (!machine) return { transactionId: 0, idTagInfo: { status: 'Invalid' } };
 
-        // ---- STARTED ----
-        if (payload.eventType === 'Started') {
-            // baseline meter register for delta energy
-            const startKwh = extractRegisterKwh(payload.meterValue);
-            if (startKwh != null) txnBaselines.set(txnId, startKwh);
+        const connOrdinal = Number(payload.connectorId) || 1;
+        const conns = await ocppMdl.getMachineConnectorsMdl(machine.mchn_id);
+        const targetConn = conns[connOrdinal - 1] || conns[0];
+        const connectorId = targetConn ? targetConn.cnntr_id : null;
+        if (!connectorId) return { transactionId: 0, idTagInfo: { status: 'Invalid' } };
 
-            // Resolve the SPECIFIC connector from the OCPP evse/connectorId
-            const evseConnId = (payload.evse && (payload.evse.connectorId || payload.evse.id)) || 1;
-            const conns = await ocppMdl.getMachineConnectorsMdl(machine.mchn_id);
-            const targetConn = conns[evseConnId - 1] || conns[0];
-            const connectorId = targetConn ? targetConn.cnntr_id : null;
-            if (!connectorId) {
-                throw new ctx.OcppError('GenericError', 'No connector configured for this machine');
-            }
+        const txnId = nextTransactionId();
+        const txnKey = String(txnId);
+        // 1.6 meterStart is the register value in Wh at the start of the transaction.
+        const meterStartKwh = payload.meterStart != null ? Number(payload.meterStart) / 1000 : 0;
+        if (!isNaN(meterStartKwh)) txnBaselines.set(txnKey, meterStartKwh);
 
-            // RECONCILE: if the app already created a session on this connector
-            // (RemoteStart), link the transaction to it — do NOT create a duplicate.
-            const unlinked = await ocppMdl.getUnlinkedSessionForConnectorMdl(connectorId);
-            const existing = unlinked && unlinked[0];
-            if (existing) {
-                await ocppMdl.attachOcppTxnMdl(existing.sssn_id, txnId);
-                await ocppMdl.updateConnectorStatusMdl(connectorId, 'charging', false);
-                await ocppMdl.recalcMachineStatusMdl(machine.mchn_id);
-                console.log(`[OCPP] Txn ${txnId} linked to app session#${existing.sssn_id} (connector ${connectorId})`);
-                return { idTokenInfo: { status: 'Accepted' } };
-            }
-
-            // No app session -> charger-initiated (post-pay). Resolve the user.
-            let user = conn.authorizedUser;
-            const evToken = payload.idToken && payload.idToken.idToken;
-            if (evToken) {
-                const rows = await ocppMdl.getUserByIdTokenMdl(evToken);
-                user = (rows && rows[0]) || user;
-            }
-            if (!user) {
-                return { idTokenInfo: { status: 'Invalid' } };
-            }
-            const sessionCode = 'OCPP-' + Date.now().toString(36).toUpperCase();
-            const res = await ocppMdl.createOcppSessionMdl({
-                sessionCode,
-                userId: user.usr_id,
-                stationId: machine.sttn_id,
-                connectorId,
-                pricePerKwh: conn.pricePerKwh,
-                ocppTxnId: txnId,
-            });
+        // RECONCILE with an app-created session (RemoteStart) on this connector.
+        const unlinked = await ocppMdl.getUnlinkedSessionForConnectorMdl(connectorId);
+        const existing = unlinked && unlinked[0];
+        if (existing) {
+            await ocppMdl.attachOcppTxnMdl(existing.sssn_id, txnKey);
             await ocppMdl.updateConnectorStatusMdl(connectorId, 'charging', false);
             await ocppMdl.recalcMachineStatusMdl(machine.mchn_id);
-            console.log(`[OCPP] Txn started ${txnId} session#${res.insertId} user#${user.usr_id} @ ${conn.ocppId}`);
-            return { idTokenInfo: { status: 'Accepted' } };
+            console.log(`[OCPP][1.6] StartTransaction txn=${txnId} linked to app session#${existing.sssn_id} (connector ${connectorId})`);
+            return { transactionId: txnId, idTagInfo: { status: 'Accepted' } };
         }
 
-        // ---- UPDATED ----
-        if (payload.eventType === 'Updated') {
-            const sRows = await ocppMdl.getSessionByOcppTxnMdl(txnId);
-            const session = sRows && sRows[0];
-            if (!session) return {};
-            const reg = extractRegisterKwh(payload.meterValue);
-            const energy = consumedKwh(txnId, reg);
-            const price = parseFloat(session.prce_per_kwh_amt) || conn.pricePerKwh || 0;
-            const cost = +(energy * price).toFixed(2);
-            // crude progress proxy (kWh toward a nominal 30kWh fill), capped at 99 until ended
-            const progress = Math.min(99, Math.round((energy / 30) * 100));
-            await ocppMdl.updateOcppSessionProgressMdl({ sessionId: session.sssn_id, energyKwh: energy, cost, progress });
-            return {};
+        // No app session -> charger-initiated (post-pay). Resolve the user by idTag.
+        let user = conn.authorizedUser;
+        if (payload.idTag) {
+            const rows = await ocppMdl.getUserByIdTokenMdl(payload.idTag);
+            user = (rows && rows[0]) || user;
         }
+        if (!user) return { transactionId: txnId, idTagInfo: { status: 'Invalid' } };
 
-        // ---- ENDED ----
-        if (payload.eventType === 'Ended') {
-            const sRows = await ocppMdl.getSessionByOcppTxnMdl(txnId);
-            const session = sRows && sRows[0];
-            if (!session) return {};
+        const sessionCode = 'OCPP-' + Date.now().toString(36).toUpperCase();
+        const res = await ocppMdl.createOcppSessionMdl({
+            sessionCode, userId: user.usr_id, stationId: machine.sttn_id,
+            connectorId, pricePerKwh: conn.pricePerKwh, ocppTxnId: txnKey,
+        });
+        await ocppMdl.updateConnectorStatusMdl(connectorId, 'charging', false);
+        await ocppMdl.recalcMachineStatusMdl(machine.mchn_id);
+        console.log(`[OCPP][1.6] StartTransaction txn=${txnId} session#${res.insertId} user#${user.usr_id} @ ${conn.ocppId}`);
+        return { transactionId: txnId, idTagInfo: { status: 'Accepted' } };
+    },
 
-            const reg = extractRegisterKwh(payload.meterValue);
-            const energy = consumedKwh(txnId, reg);
-            const price = parseFloat(session.prce_per_kwh_amt) || conn.pricePerKwh || 0;
-            const cost = +(energy * price).toFixed(2);
+    // OCPP 1.6 StopTransaction: final meter reading (meterStop, Wh) + reason.
+    // Finalizes and settles the session (escrow refund or post-pay wallet debit).
+    async StopTransaction(payload, ctx) {
+        const { conn, ocppMdl } = ctx;
+        const machine = await ensureMachine(ctx);
+        const txnKey = String(payload.transactionId);
+        const sRows = await ocppMdl.getSessionByOcppTxnMdl(txnKey);
+        const session = sRows && sRows[0];
+        if (!session) return { idTagInfo: { status: 'Accepted' } };
 
-            // connector back to occupied (cable may still be in); a StatusNotification refines it
-            if (session.cnntr_id) await ocppMdl.updateConnectorStatusMdl(session.cnntr_id, 'occupied', false);
-            await ocppMdl.recalcMachineStatusMdl(machine.mchn_id);
-            txnBaselines.delete(txnId);
-
-            // Only finalize/settle if the app hasn't already stopped this session.
-            if (session.sttus_cd === 'active') {
-                await ocppMdl.finalizeOcppSessionMdl({ sessionId: session.sssn_id, energyKwh: energy, cost });
-
-                // Prepaid (app-initiated, escrow held) vs charger-initiated (post-pay).
-                let hold = null;
-                try { hold = await ledgerService.getSessionHold(session.sssn_id); } catch (e) { /* legacy */ }
-                if (hold) {
-                    // Charger ended a prepaid session on its own -> settle the escrow
-                    // (idempotent: if the app's Stop already settled, this is a no-op).
-                    try {
-                        const ownerRows = await ocppMdl.getStationOwnerMdl(session.sttn_id);
-                        const ownerUserId = ownerRows && ownerRows[0] ? ownerRows[0].ownr_usr_id : null;
-                        await ledgerService.chargingSettle({
-                            userId: session.usr_id, sessionId: session.sssn_id, stationId: session.sttn_id,
-                            ownerUserId, holdAmount: parseFloat(hold.ttl_amt) || 0, consumedAmount: cost,
-                            audit: { actnCd: 'charging_payment', userId: session.usr_id },
-                        });
-                        await ocppMdl.setSessionPaymentMdl({ sessionId: session.sssn_id, status: 'paid' });
-                    } catch (e) {
-                        console.error('[OCPP] escrow settle failed:', e.message);
-                    }
-                } else {
-                    // Charger-initiated post-pay: debit the wallet for the actual cost
-                    await settleWallet(ctx, session, cost).catch((e) =>
-                        console.error('[OCPP] wallet settle failed:', e.message));
-                }
-            }
-
-            console.log(`[OCPP] Txn ended ${txnId} session#${session.sssn_id} energy=${energy}kWh cost=₹${cost}`);
-            return { totalCost: cost, idTokenInfo: { status: 'Accepted' } };
+        // Prefer meterStop (Wh) delta over baseline; fall back to whatever MeterValues stored.
+        const meterStopKwh = payload.meterStop != null ? Number(payload.meterStop) / 1000 : null;
+        let energy;
+        if (meterStopKwh != null && !isNaN(meterStopKwh) && txnBaselines.has(txnKey)) {
+            energy = Math.max(0, meterStopKwh - txnBaselines.get(txnKey));
+        } else {
+            energy = parseFloat(session.enrgy_cnsmd_kwh) || 0;
         }
+        const price = parseFloat(session.prce_per_kwh_amt) || conn.pricePerKwh || 0;
+        const cost = +(energy * price).toFixed(2);
 
-        return {};
+        // connector back to occupied (cable may still be in); a StatusNotification refines it
+        if (session.cnntr_id) await ocppMdl.updateConnectorStatusMdl(session.cnntr_id, 'occupied', false);
+        if (machine) await ocppMdl.recalcMachineStatusMdl(machine.mchn_id);
+        txnBaselines.delete(txnKey);
+
+        await finalizeAndSettle(ctx, session, energy, cost);
+
+        console.log(`[OCPP][1.6] StopTransaction txn=${payload.transactionId} session#${session.sssn_id} energy=${energy}kWh cost=₹${cost}`);
+        return { idTagInfo: { status: 'Accepted' } };
     },
 
     /* ---------------------------------------------------------------- */
     async MeterValues(payload, ctx) {
-        // Standalone meter values (outside TransactionEvent). Update the active txn if present.
+        // Live meter values during a transaction. OCPP 1.6 tags these with the
+        // integer transactionId; use it to update the linked session's energy/cost.
         const machine = await ensureMachine(ctx);
         if (!machine) return {};
+        const txnId = payload.transactionId != null ? String(payload.transactionId) : null;
         const reg = extractRegisterKwh(payload.meterValue);
-        if (reg == null) return {};
-        // We can't always map evse->txn here; update the machine's most recent active session.
-        // (Best-effort: handled via TransactionEvent in normal flow.)
+        if (reg == null || !txnId) {
+            console.log(`[OCPP][1.6][MeterValues] ${ctx.conn.ocppId} ignored (txnId=${txnId} register=${reg})`);
+            return {};
+        }
+
+        const sRows = await ctx.ocppMdl.getSessionByOcppTxnMdl(txnId);
+        const session = sRows && sRows[0];
+        if (!session) {
+            console.log(`[OCPP][1.6][MeterValues] ${ctx.conn.ocppId} txn=${txnId} — no linked session`);
+            return {};
+        }
+        const energy = consumedKwh(txnId, reg);
+        const price = parseFloat(session.prce_per_kwh_amt) || ctx.conn.pricePerKwh || 0;
+        const cost = +(energy * price).toFixed(2);
+        const progress = Math.min(99, Math.round((energy / 30) * 100));
+        await ctx.ocppMdl.updateOcppSessionProgressMdl({ sessionId: session.sssn_id, energyKwh: energy, cost, progress });
+        console.log(`[OCPP][1.6][MeterValues] ${ctx.conn.ocppId} txn=${txnId} session#${session.sssn_id} register=${reg}kWh energy=${energy}kWh cost=₹${cost} progress=${progress}%`);
+        return {};
+    },
+
+    /* ---------------------------------------------------------------- */
+    // Optional CP->CSMS messages some 1.6 chargers send. Acknowledge them so the
+    // charger doesn't get a CALLERROR (which can make firmware retry/disconnect).
+    async DataTransfer(_payload, _ctx) {
+        return { status: 'Accepted' };
+    },
+    async FirmwareStatusNotification(_payload, _ctx) {
+        return {};
+    },
+    async DiagnosticsStatusNotification(_payload, _ctx) {
         return {};
     },
 };
+
+// Finalize + settle a session ended by the charger (from 1.6 StopTransaction).
+// Idempotent: only acts while the session is still 'active' (the app's Stop may
+// have already settled it).
+async function finalizeAndSettle(ctx, session, energy, cost) {
+    const { ocppMdl } = ctx;
+    if (session.sttus_cd !== 'active') return;
+
+    await ocppMdl.finalizeOcppSessionMdl({ sessionId: session.sssn_id, energyKwh: energy, cost });
+
+    // Prepaid (app-initiated, escrow held) vs charger-initiated (post-pay).
+    let hold = null;
+    try { hold = await ledgerService.getSessionHold(session.sssn_id); } catch (e) { /* legacy */ }
+    if (hold) {
+        // Charger ended a prepaid session on its own -> settle the escrow
+        // (idempotent: if the app's Stop already settled, this is a no-op).
+        try {
+            const ownerRows = await ocppMdl.getStationOwnerMdl(session.sttn_id);
+            const ownerUserId = ownerRows && ownerRows[0] ? ownerRows[0].ownr_usr_id : null;
+            await ledgerService.chargingSettle({
+                userId: session.usr_id, sessionId: session.sssn_id, stationId: session.sttn_id,
+                ownerUserId, holdAmount: parseFloat(hold.ttl_amt) || 0, consumedAmount: cost,
+                audit: { actnCd: 'charging_payment', userId: session.usr_id },
+            });
+            await ocppMdl.setSessionPaymentMdl({ sessionId: session.sssn_id, status: 'paid' });
+        } catch (e) {
+            console.error('[OCPP] escrow settle failed:', e.message);
+        }
+    } else {
+        // Charger-initiated post-pay: debit the wallet for the actual cost
+        await settleWallet(ctx, session, cost).catch((e) =>
+            console.error('[OCPP] wallet settle failed:', e.message));
+    }
+}
 
 // Debit the wallet for a completed session (post-pay model)
 async function settleWallet(ctx, session, cost) {
