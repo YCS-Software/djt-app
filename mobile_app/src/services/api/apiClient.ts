@@ -24,15 +24,16 @@ function getApiBaseUrl(): string {
   // For Android emulator: use 10.0.2.2 instead of localhost
   // For physical device: use your computer's local IP (e.g., 192.168.1.XXX)
   // For production: use your production API URL
-  const defaultUrl = 'http://3.110.84.196:5000/api';
-  // const defaultUrl = 'http://localhost:5000/api';
-  
+  const defaultUrl = 'http://localhost:5000/api';
+  // const defaultUrl = 'http://3.110.84.196:5000/api';   // production
+
   if (Capacitor.isNativePlatform()) {
-    // Check if running on Android emulator
     const platform = Capacitor.getPlatform();
     if (platform === 'android') {
-      // You can detect emulator vs physical device here if needed
-      return defaultUrl;
+      // An Android emulator resolves `localhost` to itself; the host machine
+      // is reachable only on 10.0.2.2. A physical device needs the LAN IP,
+      // which you should supply via VITE_API_URL at build time.
+      return 'http://10.0.2.2:5000/api';
     }
   }
 

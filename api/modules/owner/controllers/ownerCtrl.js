@@ -151,7 +151,13 @@ exports.getAnalytics = function(req, res) {
         ownerMdl.getOwnerStationStatusMdl({ ownerId }),
         ownerMdl.getOwnerRecentTxnsMdl({ ownerId, limit: 8 }),
         ownerMdl.getOwnerCountTrendsMdl({ ownerId }),
-        ownerMdl.getOwnerDashboardMdl({ ownerId })
+        ownerMdl.getOwnerDashboardMdl({ ownerId }),
+        ownerMdl.getOwnerNetTotalsMdl({ ownerId }),
+        ownerMdl.getOwnerNetHourlySeriesMdl({ ownerId }),
+        ownerMdl.getOwnerBalanceMdl({ ownerId }),
+        ownerMdl.getOwnerEscrowHeldMdl({ ownerId }),
+        ownerMdl.getOwnerCommissionRuleMdl({ ownerId }),
+        ownerMdl.getOwnerDirectCollectedMdl({ ownerId })
     ]).then(function(results) {
         const t = (results[0] && results[0][0]) || {};
         const mo = (results[1] && results[1][0]) || {};
@@ -160,21 +166,43 @@ exports.getAnalytics = function(req, res) {
         const recentRows = results[4] || [];
         const tr = (results[5] && results[5][0]) || {};
         const counts = (results[6] && results[6][0]) || {};
+        const net = (results[7] && results[7][0]) || {};
+        const netHourlyRows = results[8] || [];
+        const bal = (results[9] && results[9][0]) || {};
+        const esc = (results[10] && results[10][0]) || {};
+        const rule = (results[11] && results[11][0]) || {};
+        const dc = (results[12] && results[12][0]) || {};
 
-        const todayRevenue = Number(t.today_revenue) || 0;
+        // `billed` is everything the driver paid (GST-inclusive, straight off the
+        // session rows). `net` is what the ledger credited this owner. The two are
+        // bridged by the DJT share plus any energy collected at the machine:
+        //     billed = net + commission + direct_collected
+        const todayBilled = Number(t.today_revenue) || 0;
+        const monthBilled = Number(mo.month_revenue) || 0;
         const todayEnergy = Number(t.today_energy) || 0;
-        const monthRevenue = Number(mo.month_revenue) || 0;
         const monthEnergy = Number(mo.month_energy) || 0;
 
-        // Fill 24 hourly buckets (00:00 .. 23:00) from the sparse query result
+        const todayNet = Number(net.today_net) || 0;
+        const monthNet = Number(net.month_net) || 0;
+        const monthCmsn = Number(net.month_cmsn) || 0;
+        const todayDirect = Number(dc.today_direct) || 0;
+        const monthDirect = Number(dc.month_direct) || 0;
+        const r2 = function(n) { return Math.round(n * 100) / 100; };
+
+        // Fill 24 hourly buckets (00:00 .. 23:00) from the sparse query results.
+        // `revenue` is now the owner's net; gross rides along for the tooltip.
         const byHour = {};
         hourlyRows.forEach(function(r) { byHour[Number(r.hr)] = r; });
+        const netByHour = {};
+        netHourlyRows.forEach(function(r) { netByHour[Number(r.hr)] = r; });
         const hourly = [];
         for (let h = 0; h < 24; h++) {
             const row = byHour[h];
+            const nRow = netByHour[h];
             hourly.push({
                 hour: (h < 10 ? '0' + h : '' + h) + ':00',
-                revenue: row ? Number(row.revenue) || 0 : 0,
+                revenue: nRow ? Number(nRow.net_amt) || 0 : 0,
+                gross: row ? Number(row.revenue) || 0 : 0,
                 consumption: row ? Number(row.energy) || 0 : 0
             });
         }
@@ -200,8 +228,11 @@ exports.getAnalytics = function(req, res) {
                 connector: r.cnntr_nm_tx || null,
                 energy_kwh: Number(r.enrgy_cnsmd_kwh) || 0,
                 duration_min: r.durn_mnts_nbr != null ? Number(r.durn_mnts_nbr) : null,
-                cost: Number(r.ttl_cst_amt) || 0,
-                status: r.sttus_cd
+                net: Number(r.net_amt) || 0,
+                gross: Number(r.ttl_cst_amt) || 0,
+                status: r.sttus_cd,
+                payment_status: r.pymnt_sttus_cd || null,
+                started_at: r.strt_ts
             };
         });
 
@@ -210,20 +241,42 @@ exports.getAnalytics = function(req, res) {
                 stations: { value: totalStations, trend_pct: trend(totalStations, tr.stations_prev) },
                 machines: { value: totalMachines, trend_pct: trend(totalMachines, tr.machines_prev) },
                 connectors: { value: totalConnectors, trend_pct: trend(totalConnectors, tr.connectors_prev) },
-                available: { value: availableMachines, trend_pct: totalMachines > 0 ? Math.round((availableMachines / totalMachines) * 100) : 0 }
+                // Not a trend: this is the share of machines currently free. The UI
+                // renders it as a plain ratio, without an up/down arrow.
+                available: { value: availableMachines, ratio_pct: totalMachines > 0 ? Math.round((availableMachines / totalMachines) * 100) : 0 }
             },
             today: {
-                revenue: todayRevenue,
+                net: todayNet,
+                billed: todayBilled,
+                direct_collected: todayDirect,
+                total_earned: r2(todayNet + todayDirect),
                 consumption: todayEnergy,
                 transactions: Number(t.today_txns) || 0,
-                revenue_trend_pct: trend(todayRevenue, t.yest_revenue),
+                net_trend_pct: trend(todayNet, net.yest_net),
                 consumption_trend_pct: trend(todayEnergy, t.yest_energy)
             },
             month: {
-                revenue: monthRevenue,
+                net: monthNet,
+                billed: monthBilled,
+                commission: monthCmsn,
+                direct_collected: monthDirect,
+                total_earned: r2(monthNet + monthDirect),
                 consumption: monthEnergy,
-                avg_revenue_per_kwh: monthEnergy > 0 ? Math.round((monthRevenue / monthEnergy) * 100) / 100 : 0,
-                transactions_today: Number(t.today_txns) || 0
+                // Per-kWh yield uses what the owner keeps, not the ledger-only slice.
+                avg_net_per_kwh: monthEnergy > 0 ? r2((monthNet + monthDirect) / monthEnergy) : 0,
+                transactions: Number(mo.month_txns) || 0,
+                net_trend_pct: trend(monthNet, net.prev_month_net)
+            },
+            balance: {
+                available: Number(bal.blnce_amt) || 0,
+                in_escrow: Number(esc.held_amt) || 0,
+                active_sessions: Number(esc.active_sessions) || 0
+            },
+            commission: {
+                owner_pct: rule.ownr_pct != null ? Number(rule.ownr_pct) : null,
+                platform_pct: rule.platfrm_pct != null ? Number(rule.platfrm_pct) : null,
+                tax_pct: rule.tax_pct != null ? Number(rule.tax_pct) : 0,
+                scope: rule.scope_cd || null
             },
             charts: { hourly: hourly },
             station_status: stationStatus,
@@ -305,6 +358,324 @@ exports.getStationAnalytics = function(req, res) {
             console.error('[ownerCtrl] getStationAnalytics error:', error);
             return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
         });
+};
+
+/*****************************************************************************
+* Date-range helpers for the earnings / station-analytics endpoints.
+* Accept ?from=YYYY-MM-DD&to=YYYY-MM-DD; default to month-to-date.
+******************************************************************************/
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+
+function isoDate(d) {
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+}
+
+// Returns { from, to } or null when a supplied value is malformed / inverted.
+function resolveRange(query) {
+    const now = new Date();
+    const to = query.to || isoDate(now);
+    const from = query.from || isoDate(new Date(now.getFullYear(), now.getMonth(), 1));
+    if (!DATE_RE.test(from) || !DATE_RE.test(to)) return null;
+    if (from > to) return null;
+    return { from, to };
+}
+
+/*****************************************************************************
+* Function      : getEarnings
+* Description   : What the owner actually earns, sourced from the double-entry
+*                 ledger rather than sssn_lst_t.ttl_cst_amt (which is what the
+*                 driver paid). Returns the net/commission/gross breakdown, the
+*                 payout balance, escrow held on in-flight sessions, the active
+*                 commission rule plus any station-scoped overrides, refunds,
+*                 and energy collected directly at the machine beyond the hold.
+******************************************************************************/
+exports.getEarnings = function(req, res) {
+    const fnm = "getEarnings";
+    const ownerId = req.user.userId;
+
+    function trend(curr, prev) {
+        curr = Number(curr) || 0; prev = Number(prev) || 0;
+        if (prev === 0) return curr > 0 ? 100 : 0;
+        return Math.round(((curr - prev) / prev) * 1000) / 10;
+    }
+
+    Promise.all([
+        ownerMdl.getOwnerNetTotalsMdl({ ownerId }),
+        ownerMdl.getOwnerBalanceMdl({ ownerId }),
+        ownerMdl.getOwnerEscrowHeldMdl({ ownerId }),
+        ownerMdl.getOwnerCommissionRuleMdl({ ownerId }),
+        ownerMdl.getOwnerStationRuleOverridesMdl({ ownerId }),
+        ownerMdl.getOwnerRefundsMdl({ ownerId }),
+        ownerMdl.getOwnerDirectCollectedMdl({ ownerId })
+    ]).then(function(results) {
+        const n = (results[0] && results[0][0]) || {};
+        const bal = (results[1] && results[1][0]) || {};
+        const esc = (results[2] && results[2][0]) || {};
+        const rule = (results[3] && results[3][0]) || {};
+        const overrides = results[4] || [];
+        const ref = (results[5] && results[5][0]) || {};
+        const dc = (results[6] && results[6][0]) || {};
+
+        const todayDirect = Number(dc.today_direct) || 0;
+        const monthDirect = Number(dc.month_direct) || 0;
+        const lifetimeDirect = Number(dc.lifetime_direct) || 0;
+
+        function period(netKey, cmsnKey, direct) {
+            const net = Number(n[netKey]) || 0;
+            const cmsn = Number(n[cmsnKey]) || 0;
+            const d = direct || 0;
+            return {
+                net: net,
+                commission: cmsn,
+                // What passed through the ledger. Excludes over-hold energy, so it
+                // is NOT the amount the driver was billed — use `billed` for that.
+                settled: Math.round((net + cmsn) * 100) / 100,
+                // Everything the driver paid, GST-inclusive. The identity that
+                // holds on screen is: billed - commission = total_earned.
+                billed: Math.round((net + cmsn + d) * 100) / 100,
+                direct_collected: d,
+                // What the owner actually keeps: their ledger share plus the
+                // over-hold energy they collected at the machine (no DJT share).
+                total_earned: Math.round((net + d) * 100) / 100
+            };
+        }
+
+        const month = period('month_net', 'month_cmsn', monthDirect);
+        month.net_trend_pct = trend(month.net, n.prev_month_net);
+
+        return df.formatSucessRes(req, res, {
+            today: period('today_net', 'today_cmsn', todayDirect),
+            month: month,
+            lifetime: period('lifetime_net', 'lifetime_cmsn', lifetimeDirect),
+            balance: {
+                available: Number(bal.blnce_amt) || 0,
+                currency: bal.crncy_cd || 'INR',
+                in_escrow: Number(esc.held_amt) || 0,
+                active_sessions: Number(esc.active_sessions) || 0
+            },
+            commission: {
+                owner_pct: rule.ownr_pct != null ? Number(rule.ownr_pct) : null,
+                platform_pct: rule.platfrm_pct != null ? Number(rule.platfrm_pct) : null,
+                // No tax leg is posted by ledgerService today, so tax always
+                // settles to 0. The UI hides the row when this is 0.
+                tax_pct: rule.tax_pct != null ? Number(rule.tax_pct) : 0,
+                scope: rule.scope_cd || null,
+                station_overrides: overrides.map(function(o) {
+                    return {
+                        station_id: o.sttn_id,
+                        station: o.sttn_nm_tx,
+                        owner_pct: Number(o.ownr_pct),
+                        platform_pct: Number(o.platfrm_pct)
+                    };
+                })
+            },
+            refunds: {
+                month: Number(ref.month_refunds) || 0,
+                lifetime: Number(ref.lifetime_refunds) || 0
+            },
+            // Energy delivered past the driver's prepaid hold. Collected by the
+            // owner at the machine, outside the ledger, commission-free.
+            direct_collected: {
+                today: todayDirect,
+                month: monthDirect,
+                lifetime: lifetimeDirect,
+                session_count: Number(dc.session_count) || 0
+            }
+        }, cntxtDtls, fnm, {});
+    }).catch(function(error) {
+        console.error('[ownerCtrl] getEarnings error:', error);
+        return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+    });
+};
+
+/*****************************************************************************
+* Function      : getSettlements
+* Description   : This owner's payout history from setlmnt_lst_t. Reads the live
+*                 schema (gross/cmsn/tax/net + UTR), not the stale column names
+*                 used by the admin web settlements model.
+******************************************************************************/
+exports.getSettlements = function(req, res) {
+    const fnm = "getSettlements";
+    const ownerId = req.user.userId;
+    const limit = parseInt(req.query.limit, 10) || 12;
+
+    ownerMdl.getOwnerSettlementsMdl({ ownerId, limit })
+        .then(function(rows) {
+            const settlements = (rows || []).map(function(s) {
+                return {
+                    settlement_id: s.setlmnt_id,
+                    period_from: s.prd_frm_dt,
+                    period_to: s.prd_to_dt,
+                    gross: Number(s.gross_amt) || 0,
+                    commission: Number(s.cmsn_amt) || 0,
+                    tax: Number(s.tax_amt) || 0,
+                    net: Number(s.net_amt) || 0,
+                    status: s.sttus_cd,
+                    utr: s.utr_tx || null,
+                    settled_at: s.u_ts,
+                    created_at: s.i_ts
+                };
+            });
+
+            const pending = settlements
+                .filter(function(s) { return s.status === 'pending'; })
+                .reduce(function(a, s) { return a + s.net; }, 0);
+
+            return df.formatSucessRes(req, res, {
+                settlements: settlements,
+                pending_net: Math.round(pending * 100) / 100,
+                last_settled: settlements.find(function(s) { return s.status === 'settled'; }) || null
+            }, cntxtDtls, fnm, {});
+        })
+        .catch(function(error) {
+            console.error('[ownerCtrl] getSettlements error:', error);
+            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+        });
+};
+
+/*****************************************************************************
+* Function      : getStationBreakdown
+* Description   : Station-wise analytics over a date window: net earnings (from
+*                 the ledger), gross, kWh, transactions, utilisation, failure
+*                 rate and machine health. Stations with no sessions still
+*                 appear, at zero, so a dead station is visible rather than absent.
+******************************************************************************/
+exports.getStationBreakdown = function(req, res) {
+    const fnm = "getStationBreakdown";
+    const ownerId = req.user.userId;
+
+    // `?range=lifetime` widens the window back to the owner's first activity.
+    // There is no earlier period to compare against, so trends are suppressed.
+    const isLifetime = req.query.range === 'lifetime';
+
+    const resolveWindow = isLifetime
+        ? ownerMdl.getOwnerFirstActivityMdl({ ownerId }).then(function(rows) {
+            const first = rows && rows[0] && rows[0].first_dt;
+            const from = first ? isoDate(new Date(first)) : isoDate(new Date());
+            return { from: from, to: isoDate(new Date()) };
+        })
+        : Promise.resolve(resolveRange(req.query));
+
+    resolveWindow.then(function(range) {
+    if (!range) return badRequest(res, 'Invalid date range; expected from/to as YYYY-MM-DD with from <= to');
+    const { from, to } = range;
+
+    // Inclusive day count -> machine-minutes available in the window.
+    const days = Math.floor((Date.parse(to) - Date.parse(from)) / 86400000) + 1;
+
+    function trend(curr, prev) {
+        if (isLifetime) return null;   // no prior window exists
+        curr = Number(curr) || 0; prev = Number(prev) || 0;
+        if (prev === 0) return curr > 0 ? 100 : 0;
+        return Math.round(((curr - prev) / prev) * 1000) / 10;
+    }
+
+    return Promise.all([
+        ownerMdl.getOwnerStationUsageMdl({ ownerId, from, to }),
+        ownerMdl.getOwnerNetByStationMdl({ ownerId, from, to }),
+        isLifetime ? Promise.resolve([]) : ownerMdl.getOwnerNetByStationPrevMdl({ ownerId, from, to }),
+        ownerMdl.getOwnerStationHealthMdl({ ownerId })
+    ]).then(function(results) {
+        const usage = results[0] || [];
+        const netRows = results[1] || [];
+        const prevRows = results[2] || [];
+        const health = results[3] || [];
+
+        const netById = {};
+        netRows.forEach(function(r) { netById[r.sttn_id] = r; });
+        const prevById = {};
+        prevRows.forEach(function(r) { prevById[r.sttn_id] = Number(r.net_amt) || 0; });
+        const healthById = {};
+        health.forEach(function(r) { healthById[r.sttn_id] = r; });
+
+        const stations = usage.map(function(u) {
+            const n = netById[u.sttn_id] || {};
+            const h = healthById[u.sttn_id] || {};
+            const net = Number(n.net_amt) || 0;
+            const cmsn = Number(n.cmsn_amt) || 0;
+            const machines = Number(h.machines) || 0;
+            const chargeMins = Number(u.charge_mins) || 0;
+            const txns = Number(u.txns) || 0;
+            const failed = Number(u.failed_txns) || 0;
+            const capacityMins = machines * days * 24 * 60;
+
+            return {
+                station_id: u.sttn_id,
+                name: u.sttn_nm_tx,
+                city: u.cty_tx || null,
+                operator: u.oprtr_nm_tx || null,
+                approval_status: u.aprvl_sttus_cd,
+                net: net,
+                commission: cmsn,
+                gross: Math.round((net + cmsn) * 100) / 100,
+                // Gross straight off the session rows; differs from net+commission
+                // when energy was delivered beyond the driver's prepaid hold.
+                session_gross: Number(u.gross_amt) || 0,
+                consumption: Number(u.kwh) || 0,
+                transactions: txns,
+                failed_transactions: failed,
+                failure_rate_pct: (txns + failed) > 0 ? Math.round((failed / (txns + failed)) * 1000) / 10 : 0,
+                charge_minutes: chargeMins,
+                utilisation_pct: capacityMins > 0 ? Math.round((chargeMins / capacityMins) * 1000) / 10 : 0,
+                net_trend_pct: trend(net, prevById[u.sttn_id]),
+                machines: machines,
+                faulted_machines: Number(h.faulted) || 0,
+                offline_machines: Number(h.offline) || 0,
+                maintenance_machines: Number(h.maintenance) || 0,
+                last_heartbeat_ts: h.last_heartbeat_ts || null,
+                mins_since_heartbeat: h.mins_since_heartbeat != null ? Number(h.mins_since_heartbeat) : null
+            };
+        });
+
+        stations.sort(function(a, b) { return b.net - a.net; });
+
+        const totalNet = stations.reduce(function(a, s) { return a + s.net; }, 0);
+        stations.forEach(function(s) {
+            s.share_pct = totalNet > 0 ? Math.round((s.net / totalNet) * 1000) / 10 : 0;
+        });
+
+        const totals = {
+            net: Math.round(totalNet * 100) / 100,
+            commission: Math.round(stations.reduce(function(a, s) { return a + s.commission; }, 0) * 100) / 100,
+            consumption: Math.round(stations.reduce(function(a, s) { return a + s.consumption; }, 0) * 1000) / 1000,
+            transactions: stations.reduce(function(a, s) { return a + s.transactions; }, 0),
+            stations: stations.length
+        };
+        const totalCapacity = stations.reduce(function(a, s) { return a + s.machines; }, 0) * days * 24 * 60;
+        const totalMins = stations.reduce(function(a, s) { return a + s.charge_minutes; }, 0);
+        totals.utilisation_pct = totalCapacity > 0 ? Math.round((totalMins / totalCapacity) * 1000) / 10 : 0;
+
+        // Anything the owner should act on: dead chargers and faults.
+        const attention = [];
+        stations.forEach(function(s) {
+            if (s.faulted_machines > 0) {
+                attention.push({ station_id: s.station_id, station: s.name, kind: 'faulted',
+                    message: s.faulted_machines + ' machine(s) faulted' });
+            }
+            if (s.machines > 0 && s.mins_since_heartbeat != null && s.mins_since_heartbeat > 60) {
+                attention.push({ station_id: s.station_id, station: s.name, kind: 'no_heartbeat',
+                    message: 'No OCPP heartbeat for ' + Math.floor(s.mins_since_heartbeat / 60) + 'h',
+                    mins_since_heartbeat: s.mins_since_heartbeat });
+            }
+            if (s.machines > 0 && s.last_heartbeat_ts == null) {
+                attention.push({ station_id: s.station_id, station: s.name, kind: 'never_seen',
+                    message: 'Charger has never reported a heartbeat' });
+            }
+        });
+
+        return df.formatSucessRes(req, res, {
+            range: { from: from, to: to, days: days, lifetime: isLifetime },
+            totals: totals,
+            stations: stations,
+            attention: attention
+        }, cntxtDtls, fnm, {});
+    });
+    }).catch(function(error) {
+        console.error('[ownerCtrl] getStationBreakdown error:', error);
+        return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+    });
 };
 
 /*****************************************************************************
@@ -535,9 +906,36 @@ exports.getTransactions = function(req, res) {
     const ownerId = req.user.userId;
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 200);
 
-    ownerMdl.getOwnerTransactionsMdl({ ownerId, limit })
+    // Optional inclusive date window. Supplying only one bound is a client bug,
+    // so reject it rather than silently listing everything.
+    const from = req.query.from;
+    const to = req.query.to;
+    if ((from && !to) || (to && !from)) {
+        return badRequest(res, 'Both from and to are required when filtering by date');
+    }
+    if (from && to) {
+        if (!DATE_RE.test(from) || !DATE_RE.test(to)) {
+            return badRequest(res, 'Invalid date range; expected from/to as YYYY-MM-DD');
+        }
+        if (from > to) return badRequest(res, 'Invalid date range; from must be <= to');
+    }
+
+    ownerMdl.getOwnerTransactionsMdl({ ownerId, limit, from: from, to: to })
         .then(function(rows) {
+            const round2 = function(n) { return Math.round(n * 100) / 100; };
+
             const transactions = (rows || []).map(function(r) {
+                const cost = Number(r.ttl_cst_amt) || 0;      // what the driver was billed
+                const net = Number(r.net_amt) || 0;           // credited to the owner
+                const cmsn = Number(r.cmsn_amt) || 0;         // kept by the platform
+                const settled = round2(net + cmsn);           // what passed through the ledger
+
+                // Percentages are derived from the amounts actually posted, not from
+                // the commission rule, so they reflect real rounding (splitConsumed
+                // floors the owner's paise and gives the remainder to the platform).
+                const ownerPct = settled > 0 ? Math.round((net / settled) * 1000) / 10 : null;
+                const platformPct = settled > 0 ? Math.round((cmsn / settled) * 1000) / 10 : null;
+
                 return {
                     code: r.sssn_cd,
                     station: r.sttn_nm_tx,
@@ -545,7 +943,15 @@ exports.getTransactions = function(req, res) {
                     customer: r.usr_nm || null,
                     energy_kwh: Number(r.enrgy_cnsmd_kwh) || 0,
                     duration_min: r.durn_mnts_nbr != null ? Number(r.durn_mnts_nbr) : null,
-                    cost: Number(r.ttl_cst_amt) || 0,
+                    cost: cost,
+                    settled: settled,
+                    net: net,
+                    commission: cmsn,
+                    owner_pct: ownerPct,
+                    platform_pct: platformPct,
+                    // Energy past the prepaid hold, collected at the machine. Never
+                    // reaches the ledger, so no commission is taken from it.
+                    direct_collected: round2(Math.max(cost - settled, 0)),
                     status: r.sttus_cd,
                     payment_status: r.pymnt_sttus_cd,
                     date: r.strt_ts || r.i_ts

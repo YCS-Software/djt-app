@@ -346,7 +346,7 @@ export default function StationDetailPage({ mode = 'manage' }: { mode?: 'profile
             <div className="owner-info-row">
               <span className="owner-info-icon"><IndianRupee size={15} /></span>
               <div className="owner-info-main">
-                <div className="owner-info-label">Price / kWh</div>
+                <div className="owner-info-label">Price / kWh (incl. GST)</div>
                 <div className="owner-info-value">₹{station?.price_per_kwh}</div>
               </div>
             </div>

@@ -57,22 +57,39 @@ export interface OwnerAnalytics {
     stations: { value: number; trend_pct: number };
     machines: { value: number; trend_pct: number };
     connectors: { value: number; trend_pct: number };
-    available: { value: number; trend_pct: number };
+    // `available` reports the share of machines currently free, not a
+    // day-over-day change, so it carries ratio_pct rather than trend_pct.
+    available: { value: number; ratio_pct: number };
   };
   today: {
-    revenue: number;
+    net: number;
+    billed: number;            // everything the driver paid, GST-inclusive
+    direct_collected: number;
+    total_earned: number;      // net + direct_collected
     consumption: number;
     transactions: number;
-    revenue_trend_pct: number;
+    net_trend_pct: number;
     consumption_trend_pct: number;
   };
   month: {
-    revenue: number;
+    net: number;
+    billed: number;
+    commission: number;        // the DJT share
+    direct_collected: number;
+    total_earned: number;
     consumption: number;
-    avg_revenue_per_kwh: number;
-    transactions_today: number;
+    avg_net_per_kwh: number;
+    transactions: number;
+    net_trend_pct: number;
   };
-  charts: { hourly: { hour: string; revenue: number; consumption: number }[] };
+  balance: { available: number; in_escrow: number; active_sessions: number };
+  commission: {
+    owner_pct: number | null;
+    platform_pct: number | null;
+    tax_pct: number;
+    scope: string | null;
+  };
+  charts: { hourly: { hour: string; revenue: number; gross: number; consumption: number }[] };
   station_status: { active: number; offline: number; faulted: number; maintenance: number; total: number };
   recent_transactions: {
     code: string;
@@ -80,8 +97,120 @@ export interface OwnerAnalytics {
     connector: string | null;
     energy_kwh: number;
     duration_min: number | null;
-    cost: number;
+    net: number;
+    gross: number;
     status: string;
+    payment_status: string | null;
+    started_at: string | null;
+  }[];
+}
+
+/**
+ * A period's money. The identity shown on screen is:
+ *     billed − commission = total_earned
+ * `settled` is the ledger-only slice and excludes machine-collected energy, so
+ * it is deliberately never labelled "gross" in the UI.
+ */
+export interface EarningsPeriod {
+  net: number;              // credited to the owner's earnings account
+  commission: number;       // the DJT share
+  settled: number;          // net + commission (what passed through the ledger)
+  billed: number;           // net + commission + direct_collected (what the driver paid)
+  direct_collected: number; // energy past the prepaid hold, collected at the machine
+  total_earned: number;     // net + direct_collected — what the owner actually keeps
+  net_trend_pct?: number;
+}
+
+export interface OwnerEarnings {
+  today: EarningsPeriod;
+  month: EarningsPeriod;
+  lifetime: EarningsPeriod;
+  balance: {
+    available: number;
+    currency: string;
+    in_escrow: number;
+    active_sessions: number;
+  };
+  commission: {
+    owner_pct: number | null;
+    platform_pct: number | null;
+    tax_pct: number;
+    scope: string | null;
+    station_overrides: {
+      station_id: number;
+      station: string;
+      owner_pct: number;
+      platform_pct: number;
+    }[];
+  };
+  refunds: { month: number; lifetime: number };
+  direct_collected: { today: number; month: number; lifetime: number; session_count: number };
+}
+
+export interface OwnerSettlement {
+  settlement_id: number;
+  period_from: string | null;
+  period_to: string | null;
+  gross: number;
+  commission: number;
+  tax: number;
+  net: number;
+  status: string;         // pending | settled | failed
+  utr: string | null;
+  settled_at: string | null;
+  created_at: string;
+}
+
+export interface OwnerSettlements {
+  settlements: OwnerSettlement[];
+  pending_net: number;
+  last_settled: OwnerSettlement | null;
+}
+
+export interface StationBreakdownRow {
+  station_id: number;
+  name: string;
+  city: string | null;
+  operator: string | null;
+  approval_status: string;
+  net: number;
+  commission: number;
+  gross: number;
+  session_gross: number;
+  consumption: number;
+  transactions: number;
+  failed_transactions: number;
+  failure_rate_pct: number;
+  charge_minutes: number;
+  utilisation_pct: number;
+  // null for a lifetime window — there is no earlier period to compare against.
+  net_trend_pct: number | null;
+  share_pct: number;
+  machines: number;
+  faulted_machines: number;
+  offline_machines: number;
+  maintenance_machines: number;
+  last_heartbeat_ts: string | null;
+  mins_since_heartbeat: number | null;
+}
+
+export interface StationBreakdown {
+  range: { from: string; to: string; days: number; lifetime: boolean };
+  totals: {
+    net: number;
+    commission: number;
+    consumption: number;
+    transactions: number;
+    stations: number;
+    utilisation_pct: number;
+  };
+  stations: StationBreakdownRow[];
+  attention: {
+    station_id: number;
+    station: string;
+    kind: 'faulted' | 'no_heartbeat' | 'never_seen';
+    message: string;
+    mins_since_heartbeat?: number;
   }[];
 }
 
@@ -161,7 +290,13 @@ export interface OwnerTransaction {
   customer: string | null;
   energy_kwh: number;
   duration_min: number | null;
-  cost: number;
+  cost: number;              // gross — what the driver was billed
+  settled: number;           // net + commission — what passed through the ledger
+  net: number;               // the owner's share, credited by the ledger
+  commission: number;        // the platform's share
+  owner_pct: number | null;  // realised split, derived from posted amounts
+  platform_pct: number | null;
+  direct_collected: number;  // over-hold energy collected at the machine
   status: string;
   payment_status: string;
   date: string | null;
@@ -273,13 +408,42 @@ export const ownerService = {
     return res.data;
   },
 
+  // Net earnings from the ledger — the money the owner actually receives.
+  getEarnings: async (): Promise<OwnerEarnings> => {
+    const res = await apiClient.get<{ data: OwnerEarnings }>('/owner/earnings', AUTH);
+    return res.data;
+  },
+
+  getSettlements: async (limit = 12): Promise<OwnerSettlements> => {
+    const res = await apiClient.get<{ data: OwnerSettlements }>(`/owner/settlements?limit=${limit}`, AUTH);
+    return res.data;
+  },
+
+  // Station-wise analytics. Omit the argument for month-to-date; pass
+  // 'lifetime' to widen the window back to the owner's first activity.
+  getStationBreakdown: async (
+    range?: { from: string; to: string } | 'lifetime',
+  ): Promise<StationBreakdown> => {
+    const qs = range === 'lifetime'
+      ? '?range=lifetime'
+      : range ? `?from=${range.from}&to=${range.to}` : '';
+    const res = await apiClient.get<{ data: StationBreakdown }>(`/owner/analytics/stations${qs}`, AUTH);
+    return res.data;
+  },
+
   getMyStations: async (): Promise<OwnerStation[]> => {
     const res = await apiClient.get<{ data: { stations: OwnerStation[] } }>('/owner/stations', AUTH);
     return res.data?.stations || [];
   },
 
-  getTransactions: async (limit = 50): Promise<OwnerTransaction[]> => {
-    const res = await apiClient.get<{ data: { transactions: OwnerTransaction[] } }>(`/owner/transactions?limit=${limit}`, AUTH);
+  // Omit `range` for all time; pass an inclusive from/to window to filter by date.
+  getTransactions: async (
+    limit = 50,
+    range?: { from: string; to: string },
+  ): Promise<OwnerTransaction[]> => {
+    const qs = range ? `&from=${range.from}&to=${range.to}` : '';
+    const res = await apiClient.get<{ data: { transactions: OwnerTransaction[] } }>(
+      `/owner/transactions?limit=${limit}${qs}`, AUTH);
     return res.data?.transactions || [];
   },
 

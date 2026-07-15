@@ -15,8 +15,18 @@ router.use(accessCtrl.isOwner);
 // Dashboard summary
 router.get('/dashboard', ownerCtrl.getDashboard);
 
-// Rich dashboard analytics (revenue/consumption charts, station status, recent txns)
+// Rich dashboard analytics (net revenue/consumption charts, station status, recent txns)
 router.get('/analytics', ownerCtrl.getAnalytics);
+
+// Station-wise breakdown: net, kWh, utilisation, failure rate, machine health.
+// Accepts ?from=YYYY-MM-DD&to=YYYY-MM-DD (defaults to month-to-date).
+router.get('/analytics/stations', ownerCtrl.getStationBreakdown);
+
+// Net earnings from the ledger: commission split, payout balance, escrow, refunds
+router.get('/earnings', ownerCtrl.getEarnings);
+
+// This owner's payout history (setlmnt_lst_t)
+router.get('/settlements', ownerCtrl.getSettlements);
 
 // Full transaction list across the owner's stations
 router.get('/transactions', ownerCtrl.getTransactions);

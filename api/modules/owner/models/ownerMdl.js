@@ -357,14 +357,32 @@ exports.getOwnerStationStatusMdl = function(data) {
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
 };
 
+// Amount credited to one account type by a session's settle journal (0 until it
+// posts). Correlated on the outer query's `s.sssn_id`.
+function sessionLegSubQry(acctTypCd) {
+    return `
+        SELECT COALESCE(SUM(l2.amt), 0)
+        FROM jrnl_lst_t j2
+        INNER JOIN jrnl_leg_lst_t l2 ON l2.jrnl_id = j2.jrnl_id
+        INNER JOIN acct_lst_t a2 ON a2.acct_id = l2.acct_id
+        WHERE j2.ref_typ_cd = 'session' AND j2.ref_id = s.sssn_id
+            AND j2.jrnl_typ_cd = 'charging_payment'
+            AND j2.sttus_cd = 'posted' AND j2.a_in = 1
+            AND a2.acct_typ_cd = '${acctTypCd}' AND l2.drct_cd = 'credit'`;
+}
+
+const SESSION_NET_SUBQRY = sessionLegSubQry('owner_earnings');
+const SESSION_CMSN_SUBQRY = sessionLegSubQry('platform_revenue');
+
 // Recent sessions across the owner's stations (any status)
 exports.getOwnerRecentTxnsMdl = function(data) {
     const ownerId = numVal(data.ownerId);
     const limit = Number.isFinite(Number(data.limit)) ? Math.max(0, parseInt(data.limit, 10)) : 8;
     const QRY_TO_EXEC = `
         SELECT s.sssn_cd, s.enrgy_cnsmd_kwh, s.durn_mnts_nbr, s.ttl_cst_amt,
-            s.sttus_cd, s.strt_ts, s.i_ts,
-            st.sttn_nm_tx, c.cnntr_nm_tx
+            s.sttus_cd, s.pymnt_sttus_cd, s.strt_ts, s.i_ts,
+            st.sttn_nm_tx, c.cnntr_nm_tx,
+            (${SESSION_NET_SUBQRY}) AS net_amt
         FROM sssn_lst_t s
         INNER JOIN sttn_lst_t st ON s.sttn_id = st.sttn_id
         LEFT JOIN cnntr_lst_t c ON s.cnntr_id = c.cnntr_id
@@ -481,21 +499,323 @@ exports.getMachineLifetimeMdl = function(data) {
 };
 
 // Full transactions list across the owner's stations (for the Transactions page)
+// `from`/`to` are optional inclusive YYYY-MM-DD bounds; omit both for all time.
+// Sessions are dated by strt_ts, falling back to i_ts when a session never
+// started — the same value the controller returns as `date`.
 exports.getOwnerTransactionsMdl = function(data) {
     const ownerId = numVal(data.ownerId);
     const limit = Number.isFinite(Number(data.limit)) ? Math.max(0, parseInt(data.limit, 10)) : 50;
+
+    const hasRange = Boolean(data.from && data.to);
+    const dateFilter = hasRange ? `AND DATE(COALESCE(s.strt_ts, s.i_ts)) BETWEEN ? AND ?` : '';
+
     const QRY_TO_EXEC = `
         SELECT s.sssn_cd, s.enrgy_cnsmd_kwh, s.durn_mnts_nbr, s.ttl_cst_amt,
             s.sttus_cd, s.pymnt_sttus_cd, s.strt_ts, s.i_ts,
-            st.sttn_nm_tx, c.cnntr_nm_tx, u.nm_tx AS usr_nm
+            st.sttn_nm_tx, c.cnntr_nm_tx, u.nm_tx AS usr_nm,
+            (${SESSION_NET_SUBQRY}) AS net_amt,
+            (${SESSION_CMSN_SUBQRY}) AS cmsn_amt
         FROM sssn_lst_t s
         INNER JOIN sttn_lst_t st ON s.sttn_id = st.sttn_id
         LEFT JOIN cnntr_lst_t c ON s.cnntr_id = c.cnntr_id
         LEFT JOIN usr_lst_t u ON s.usr_id = u.usr_id
         WHERE st.ownr_usr_id = ? AND s.a_in = 1
-        ORDER BY s.i_ts DESC
+        ${dateFilter}
+        ORDER BY COALESCE(s.strt_ts, s.i_ts) DESC
         LIMIT ${limit}`;
-    const PARAMS = [ownerId];
+    const PARAMS = hasRange ? [ownerId, escVal(data.from), escVal(data.to)] : [ownerId];
+    console.log('[getOwnerTransactionsMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+/*****************************************************************************
+* NET EARNINGS (ledger truth)
+*
+* The owner's real income is NOT sssn_lst_t.ttl_cst_amt (that is what the driver
+* paid). On stop, ledgerService.chargingSettle posts a `charging_payment` journal:
+*
+*     DEBIT  ESCROW_HOLD      (consumed)   <- gross
+*     CREDIT OWNER_<owner>    (ownr_pct%)  <- net earnings
+*     CREDIT PLATFORM_REVENUE (platfrm_pct%)
+*
+* So net = credit legs landing on the owner_earnings account, and
+* gross = net + commission. Journals link back via ref_typ_cd='session'.
+* Refunds never touch the owner account, so they need no subtraction here.
+******************************************************************************/
+
+// Shared FROM/WHERE for owner-attributed charging_payment legs.
+const NET_LEG_JOIN = `
+        FROM jrnl_lst_t j
+        INNER JOIN jrnl_leg_lst_t l ON l.jrnl_id = j.jrnl_id
+        INNER JOIN acct_lst_t a ON a.acct_id = l.acct_id
+        INNER JOIN sssn_lst_t s ON s.sssn_id = j.ref_id
+        INNER JOIN sttn_lst_t st ON st.sttn_id = s.sttn_id
+        WHERE j.ref_typ_cd = 'session'
+            AND j.jrnl_typ_cd = 'charging_payment'
+            AND j.sttus_cd = 'posted'
+            AND j.a_in = 1
+            AND st.ownr_usr_id = ?`;
+
+// A leg's contribution to net (owner credit) and to commission (platform credit).
+const NET_EXPR = `CASE WHEN a.acct_typ_cd = 'owner_earnings'   AND l.drct_cd = 'credit' THEN l.amt ELSE 0 END`;
+const CMSN_EXPR = `CASE WHEN a.acct_typ_cd = 'platform_revenue' AND l.drct_cd = 'credit' THEN l.amt ELSE 0 END`;
+
+// Net earned today / yesterday / this month / lifetime, in one pass.
+exports.getOwnerNetTotalsMdl = function(data) {
+    const QRY_TO_EXEC = `
+        SELECT
+            COALESCE(SUM(CASE WHEN DATE(j.i_ts) = CURDATE() THEN (${NET_EXPR}) ELSE 0 END), 0) AS today_net,
+            COALESCE(SUM(CASE WHEN DATE(j.i_ts) = CURDATE() THEN (${CMSN_EXPR}) ELSE 0 END), 0) AS today_cmsn,
+            COALESCE(SUM(CASE WHEN DATE(j.i_ts) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) THEN (${NET_EXPR}) ELSE 0 END), 0) AS yest_net,
+            COALESCE(SUM(CASE WHEN j.i_ts >= DATE_FORMAT(CURDATE(), '%Y-%m-01') THEN (${NET_EXPR}) ELSE 0 END), 0) AS month_net,
+            COALESCE(SUM(CASE WHEN j.i_ts >= DATE_FORMAT(CURDATE(), '%Y-%m-01') THEN (${CMSN_EXPR}) ELSE 0 END), 0) AS month_cmsn,
+            COALESCE(SUM(CASE WHEN j.i_ts >= DATE_FORMAT(CURDATE() - INTERVAL 1 MONTH, '%Y-%m-01')
+                              AND j.i_ts <  DATE_FORMAT(CURDATE(), '%Y-%m-01') THEN (${NET_EXPR}) ELSE 0 END), 0) AS prev_month_net,
+            COALESCE(SUM(${NET_EXPR}), 0) AS lifetime_net,
+            COALESCE(SUM(${CMSN_EXPR}), 0) AS lifetime_cmsn
+        ${NET_LEG_JOIN}`;
+    const PARAMS = [numVal(data.ownerId)];
+    console.log('[getOwnerNetTotalsMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+// Hourly net-revenue series for today's sparkline (mirrors getOwnerHourlySeriesMdl).
+exports.getOwnerNetHourlySeriesMdl = function(data) {
+    const QRY_TO_EXEC = `
+        SELECT HOUR(j.i_ts) AS hr,
+            COALESCE(SUM(${NET_EXPR}), 0) AS net_amt,
+            COALESCE(SUM(${CMSN_EXPR}), 0) AS cmsn_amt
+        ${NET_LEG_JOIN}
+            AND DATE(j.i_ts) = CURDATE()
+        GROUP BY HOUR(j.i_ts)
+        ORDER BY hr`;
+    const PARAMS = [numVal(data.ownerId)];
+    console.log('[getOwnerNetHourlySeriesMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+// Net + commission per station over an inclusive [from, to] date window.
+exports.getOwnerNetByStationMdl = function(data) {
+    const QRY_TO_EXEC = `
+        SELECT st.sttn_id,
+            COALESCE(SUM(${NET_EXPR}), 0) AS net_amt,
+            COALESCE(SUM(${CMSN_EXPR}), 0) AS cmsn_amt
+        ${NET_LEG_JOIN}
+            AND DATE(j.i_ts) BETWEEN ? AND ?
+        GROUP BY st.sttn_id`;
+    const PARAMS = [numVal(data.ownerId), escVal(data.from), escVal(data.to)];
+    console.log('[getOwnerNetByStationMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+// Net per station for the *previous* window of equal length (drives the trend pill).
+exports.getOwnerNetByStationPrevMdl = function(data) {
+    const QRY_TO_EXEC = `
+        SELECT st.sttn_id, COALESCE(SUM(${NET_EXPR}), 0) AS net_amt
+        ${NET_LEG_JOIN}
+            AND DATE(j.i_ts) BETWEEN
+                DATE_SUB(?, INTERVAL DATEDIFF(?, ?) + 1 DAY) AND DATE_SUB(?, INTERVAL 1 DAY)
+        GROUP BY st.sttn_id`;
+    const from = escVal(data.from), to = escVal(data.to);
+    const PARAMS = [numVal(data.ownerId), from, to, from, from];
+    console.log('[getOwnerNetByStationPrevMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+// Session-side usage per station (kWh, txns, charging minutes, failures, gross).
+// LEFT JOIN so stations with no sessions still appear with zeroes.
+exports.getOwnerStationUsageMdl = function(data) {
+    const QRY_TO_EXEC = `
+        SELECT st.sttn_id, st.sttn_nm_tx, st.cty_tx, st.oprtr_nm_tx, st.aprvl_sttus_cd,
+            COALESCE(SUM(CASE WHEN s.sttus_cd = 'completed' THEN s.enrgy_cnsmd_kwh END), 0) AS kwh,
+            COUNT(CASE WHEN s.sttus_cd = 'completed' THEN 1 END) AS txns,
+            COALESCE(SUM(CASE WHEN s.sttus_cd = 'completed' THEN s.durn_mnts_nbr END), 0) AS charge_mins,
+            COUNT(CASE WHEN s.sttus_cd IN ('cancelled', 'failed') THEN 1 END) AS failed_txns,
+            COALESCE(SUM(CASE WHEN s.sttus_cd = 'completed' THEN s.ttl_cst_amt END), 0) AS gross_amt
+        FROM sttn_lst_t st
+        LEFT JOIN sssn_lst_t s
+            ON s.sttn_id = st.sttn_id AND s.a_in = 1
+            AND DATE(s.strt_ts) BETWEEN ? AND ?
+        WHERE st.ownr_usr_id = ? AND st.a_in = 1
+        GROUP BY st.sttn_id, st.sttn_nm_tx, st.cty_tx, st.oprtr_nm_tx, st.aprvl_sttus_cd`;
+    const PARAMS = [escVal(data.from), escVal(data.to), numVal(data.ownerId)];
+    console.log('[getOwnerStationUsageMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+// Earliest activity for this owner — the true start of a "lifetime" window.
+// Falls back to when their first station was created if no session exists yet.
+exports.getOwnerFirstActivityMdl = function(data) {
+    const QRY_TO_EXEC = `
+        SELECT LEAST(
+            COALESCE((SELECT DATE(MIN(s.strt_ts)) FROM sssn_lst_t s
+                      INNER JOIN sttn_lst_t st ON st.sttn_id = s.sttn_id
+                      WHERE st.ownr_usr_id = ? AND s.a_in = 1), CURDATE()),
+            COALESCE((SELECT DATE(MIN(i_ts)) FROM sttn_lst_t
+                      WHERE ownr_usr_id = ? AND a_in = 1), CURDATE())
+        ) AS first_dt`;
+    const PARAMS = [numVal(data.ownerId), numVal(data.ownerId)];
+    console.log('[getOwnerFirstActivityMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+// Machine health per station: counts by status + newest OCPP heartbeat.
+exports.getOwnerStationHealthMdl = function(data) {
+    const QRY_TO_EXEC = `
+        SELECT st.sttn_id,
+            COUNT(m.mchn_id) AS machines,
+            COALESCE(SUM(m.sttus_cd = 'faulted'), 0) AS faulted,
+            COALESCE(SUM(m.sttus_cd = 'offline'), 0) AS offline,
+            COALESCE(SUM(m.sttus_cd = 'maintenance'), 0) AS maintenance,
+            MAX(m.lst_hb_ts) AS last_heartbeat_ts,
+            TIMESTAMPDIFF(MINUTE, MAX(m.lst_hb_ts), NOW()) AS mins_since_heartbeat
+        FROM sttn_lst_t st
+        LEFT JOIN mchn_lst_t m ON m.sttn_id = st.sttn_id AND m.a_in = 1
+        WHERE st.ownr_usr_id = ? AND st.a_in = 1
+        GROUP BY st.sttn_id`;
+    const PARAMS = [numVal(data.ownerId)];
+    console.log('[getOwnerStationHealthMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+/*****************************************************************************
+* BALANCE, ESCROW, COMMISSION RULE, SETTLEMENTS
+******************************************************************************/
+
+// Cached balance of the owner's earnings account (credits less payouts).
+exports.getOwnerBalanceMdl = function(data) {
+    const QRY_TO_EXEC = `
+        SELECT acct_id, blnce_amt, crncy_cd
+        FROM acct_lst_t
+        WHERE acct_typ_cd = 'owner_earnings' AND ownr_usr_id = ? AND a_in = 1
+        LIMIT 1`;
+    const PARAMS = [numVal(data.ownerId)];
+    console.log('[getOwnerBalanceMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+// Money still held in escrow for this owner's in-flight sessions: holds posted
+// with no settle/refund journal yet.
+exports.getOwnerEscrowHeldMdl = function(data) {
+    const QRY_TO_EXEC = `
+        SELECT COALESCE(SUM(j.ttl_amt), 0) AS held_amt, COUNT(*) AS active_sessions
+        FROM jrnl_lst_t j
+        INNER JOIN sssn_lst_t s ON s.sssn_id = j.ref_id
+        INNER JOIN sttn_lst_t st ON st.sttn_id = s.sttn_id
+        WHERE j.ref_typ_cd = 'session'
+            AND j.jrnl_typ_cd = 'charging_hold'
+            AND j.sttus_cd = 'posted'
+            AND j.a_in = 1
+            AND st.ownr_usr_id = ?
+            AND NOT EXISTS (
+                SELECT 1 FROM jrnl_lst_t j2
+                WHERE j2.ref_typ_cd = 'session' AND j2.ref_id = j.ref_id
+                    AND j2.jrnl_typ_cd IN ('charging_payment', 'charging_refund')
+                    AND j2.a_in = 1
+            )`;
+    const PARAMS = [numVal(data.ownerId)];
+    console.log('[getOwnerEscrowHeldMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+// Effective commission rule for this owner (station overrides listed separately).
+// Mirrors ledgerMdl.resolveCommissionRule's precedence: station > owner > global.
+exports.getOwnerCommissionRuleMdl = function(data) {
+    const QRY_TO_EXEC = `
+        SELECT rule_id, scope_cd, sttn_id, ownr_pct, platfrm_pct, tax_pct
+        FROM cmsn_rule_lst_t
+        WHERE a_in = 1
+            AND eff_frm_ts <= NOW()
+            AND (eff_to_ts IS NULL OR eff_to_ts >= NOW())
+            AND ((scope_cd = 'owner' AND ownr_usr_id = ?) OR scope_cd = 'global')
+        ORDER BY FIELD(scope_cd, 'owner', 'global'), prirty_nbr DESC, rule_id DESC
+        LIMIT 1`;
+    const PARAMS = [numVal(data.ownerId)];
+    console.log('[getOwnerCommissionRuleMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+// Station-scoped commission overrides, so the owner can see where their rate differs.
+exports.getOwnerStationRuleOverridesMdl = function(data) {
+    const QRY_TO_EXEC = `
+        SELECT r.rule_id, r.sttn_id, st.sttn_nm_tx, r.ownr_pct, r.platfrm_pct, r.tax_pct
+        FROM cmsn_rule_lst_t r
+        INNER JOIN sttn_lst_t st ON st.sttn_id = r.sttn_id
+        WHERE r.a_in = 1 AND r.scope_cd = 'station'
+            AND r.eff_frm_ts <= NOW()
+            AND (r.eff_to_ts IS NULL OR r.eff_to_ts >= NOW())
+            AND st.ownr_usr_id = ? AND st.a_in = 1
+        ORDER BY st.sttn_nm_tx`;
+    const PARAMS = [numVal(data.ownerId)];
+    console.log('[getOwnerStationRuleOverridesMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+// Payout history for this owner. NOTE: columns follow the live schema in
+// migrations/2026_06_payment_ledger.sql (gross_amt/cmsn_amt/tax_amt/net_amt),
+// not the stale names used by the admin web settlements model.
+exports.getOwnerSettlementsMdl = function(data) {
+    const limit = Number.isFinite(Number(data.limit)) ? Math.max(1, parseInt(data.limit, 10)) : 12;
+    const QRY_TO_EXEC = `
+        SELECT setlmnt_id, prd_frm_dt, prd_to_dt, gross_amt, cmsn_amt, tax_amt,
+            net_amt, sttus_cd, utr_tx, i_ts, u_ts
+        FROM setlmnt_lst_t
+        WHERE ownr_usr_id = ?
+        ORDER BY COALESCE(prd_to_dt, i_ts) DESC, setlmnt_id DESC
+        LIMIT ${limit}`;
+    const PARAMS = [numVal(data.ownerId)];
+    console.log('[getOwnerSettlementsMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+// Energy delivered beyond the driver's prepaid hold. chargingSettle caps the
+// settled amount at the hold (`if (consumed > hold) consumed = hold`), so the
+// excess never passes through the ledger. The owner collects it directly at the
+// machine, and keeps 100% of it — no platform commission applies. Reported as
+// income, not as a discrepancy.
+exports.getOwnerDirectCollectedMdl = function(data) {
+    const QRY_TO_EXEC = `
+        SELECT
+            COALESCE(SUM(CASE WHEN DATE(s.strt_ts) = CURDATE()
+                              THEN GREATEST(s.ttl_cst_amt - pay.settled_amt, 0) ELSE 0 END), 0) AS today_direct,
+            COALESCE(SUM(CASE WHEN s.strt_ts >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+                              THEN GREATEST(s.ttl_cst_amt - pay.settled_amt, 0) ELSE 0 END), 0) AS month_direct,
+            COALESCE(SUM(GREATEST(s.ttl_cst_amt - pay.settled_amt, 0)), 0) AS lifetime_direct,
+            COUNT(CASE WHEN s.ttl_cst_amt > pay.settled_amt THEN 1 END) AS session_count
+        FROM sssn_lst_t s
+        INNER JOIN sttn_lst_t st ON st.sttn_id = s.sttn_id
+        INNER JOIN (
+            SELECT j.ref_id, SUM(CASE WHEN l.drct_cd = 'debit' THEN l.amt ELSE 0 END) AS settled_amt
+            FROM jrnl_lst_t j
+            INNER JOIN jrnl_leg_lst_t l ON l.jrnl_id = j.jrnl_id
+            INNER JOIN acct_lst_t a ON a.acct_id = l.acct_id
+            WHERE j.ref_typ_cd = 'session' AND j.jrnl_typ_cd = 'charging_payment'
+                AND j.sttus_cd = 'posted' AND j.a_in = 1
+                AND a.acct_typ_cd = 'escrow_hold'
+            GROUP BY j.ref_id
+        ) pay ON pay.ref_id = s.sssn_id
+        WHERE st.ownr_usr_id = ? AND s.a_in = 1 AND s.sttus_cd = 'completed'`;
+    const PARAMS = [numVal(data.ownerId)];
+    console.log('[getOwnerDirectCollectedMdl] Query:', QRY_TO_EXEC);
+    return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
+};
+
+// Refunds returned to drivers from this owner's sessions (context, not a deduction).
+exports.getOwnerRefundsMdl = function(data) {
+    const QRY_TO_EXEC = `
+        SELECT
+            COALESCE(SUM(CASE WHEN j.i_ts >= DATE_FORMAT(CURDATE(), '%Y-%m-01') THEN j.ttl_amt ELSE 0 END), 0) AS month_refunds,
+            COALESCE(SUM(j.ttl_amt), 0) AS lifetime_refunds
+        FROM jrnl_lst_t j
+        INNER JOIN sssn_lst_t s ON s.sssn_id = j.ref_id
+        INNER JOIN sttn_lst_t st ON st.sttn_id = s.sttn_id
+        WHERE j.ref_typ_cd = 'session'
+            AND j.jrnl_typ_cd = 'charging_refund'
+            AND j.sttus_cd = 'posted'
+            AND j.a_in = 1
+            AND st.ownr_usr_id = ?`;
+    const PARAMS = [numVal(data.ownerId)];
+    console.log('[getOwnerRefundsMdl] Query:', QRY_TO_EXEC);
     return dbutil.execQuery(sqldb.MySQLConPool, QRY_TO_EXEC, PARAMS, cntxtDtls);
 };
 
