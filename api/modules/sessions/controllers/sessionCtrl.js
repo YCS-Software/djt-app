@@ -25,13 +25,14 @@ function isChargerOnline(ocppId) {
 // real relay ON). `evseId` is the 1-based connector ordinal (= 1.6 connectorId).
 // Returns { attempted, accepted, message }. Only attempts when remote control is
 // enabled and the charger holds a live socket.
-async function remoteStartCharger(ocppId, evseId, userId) {
+async function remoteStartCharger(ocppId, evseId, userId, connStatus) {
     if (!config.ocpp || config.ocpp.remoteControl === false) return { attempted: false };
     const conn = ocppServer.getConnection(ocppId);
     if (!conn) {
         console.log(`[sessionCtrl][1.6] RemoteStartTransaction skipped — ${ocppId} not connected`);
         return { attempted: false }; // offline is guarded before we reach here
     }
+    const connSt = connStatus || 'unknown'; // connector's last reported status, for diagnosing rejects
     // The app has already validated + held funds for this driver. If the charger
     // has AuthorizeRemoteTxRequests=true it will send an Authorize right after the
     // RemoteStart — that must be accepted regardless of the now-reduced wallet
@@ -39,13 +40,13 @@ async function remoteStartCharger(ocppId, evseId, userId) {
     conn.pendingRemoteAuth = { idTag: String(userId), until: Date.now() + 120000 };
     const connectorId = Number(evseId) || 1;
     try {
-        console.log(`[sessionCtrl][1.6] -> RemoteStartTransaction ${ocppId} connectorId=${connectorId} idTag=${userId}`);
+        console.log(`[sessionCtrl][1.6] -> RemoteStartTransaction ${ocppId} connectorId=${connectorId} idTag=${userId} connStatus=${connSt}`);
         const result = await ocppServer.sendCall(conn, 'RemoteStartTransaction', {
             connectorId,
             idTag: String(userId),
         });
         const accepted = !!(result && result.status === 'Accepted');
-        console.log(`[sessionCtrl][1.6] <- RemoteStartTransaction ${ocppId} status=${result && result.status} accepted=${accepted}`);
+        console.log(`[sessionCtrl][1.6] <- RemoteStartTransaction ${ocppId} status=${result && result.status} accepted=${accepted} connStatus=${connSt}`);
         return {
             attempted: true,
             accepted,
@@ -53,7 +54,7 @@ async function remoteStartCharger(ocppId, evseId, userId) {
                 : 'The charger did not accept the start request. Please try again.',
         };
     } catch (e) {
-        console.log(`[sessionCtrl][1.6] RemoteStartTransaction ${ocppId} FAILED: ${e.message}`);
+        console.log(`[sessionCtrl][1.6] RemoteStartTransaction ${ocppId} FAILED: ${e.message} connStatus=${connSt}`);
         return { attempted: true, accepted: false, message: 'The charger did not respond. Please try again.' };
     }
 }
@@ -81,6 +82,48 @@ async function remoteStopCharger(ocppId, transactionId) {
     }
 }
 
+// Per-connector readiness gate, evaluated BEFORE any wallet hold. A charger only
+// accepts a RemoteStartTransaction when the connector is physically ready — cable
+// plugged in -> OCPP 'Preparing'. Firing a start at any other state is rejected by
+// the charger and would needlessly churn the wallet (debit -> refund). We trust the
+// connector's last reported status ONLY while the charger is online; offline is left
+// to the existing guards (its stored status is stale). `live` is one row from
+// getConnectorLiveMdl. Throws a 400 _userMessage error when not ready; returns
+// silently (fail-open) when ready or when readiness can't be determined.
+function assertConnectorReadyToStart(live) {
+    if (!live) return;                                   // unknown connector -> don't add a new block
+    if (!isChargerOnline(live.ocpp_id_tx)) return;       // offline: stale status, handled elsewhere
+    let message = null;
+    switch (live.cnntr_sttus_cd) {
+        case 'preparing':                                // cable in, awaiting auth -> startable
+            return;
+        case 'available':                                // nothing plugged in yet
+            message = 'Please plug the connector into your vehicle, then tap Start.';
+            break;
+        case 'occupied':                                 // previous session still finishing
+            message = 'The previous session is still finishing. Please wait a moment and try again.';
+            break;
+        case 'charging':
+        case 'suspended_ev':
+        case 'suspended_evse':
+            message = 'A charging session is already active on this connector.';
+            break;
+        case 'faulted':
+            message = 'This connector has a fault and cannot start charging. Please try another connector.';
+            break;
+        case 'unavailable':
+        case 'reserved':
+            message = 'This connector is currently unavailable. Please try again later.';
+            break;
+        default:
+            return;                                      // unknown/legacy status -> fail open
+    }
+    const err = new Error(message);
+    err.status = std.message["BAD_REQUEST"].code;
+    err._userMessage = true;
+    throw err;
+}
+
 /**
  * Derive a human connector state from THIS connector's REAL live status
  * (cnntr_sttus_cd, set per-connector from the charger's OCPP StatusNotification).
@@ -93,7 +136,7 @@ async function remoteStopCharger(ocppId, transactionId) {
  *  charging       – energy actually flowing (StatusNotification 'Charging')
  *  suspended_ev   – charger ready, vehicle paused it (SuspendedEV)
  *  suspended_evse – vehicle ready, charger paused it (SuspendedEVSE)
- *  plugged        – cable connected (Preparing/Occupied) but not charging yet
+ *  plugged        – cable connected (Preparing/Finishing) but not charging yet
  *  unplugged      – online and free (Available)
  * `sssnStatus` is accepted for signature compatibility but no longer forces a
  * state — the machine's own status is authoritative.
@@ -105,6 +148,9 @@ function deriveConnectorState(online, connStatus, sssnStatus) { // eslint-disabl
     if (connStatus === 'suspended_ev') return 'suspended_ev';
     if (connStatus === 'suspended_evse') return 'suspended_evse';
     if (connStatus === 'charging') return 'charging';
+    // 'preparing' (cable in, awaiting auth) and 'occupied' (finishing / cable still
+    // in) both surface to the app as "plugged" — preserves the existing plug-in gate.
+    if (connStatus === 'preparing') return 'plugged';
     if (connStatus === 'occupied') return 'plugged';
     return 'unplugged';
 }
@@ -401,8 +447,15 @@ exports.startSession = function(req, res) {
         });
     }
 
-    // Get station details
-    stationMdl.getStationByIdMdl({ stationId: station_id })
+    // Defense-in-depth: refuse to start unless THIS connector is physically ready
+    // (cable plugged -> OCPP 'Preparing'). Evaluated BEFORE any wallet hold so a
+    // mis-timed tap never debits/refunds the customer. Throws a 400 when not ready.
+    sessionMdl.getConnectorLiveMdl({ connectorId: connector_id })
+        .then(function(liveRows) {
+            assertConnectorReadyToStart(liveRows && liveRows[0]);
+            // Get station details
+            return stationMdl.getStationByIdMdl({ stationId: station_id });
+        })
         .then(function(stationResults) {
             if (!stationResults || stationResults.length === 0) {
                 return res.status(std.message["NOT_FOUND"].code).json({
@@ -496,7 +549,7 @@ exports.startSession = function(req, res) {
                                             const co = coRows && coRows[0];
                                             const chargerOcppId = (co && co.ocpp_id_tx) || (qr_code && extractOcppId(qr_code)) || null;
                                             const evseId = (co && co.ordinal) || 1;
-                                            return remoteStartCharger(chargerOcppId, evseId, userId);
+                                            return remoteStartCharger(chargerOcppId, evseId, userId, co && co.cnntr_sttus_cd);
                                         })
                                         .then(function(rs) {
                                             if (rs && rs.attempted && !rs.accepted) {

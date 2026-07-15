@@ -104,7 +104,7 @@ exports.recalcMachineStatusMdl = function(machineId) {
         SET m.sttus_cd = (
             SELECT CASE
                 WHEN SUM(c.cnntr_sttus_cd = 'faulted') > 0 THEN 'faulted'
-                WHEN SUM(c.cnntr_sttus_cd IN ('occupied', 'charging', 'reserved', 'suspended_ev', 'suspended_evse')) > 0 THEN 'in_use'
+                WHEN SUM(c.cnntr_sttus_cd IN ('preparing', 'occupied', 'charging', 'reserved', 'suspended_ev', 'suspended_evse')) > 0 THEN 'in_use'
                 ELSE 'available'
             END
             FROM cnntr_lst_t c WHERE c.mchn_id = m.mchn_id AND c.a_in = 1

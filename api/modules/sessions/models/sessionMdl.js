@@ -249,7 +249,7 @@ exports.getMachineLiveByIdMdl = function(data) {
 exports.getConnectorOcppInfoMdl = function(data) {
     const connectorId = parseInt(data.connectorId) || 0;
     const QRY_TO_EXEC = `
-        SELECT c.cnntr_id, c.mchn_id, m.ocpp_id_tx,
+        SELECT c.cnntr_id, c.mchn_id, c.cnntr_sttus_cd, m.ocpp_id_tx,
                (SELECT COUNT(*) FROM cnntr_lst_t x WHERE x.mchn_id = c.mchn_id AND x.a_in = 1 AND x.cnntr_id <= c.cnntr_id) AS ordinal
         FROM cnntr_lst_t c
         INNER JOIN mchn_lst_t m ON c.mchn_id = m.mchn_id

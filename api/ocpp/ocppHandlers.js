@@ -37,7 +37,7 @@ function nextTransactionId() {
 // kept distinct so the app can show "paused by vehicle / charger".
 const CONNECTOR_STATUS_MAP = {
     Available: 'available',
-    Preparing: 'occupied',      // cable plugged, not charging yet
+    Preparing: 'preparing',     // cable plugged, awaiting auth — the ONLY state a RemoteStart is accepted in
     Charging: 'charging',       // energy actually flowing
     SuspendedEV: 'suspended_ev',      // charger ready, vehicle paused it
     SuspendedEVSE: 'suspended_evse',  // vehicle ready, charger paused it
@@ -134,8 +134,8 @@ const handlers = {
     async StatusNotification(payload, ctx) {
         const machine = await ensureMachine(ctx);
         // OCPP 1.6 StatusNotification is PER CONNECTOR: { connectorId, status, errorCode }.
-        // e.g. "Preparing" when the cable is plugged into the vehicle -> 'occupied',
-        // which the customer app reads as "plugged in".
+        // e.g. "Preparing" when the cable is plugged into the vehicle -> 'preparing',
+        // which the customer app (via deriveConnectorState) still reads as "plugged in".
         const rawStatus = payload.status;
         const connectorId = Number(payload.connectorId) || 1;
         const connStatus = CONNECTOR_STATUS_MAP[rawStatus] || 'available';
