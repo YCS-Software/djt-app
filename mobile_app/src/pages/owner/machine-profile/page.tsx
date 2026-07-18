@@ -6,6 +6,7 @@ import ConnectorQrModal from '../../../components/ConnectorQrModal';
 import {
   ArrowLeft, Power, Plug, Zap, Loader2, IndianRupee, Receipt, Clock, BarChart3, Tag, Activity,
   Hash, Wifi, WifiOff, Copy, Check, Cpu, Building2, CalendarDays, TrendingUp, TrendingDown, Settings, QrCode,
+  SlidersHorizontal, ChevronRight,
 } from 'lucide-react';
 
 const MACHINE_STATUS: Record<string, string> = {
@@ -118,6 +119,16 @@ export default function MachineProfilePage() {
         </div>
         <p className="owner-field-hint owner-qr-cta">Each connector below has its own QR — tap the QR icon to download it.</p>
       </div>
+
+      {/* Remote controls entry (reset / unlock / availability / …) */}
+      <button className="owner-card owner-ctrl-entry" onClick={() => navigate(`/owner/machines/${m.machine_id}/controls`)}>
+        <span className="owner-ctrl-entry-icon"><SlidersHorizontal size={18} /></span>
+        <div className="owner-ctrl-entry-main">
+          <div className="owner-ctrl-entry-title">Remote Controls</div>
+          <div className="owner-ctrl-entry-sub">Reset, unlock, availability &amp; diagnostics</div>
+        </div>
+        <ChevronRight size={18} />
+      </button>
 
       {/* Performance — Today */}
       <div className="owner-section-head"><h2 className="owner-h2">Today</h2></div>

@@ -311,6 +311,18 @@ export interface OcppConnection {
   authorized_user: number | null;
 }
 
+/** Ack returned by a Charger Controls command (the charger's OCPP response). */
+export interface ChargerCommandResult {
+  result?: { status?: string; fileName?: string } | null;
+}
+
+export interface ChargerConfigKey { key: string; value?: string | null; readonly?: boolean; }
+export interface ChargerConfigResult {
+  result?: { configurationKey?: ChargerConfigKey[]; unknownKey?: string[] } | null;
+}
+export interface DiagnosticsParams { location: string; retries?: number; retry_interval?: number; start_time?: string; stop_time?: string; }
+export interface FirmwareParams { location: string; retrieve_date?: string; retries?: number; retry_interval?: number; }
+
 export interface OwnerMachine {
   machine_id: number;
   station_id: number;
@@ -510,5 +522,40 @@ export const ownerService = {
   addConnector: async (machineId: number, data: CreateConnectorRequest): Promise<number> => {
     const res = await apiClient.post<{ data: { connector_id: number } }>(`/owner/machines/${machineId}/connectors`, data, AUTH);
     return res.data.connector_id;
+  },
+
+  // ---- Charger Controls (owner remote OCPP operations) ----
+  // Each returns the charger's ack, e.g. { result: { status: 'Accepted' | 'Rejected' | 'Unlocked' | ... } }.
+  chargerReset: async (ocppId: string, type: 'Soft' | 'Hard' = 'Soft'): Promise<ChargerCommandResult> => {
+    const res = await apiClient.post<{ data: ChargerCommandResult }>('/ocpp/reset', { ocpp_id: ocppId, type }, AUTH);
+    return res.data;
+  },
+  chargerClearCache: async (ocppId: string): Promise<ChargerCommandResult> => {
+    const res = await apiClient.post<{ data: ChargerCommandResult }>('/ocpp/clear-cache', { ocpp_id: ocppId }, AUTH);
+    return res.data;
+  },
+  chargerUnlockConnector: async (ocppId: string, connectorId: number): Promise<ChargerCommandResult> => {
+    const res = await apiClient.post<{ data: ChargerCommandResult }>('/ocpp/unlock-connector', { ocpp_id: ocppId, connector_id: connectorId }, AUTH);
+    return res.data;
+  },
+  chargerChangeAvailability: async (ocppId: string, type: 'Operative' | 'Inoperative', connectorId = 0): Promise<ChargerCommandResult> => {
+    const res = await apiClient.post<{ data: ChargerCommandResult }>('/ocpp/change-availability', { ocpp_id: ocppId, type, connector_id: connectorId }, AUTH);
+    return res.data;
+  },
+  chargerTriggerMessage: async (ocppId: string, requestedMessage = 'StatusNotification', connectorId?: number): Promise<ChargerCommandResult> => {
+    const res = await apiClient.post<{ data: ChargerCommandResult }>('/ocpp/trigger-message', { ocpp_id: ocppId, requested_message: requestedMessage, connector_id: connectorId }, AUTH);
+    return res.data;
+  },
+  chargerGetConfiguration: async (ocppId: string, keys?: string[]): Promise<ChargerConfigResult> => {
+    const res = await apiClient.post<{ data: ChargerConfigResult }>('/ocpp/get-configuration', { ocpp_id: ocppId, keys }, AUTH);
+    return res.data;
+  },
+  chargerGetDiagnostics: async (ocppId: string, params: DiagnosticsParams): Promise<ChargerCommandResult> => {
+    const res = await apiClient.post<{ data: ChargerCommandResult }>('/ocpp/get-diagnostics', { ocpp_id: ocppId, ...params }, AUTH);
+    return res.data;
+  },
+  chargerUpdateFirmware: async (ocppId: string, params: FirmwareParams): Promise<ChargerCommandResult> => {
+    const res = await apiClient.post<{ data: ChargerCommandResult }>('/ocpp/update-firmware', { ocpp_id: ocppId, ...params }, AUTH);
+    return res.data;
   },
 };

@@ -19,6 +19,7 @@ import StationDetailPage from "../pages/owner/station-detail/page";
 import MachineProfilePage from "../pages/owner/machine-profile/page";
 import OwnerEarningsPage from "../pages/owner/earnings/page";
 import OwnerStationAnalyticsPage from "../pages/owner/station-analytics/page";
+import ChargerControlsPage from "../pages/owner/charger-controls/page";
 
 const routes: RouteObject[] = [
   // Root route - redirect based on auth status
@@ -97,6 +98,10 @@ const routes: RouteObject[] = [
       {
         path: "/owner/machines/:machineId",
         element: <MachineProfilePage />,
+      },
+      {
+        path: "/owner/machines/:machineId/controls",
+        element: <ChargerControlsPage />,
       },
       {
         path: "/owner/earnings",
