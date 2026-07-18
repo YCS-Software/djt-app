@@ -1095,6 +1095,11 @@ optgroup { color: var(--o-text-dim); background: rgba(9, 24, 42, 0.5); }
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
+/* Charger-controls dialogs are centered (not bottom-sheets like the form modals) */
+.owner-modal-overlay.owner-modal-center { align-items: center; padding: 1.25rem; }
+.owner-modal-overlay.owner-modal-center .owner-confirm { animation: owner-pop 200ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes owner-pop { from { transform: scale(0.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
 /* Confirm dialog (reuses .owner-modal-overlay) */
 .owner-confirm {
   width: 100%; max-width: 340px; background: #0F1E30; border: 1px solid rgba(255,255,255,0.1);

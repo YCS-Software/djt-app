@@ -173,12 +173,12 @@ export default function ChargerControlsPage() {
         <div className="owner-ctrl-row">
           <span className="owner-ctrl-icon tone-red"><Power size={17} /></span>
           <div className="owner-ctrl-main">
-            <div className="owner-ctrl-title">Hard Reset</div>
-            <div className="owner-ctrl-sub">Full reboot (power-cycle). Drops any active session immediately.</div>
+            <div className="owner-ctrl-title">Reboot <span className="owner-ctrl-ord">Hard Reset</span></div>
+            <div className="owner-ctrl-sub">Full power-cycle reboot. Drops any active session immediately.</div>
           </div>
           <button className="owner-btn owner-btn-danger owner-btn-sm" disabled={disabled}
-            onClick={() => ask({ title: 'Hard reset charger?', message: 'This reboots the charger immediately and drops any active session. Use only if the charger is stuck.', danger: true, label: 'Hard reset', run: () => ownerService.chargerReset(ocppId!, 'Hard') })}>
-            {busy === 'hard-reset' ? <Loader2 className="owner-spin" size={15} /> : <Power size={15} />} Hard
+            onClick={() => ask({ title: 'Reboot charger?', message: 'This reboots the charger immediately (OCPP Hard Reset) and drops any active session. Use when the charger is stuck.', danger: true, label: 'Reboot', run: () => ownerService.chargerReset(ocppId!, 'Hard') })}>
+            {busy === 'reboot' ? <Loader2 className="owner-spin" size={15} /> : <Power size={15} />} Reboot
           </button>
         </div>
         <div className="owner-ctrl-row">
@@ -309,7 +309,7 @@ export default function ChargerControlsPage() {
 
       {/* Confirm dialog */}
       {pending && (
-        <div className="owner-modal-overlay" onClick={() => setPending(null)}>
+        <div className="owner-modal-overlay owner-modal-center" onClick={() => setPending(null)}>
           <div className="owner-confirm" onClick={(e) => e.stopPropagation()}>
             <div className={`owner-confirm-icon ${pending.danger ? 'danger' : ''}`}>
               <AlertTriangle size={30} />
@@ -329,7 +329,7 @@ export default function ChargerControlsPage() {
 
       {/* Configuration display */}
       {configModal && (
-        <div className="owner-modal-overlay" onClick={() => setConfigModal(null)}>
+        <div className="owner-modal-overlay owner-modal-center" onClick={() => setConfigModal(null)}>
           <div className="owner-confirm owner-config-modal" onClick={(e) => e.stopPropagation()}>
             <h3 className="owner-confirm-title">Charger Configuration</h3>
             {configModal.loading ? (
@@ -359,7 +359,7 @@ export default function ChargerControlsPage() {
 
       {/* Diagnostics / Firmware form */}
       {formModal && (
-        <div className="owner-modal-overlay" onClick={() => setFormModal(null)}>
+        <div className="owner-modal-overlay owner-modal-center" onClick={() => setFormModal(null)}>
           <div className="owner-confirm owner-form-modal" onClick={(e) => e.stopPropagation()}>
             <h3 className="owner-confirm-title">{formModal.kind === 'diagnostics' ? 'Get Diagnostics' : 'Update Firmware'}</h3>
             <p className="owner-confirm-text">
