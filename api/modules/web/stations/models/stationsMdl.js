@@ -19,21 +19,6 @@ exports.listMdl = function() {
 };
 
 /*****************************************************************************
-* Function      : summaryMdl
-* Description   : Charging totals across completed sessions — consumption,
-*                 amount (with taxes), energy price and derived tax.
-*                 energy price = Σ(kWh × price/kWh); tax = amount − energy price.
-******************************************************************************/
-exports.summaryMdl = function() {
-    const QRY = `SELECT COALESCE(SUM(enrgy_cnsmd_kwh), 0) AS totalConsumption,
-                        COALESCE(SUM(ttl_cst_amt), 0) AS totalAmount,
-                        COALESCE(SUM(enrgy_cnsmd_kwh * prce_per_kwh_amt), 0) AS totalEnergyPrice
-                 FROM sssn_lst_t
-                 WHERE sttus_cd = 'completed'`;
-    return dbutil.execQuery(sqldb.MySQLConPool, QRY, [], cntxtDtls);
-};
-
-/*****************************************************************************
 * Function      : getByIdMdl
 * Description   : Single station/charger detail filtered by primary id column.
 * Arguments     : data object with id
