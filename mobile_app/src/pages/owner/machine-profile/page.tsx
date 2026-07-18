@@ -12,8 +12,8 @@ const MACHINE_STATUS: Record<string, string> = {
   available: 'Available', in_use: 'In use', offline: 'Offline', faulted: 'Faulted', maintenance: 'Maintenance',
 };
 
-const inr = (n: number, dp = 2) =>
-  n.toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+const inr = (n?: number | null, dp = 2) =>
+  (n ?? 0).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 
 function fmtDate(d?: string | null, withTime = false) {
   if (!d) return '—';

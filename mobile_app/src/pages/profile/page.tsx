@@ -79,8 +79,8 @@ export default function Profile() {
     return `₹${amount.toFixed(0)}`;
   };
 
-  const formatNumber = (num: number) => {
-    return num.toLocaleString('en-IN');
+  const formatNumber = (num?: number | null) => {
+    return (num ?? 0).toLocaleString('en-IN');
   };
 
   if (isLoading) {

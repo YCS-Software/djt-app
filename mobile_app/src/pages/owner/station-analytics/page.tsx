@@ -5,8 +5,8 @@ import { ownerService } from '../../../services/api';
 import type { StationBreakdown, StationBreakdownRow } from '../../../services/api/ownerService';
 import { ArrowLeft, Loader2, AlertTriangle, Building2, ChevronRight } from 'lucide-react';
 
-const inr = (n: number, dp = 2) =>
-  n.toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+const inr = (n?: number | null, dp = 2) =>
+  (n ?? 0).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 
 const COLORS = ['#34D399', '#38BDF8', '#A78BFA', '#FBBF24', '#F472B6', '#6F8AA6'];
 

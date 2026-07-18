@@ -11,8 +11,8 @@ import {
   Settings, Building2, Phone, User, Navigation, CalendarDays, Gauge, ChevronRight, QrCode,
 } from 'lucide-react';
 
-const inr = (n: number, dp = 2) =>
-  n.toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+const inr = (n?: number | null, dp = 2) =>
+  (n ?? 0).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 
 function fmtDate(d?: string | null) {
   if (!d) return '—';

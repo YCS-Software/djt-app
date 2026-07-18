@@ -3,7 +3,7 @@ import { ownerService } from '../../../services/api';
 import type { OwnerTransaction } from '../../../services/api/ownerService';
 import { Zap, Loader2, Receipt, User, Calendar } from 'lucide-react';
 
-const inr = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const inr = (n?: number | null) => (n ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /**
  * sssn_lst_t.sttus_cd is one of: initiated, active, completed, cancelled, failed.

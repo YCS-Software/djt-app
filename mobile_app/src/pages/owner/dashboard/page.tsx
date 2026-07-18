@@ -13,8 +13,8 @@ import {
   Wallet, Hourglass, ArrowRight,
 } from 'lucide-react';
 
-const inr = (n: number, dp = 2) =>
-  n.toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+const inr = (n?: number | null, dp = 2) =>
+  (n ?? 0).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 
 // Small green/red/flat trend pill — matches the image's "▲ 0% vs yesterday"
 function Trend({ pct, suffix = 'vs yesterday' }: { pct: number; suffix?: string }) {

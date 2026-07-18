@@ -6,8 +6,8 @@ import {
   ArrowLeft, Loader2, Wallet, Hourglass, Info, CheckCircle2, Clock, XCircle, Receipt, Zap,
 } from 'lucide-react';
 
-const inr = (n: number, dp = 2) =>
-  n.toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+const inr = (n?: number | null, dp = 2) =>
+  (n ?? 0).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 
 const fmtDate = (d: string | null) =>
   d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
