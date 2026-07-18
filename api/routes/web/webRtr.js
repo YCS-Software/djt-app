@@ -60,9 +60,6 @@ router.use('/stations', require('./bulkRemoteRtr'));
 router.use('/businesses', require('./businessesRtr'));
 router.use('/settlements', require('./settlementsRtr'));
 
-// ── FINANCE (franchise revenue share) ───────────────────────────────────────
-router.use('/finance', require('./financeRtr'));
-
 // ── LIVE ANALYTICS ──────────────────────────────────────────────────────────
 router.use('/live-sessions', require('./live-sessionsRtr'));
 

@@ -10,7 +10,6 @@ const mdl = require('../models/menuMdl');
 const ADMIN_MENU = [
     { heading: '', items: [
         { title: 'Dashboard', path: '/dashboard' },
-        { title: 'Finance', path: '/finance' },
     ] },
     { heading: 'MANAGE', items: [
         { title: 'Partners', path: '/partners' },
@@ -41,10 +40,7 @@ const ADMIN_MENU = [
 
 // Owner/operator get a reduced view (extend as needed).
 const OWNER_MENU = [
-    { heading: '', items: [
-        { title: 'Dashboard', path: '/dashboard' },
-        { title: 'Finance', path: '/finance' },
-    ] },
+    { heading: '', items: [{ title: 'Dashboard', path: '/dashboard' }] },
     { heading: 'NETWORK', items: [
         { title: 'EV Drivers', path: '/drivers' },
         { title: 'Transactions', path: '/transactions' },
