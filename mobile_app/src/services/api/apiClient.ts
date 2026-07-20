@@ -20,25 +20,26 @@ function getApiBaseUrl(): string {
     }
   }
 
-  // Priority 3: Fallback to default
-  // For Android emulator: use 10.0.2.2 instead of localhost
-  // For physical device: use your computer's local IP (e.g., 192.168.1.XXX)
-  // For production: use your production API URL
-  const defaultUrl = 'http://localhost:5000/api';
-  // const defaultUrl = 'http://3.110.84.196:5000/api';   // production
+  // Priority 3: environment-based default.
+  //   - Local development (`npm run dev`) → the local server on this machine.
+  //   - Production build (`npm run build`) → the deployed production API.
+  // Override either by setting VITE_API_URL (handled above), e.g. a physical
+  // device on your LAN should build with VITE_API_URL=http://<your-ip>:5000/api.
+  const LOCAL_URL = 'http://localhost:5000/api';
+  const PROD_URL = 'http://3.110.84.196:5000/api';
 
-  if (Capacitor.isNativePlatform()) {
-    const platform = Capacitor.getPlatform();
-    if (platform === 'android') {
-      // An Android emulator resolves `localhost` to itself; the host machine
-      // is reachable only on 10.0.2.2. A physical device needs the LAN IP,
-      // which you should supply via VITE_API_URL at build time.
+  if (import.meta.env.DEV) {
+    // An Android emulator resolves `localhost` to itself; the host machine is
+    // reachable only on 10.0.2.2. A physical device needs the LAN IP via
+    // VITE_API_URL at build time.
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
       return 'http://10.0.2.2:5000/api';
     }
+    return LOCAL_URL;
   }
 
-  // For web development
-  return defaultUrl;
+  // Production
+  return PROD_URL;
 }
 
 const API_BASE_URL = getApiBaseUrl();
