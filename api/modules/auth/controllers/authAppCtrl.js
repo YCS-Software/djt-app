@@ -5,6 +5,7 @@ const config = require(appRoot + '/config/config');
 const df = require(appRoot + '/utils/dateFormatUtil');
 const authAppMdl = require('../models/authAppMdl');
 const audit = require(appRoot + '/utils/auditUtil');
+const sms = require(appRoot + '/utils/smsUtil');
 const cntxtDtls = "authAppCtrl";
 
 // JWT secret/expiry used for the web admin email+password flow.
@@ -21,10 +22,54 @@ const toAdminUser = (u) => ({
   role: u.usr_typ_cd
 });
 
-// Generate random OTP
+// Generate a random 4-digit OTP (cryptographically random, 1000-9999)
 const generateOTP = () => {
-  return Math.floor(1000 + Math.random() * 9000).toString();
+  return String(crypto.randomInt(1000, 10000));
 };
+
+// Optional fixed-OTP test logins (app-store reviewers, internal testers).
+// Both must be set in .env to take effect, e.g.
+//   OTP_TEST_NUMBERS=9000000001,9000000002
+//   OTP_TEST_CODE=4321
+// Numbers on the list get OTP_TEST_CODE and no SMS is sent to them.
+const OTP_TEST_NUMBERS = String(process.env.OTP_TEST_NUMBERS || '')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+const OTP_TEST_CODE = /^\d{4}$/.test(String(process.env.OTP_TEST_CODE || '')) ? String(process.env.OTP_TEST_CODE) : null;
+const isTestNumber = (phone) => !!OTP_TEST_CODE && OTP_TEST_NUMBERS.indexOf(String(phone)) !== -1;
+
+/**
+ * Create an OTP for `phone`, store it, and deliver it by SMS (MSG91).
+ * Resolves { otpId, devOtp } on success. Rejects with a user-facing error
+ * (err_status 502) when the SMS could not be handed to the gateway, so the
+ * app never tells the user "OTP sent" for a message that will not arrive.
+ * `devOtp` is only set when the SMS gateway is in mock mode (no auth key).
+ */
+function issueOtp(phone, usrId) {
+    const expiryMinutes = config.otp.expiryMinutes || 5;
+    const testLogin = isTestNumber(phone);
+    const otp = testLogin ? OTP_TEST_CODE : generateOTP();
+
+    return authAppMdl.storeOTPMdl({ phoneNumber: phone, otp: otp, expiryMinutes: expiryMinutes })
+        .then(function(otpResults) {
+            const otpId = otpResults.insertId;
+            if (testLogin) {
+                console.log(`[otp] test number ******${String(phone).slice(-4)} — fixed OTP, no SMS sent`);
+                return { otpId: otpId, devOtp: undefined };
+            }
+            return sms.sendOTP(phone, otp, { usrId: usrId || undefined })
+                .then(function(result) {
+                    if (!result || !result.success) {
+                        console.error(`[otp] SMS send failed for ******${String(phone).slice(-4)}:`, result && result.error);
+                        throw { err_status: 502, err_message: 'We could not send the OTP right now. Please try again in a moment.' };
+                    }
+                    if (result.mock) {
+                        // No MSG91 key configured (local dev): surface the OTP so login still works.
+                        console.log(`\n📱 [MOCK SMS] OTP for ${phone}: ${otp} (expires in ${expiryMinutes} min)\n`);
+                    }
+                    return { otpId: otpId, devOtp: result.mock ? otp : undefined };
+                });
+        });
+}
 
 /*****************************************************************************
 * Function      : sendOTP
@@ -45,10 +90,6 @@ exports.sendOTP = function(req, res) {
         });
     }
     
-    // Generate OTP
-    let otp =  '9999' ;
-    const expiryMinutes = config.otp.expiryMinutes || 5;
-    
     // Check if user exists first
     authAppMdl.findUserByPhoneMdl({ phoneNumber: phonenumber })
         .then(function(userResults) {
@@ -64,34 +105,26 @@ exports.sendOTP = function(req, res) {
                 });
             }
             
-            // Store OTP in database
-            return authAppMdl.storeOTPMdl({
-                phoneNumber: phonenumber,
-                otp: otp,
-                expiryMinutes: expiryMinutes
-            }).then(function(otpResults) {
-                // Log OTP for development
-                console.log(`\n📱 OTP for ${phonenumber}: ${otp}`);
-                console.log(`⏰ Expires in: ${expiryMinutes} minutes\n`);
-
+            // Store the OTP and send it by SMS
+            return issueOtp(phonenumber, user.usr_id).then(function(issued) {
                 const ctx = audit.reqCtx(req);
                 audit.writeAudit({
                     userId: user.usr_id,
                     action: 'otp_sent',
                     entityType: 'user',
                     entityId: user.usr_id,
-                    newVal: { phone: '******' + phonenumber.slice(-4), otpID: otpResults.insertId },
+                    newVal: { phone: '******' + phonenumber.slice(-4), otpID: issued.otpId },
                     ip: ctx.ip,
                     userAgent: ctx.userAgent
                 });
 
                 return df.formatSucessRes(req, res, {
-                    otpID: otpResults.insertId,
+                    otpID: issued.otpId,
                     usr_id: user.usr_id,
                     status: 'sent',
                     user_message: 'OTP has been sent to your mobile number',
                     show_fallback_message: false,
-                    dev_otp: process.env.NODE_ENV === 'development' ? otp : undefined
+                    dev_otp: issued.devOtp
                 }, cntxtDtls, fnm, {});
             });
         })
@@ -120,10 +153,6 @@ exports.sendSignupOTP = function(req, res) {
         });
     }
     
-    // Generate OTP
-    const otp =9999; //generateOTP();
-    const expiryMinutes = config.otp.expiryMinutes || 5;
-    
     // Check if user already exists
     authAppMdl.findUserByPhoneMdl({ phoneNumber: phonenumber })
         .then(function(userResults) {
@@ -139,33 +168,25 @@ exports.sendSignupOTP = function(req, res) {
                 });
             }
             
-            // Store OTP in database for new user
-            return authAppMdl.storeOTPMdl({
-                phoneNumber: phonenumber,
-                otp: otp,
-                expiryMinutes: expiryMinutes
-            }).then(function(otpResults) {
-                // Log OTP for development
-                console.log(`\n📱 Signup OTP for ${phonenumber}: ${otp}`);
-                console.log(`⏰ Expires in: ${expiryMinutes} minutes\n`);
-
+            // Store the OTP and send it by SMS (new user)
+            return issueOtp(phonenumber, null).then(function(issued) {
                 const ctx = audit.reqCtx(req);
                 audit.writeAudit({
                     userId: null,
                     action: 'otp_sent',
                     entityType: 'user',
-                    newVal: { phone: '******' + phonenumber.slice(-4), otpID: otpResults.insertId },
+                    newVal: { phone: '******' + phonenumber.slice(-4), otpID: issued.otpId },
                     ip: ctx.ip,
                     userAgent: ctx.userAgent
                 });
 
                 return df.formatSucessRes(req, res, {
-                    otpID: otpResults.insertId,
+                    otpID: issued.otpId,
                     usr_id: null,
                     status: 'sent',
                     user_message: 'OTP has been sent to your mobile number',
                     show_fallback_message: false,
-                    dev_otp: process.env.NODE_ENV === 'development' ? otp : undefined
+                    dev_otp: issued.devOtp
                 }, cntxtDtls, fnm, {});
             });
         })
@@ -194,8 +215,10 @@ exports.verifyOTP = function(req, res) {
         });
     }
     
-    // Verify OTP from database
-    authAppMdl.verifyOTPMdl({ phoneNumber: phno, otp: otp })
+    // Check against the LATEST unexpired OTP for this number, with an attempt
+    // cap so a 4-digit code cannot be brute-forced within its validity window.
+    const maxAttempts = config.otp.maxAttempts || 3;
+    authAppMdl.getValidOTPMdl({ phoneNumber: phno })
         .then(function(otpResults) {
             if (!otpResults || otpResults.length === 0) {
                 return res.status(std.message["INVALID_OTP"].code).json({
@@ -204,9 +227,28 @@ exports.verifyOTP = function(req, res) {
                     data: null
                 });
             }
-            
+
             const otpRecord = otpResults[0];
-            
+
+            if ((Number(otpRecord.attmpts_nbr) || 0) >= maxAttempts) {
+                return res.status(std.message["MAX_ATTEMPTS"].code).json({
+                    status: std.message["MAX_ATTEMPTS"].code,
+                    message: 'Too many incorrect attempts. Please request a new OTP.',
+                    data: null
+                });
+            }
+
+            if (String(otpRecord.otp_tx) !== String(otp).trim()) {
+                return authAppMdl.incrementOTPAttemptsMdl({ otpId: otpRecord.otp_id })
+                    .then(function() {
+                        return res.status(std.message["INVALID_OTP"].code).json({
+                            status: std.message["INVALID_OTP"].code,
+                            message: 'Invalid or expired OTP',
+                            data: null
+                        });
+                    });
+            }
+
             // Mark OTP as verified
             return authAppMdl.markOTPVerifiedMdl({ otpId: otpRecord.otp_id })
                 .then(function() {
