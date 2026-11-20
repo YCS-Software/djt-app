@@ -1,7 +1,7 @@
 # Payment & Double-Entry Ledger — Design Document
 
 **Status:** Design approved (plan only — no schema/code applied yet)
-**Database:** `DJT_POWERTECH_DEV` @ `3.110.84.196` (MySQL)
+**Database:** `DJT_POWERTECH_DEV` @ `<DB_HOST>` (MySQL)
 **Scope:** Seamless payments (wallet / UPI / card) with per-transaction and per-account
 audit history, and automatic revenue split between the **station owner** and the **DJT platform**.
 

@@ -48,7 +48,7 @@ npm start
 ### Expected output:
 ```
 ✅ MySQL Database connected successfully
-   Host: 13.202.34.243:3306
+   Host: <DB_HOST>:3306
    Database: DJTDB
 ```
 
@@ -57,11 +57,11 @@ npm start
 ## 📋 Your Database Info
 
 - **Type:** MySQL
-- **Host:** 13.202.34.243
+- **Host:** <DB_HOST>
 - **Port:** 3306
 - **Database:** DJTDB
 - **User:** root
-- **Password:** YcsPass@2025
+- **Password:** <set-in-.env>
 
 ---
 

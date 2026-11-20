@@ -40,10 +40,10 @@ mysql -u root -p DJTDB < database/schema.sql
 ### 3. Configure Environment
 File: `server/.env`
 ```env
-DB_HOST=13.202.34.243
+DB_HOST=<DB_HOST>
 DB_PORT=3306
 DB_USER=root
-DB_PASSWORD=YcsPass@2025
+DB_PASSWORD=<set-in-.env>
 DB_NAME=DJTDB
 ```
 

@@ -63,11 +63,11 @@ Updated comment to reflect MySQL instead of MS SQL Server.
 ## 📝 Your Database Configuration
 
 ```javascript
-Host: 13.202.34.243
+Host: <DB_HOST>
 Port: 3306
 Database: DJTDB
 User: root
-Password: YcsPass@2025
+Password: <set-in-.env>
 Connection Pool: 200 connections
 ```
 
@@ -84,13 +84,13 @@ npm start
 ### 2. Expected Output
 ```
 ✅ MySQL Database connected successfully
-   Host: 13.202.34.243:3306
+   Host: <DB_HOST>:3306
    Database: DJTDB
 ```
 
 ### 3. If Connection Fails
 Check these:
-- ✅ MySQL server is running on `13.202.34.243:3306`
+- ✅ MySQL server is running on `<DB_HOST>:3306`
 - ✅ Database `DJTDB` exists
 - ✅ User `root` has access from your IP
 - ✅ Password is correct
@@ -172,12 +172,12 @@ npm start
 
 ### 2. Run Schema Setup (if needed)
 ```bash
-mysql -h 13.202.34.243 -u root -p DJTDB < server/database/schema.sql
+mysql -h <DB_HOST> -u root -p DJTDB < server/database/schema.sql
 ```
 
 ### 3. Verify Schema
 ```bash
-mysql -h 13.202.34.243 -u root -p DJTDB < server/database/verify_schema.sql
+mysql -h <DB_HOST> -u root -p DJTDB < server/database/verify_schema.sql
 ```
 
 ### 4. Test APIs
@@ -203,7 +203,7 @@ Use the **API_TESTING_GUIDE.md** to test all endpoints.
 **Cause:** Invalid credentials or user doesn't have access  
 **Solution:** 
 ```sql
-GRANT ALL PRIVILEGES ON DJTDB.* TO 'root'@'%' IDENTIFIED BY 'YcsPass@2025';
+GRANT ALL PRIVILEGES ON DJTDB.* TO 'root'@'%' IDENTIFIED BY '<set-in-.env>';
 FLUSH PRIVILEGES;
 ```
 

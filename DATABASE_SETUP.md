@@ -10,10 +10,10 @@ Database configuration is managed through environment variables in `.env`:
 
 ```env
 # Database Configuration (MS SQL Server)
-DB_HOST=3.109.125.59
+DB_HOST=<DB_HOST>
 DB_PORT=1433
-DB_USER=DSCRDA
-DB_PASSWORD=Dr3amCrda@123
+DB_USER=<set-in-.env>
+DB_PASSWORD=<set-in-.env>
 DB_NAME=APCTDB
 DB_MAX_POOL=200
 DB_MIN_POOL=5
