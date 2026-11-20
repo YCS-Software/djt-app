@@ -16,7 +16,8 @@ const config = require(appRoot + '/config/config');
 const PREFIX = 'DJTEV1';
 
 function secret() {
-    return (config.qr && config.qr.secret) || process.env.QR_SECRET || (config.jwt && config.jwt.secret) || 'djt-qr-secret';
+    // Single source: config.qr.secret (QR_SECRET, else JWT_SECRET). No hardcoded fallback.
+    return config.qr.secret;
 }
 
 function b64url(buf) {

@@ -3,14 +3,23 @@
  * Environment-based configuration settings
  */
 
+// Load .env here too so standalone scripts/tests get the same values as server.js.
+require('dotenv').config({ path: require('path').resolve(__dirname, '..', '.env') });
+
+// No built-in fallback secret: a publicly known default would let anyone forge
+// login tokens. Refuse to start instead.
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET is missing in .env. Copy .env.example to .env and set it.');
+}
+
 module.exports = {
   // Server settings
   port: process.env.PORT || 5000,
   environment: process.env.NODE_ENV || 'development',
-  
+
   // JWT settings
   jwt: {
-    secret: process.env.JWT_SECRET || 'your_jwt_secret_key',
+    secret: process.env.JWT_SECRET,
     expiresIn: '7d'
   },
   
@@ -21,9 +30,13 @@ module.exports = {
     maxAttempts: 3
   },
 
-  // QR signing (machine QR codes — app-only, HMAC-signed)
+  // QR signing (machine QR codes — app-only, HMAC-signed).
+  // IMPORTANT: every QR sticker already printed was signed with this value.
+  // Changing it invalidates all of them. It is QR_SECRET when set, otherwise
+  // JWT_SECRET — so set QR_SECRET to the CURRENT JWT_SECRET before ever
+  // rotating JWT_SECRET, and never change QR_SECRET afterwards.
   qr: {
-    secret: process.env.QR_SECRET || process.env.JWT_SECRET || 'djt_qr_signing_secret_change_me'
+    secret: process.env.QR_SECRET || process.env.JWT_SECRET
   },
 
   // OCPP settings
@@ -37,27 +50,5 @@ module.exports = {
     // and "Stop" sends RequestStopTransaction. Set OCPP_REMOTE_CONTROL=false to
     // fall back to DB-only sessions (for chargers that don't support remote start).
     remoteControl: process.env.OCPP_REMOTE_CONTROL !== 'false'
-  },
-  
-  // CORS settings
-  cors: {
-    origin: process.env.CORS_ORIGIN || '*',
-    credentials: true
-  },
-  
-  // Database settings (for future use)
-  database: {
-    host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 5432,
-    name: process.env.DB_NAME || 'phone_auth_db',
-    user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || ''
-  },
-  
-  // SMS Gateway settings (for future integration)
-  sms: {
-    provider: process.env.SMS_PROVIDER || 'mock',
-    apiKey: process.env.SMS_API_KEY || '',
-    senderId: process.env.SMS_SENDER_ID || 'PHAUTH'
   }
 };

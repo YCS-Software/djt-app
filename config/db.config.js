@@ -3,15 +3,30 @@
  * For EV Charging Station Application
  */
 
+const path = require('path');
 const mysql = require('mysql2/promise');
 
+// Connection details come ONLY from the environment (.env at the project root).
+// Nothing sensitive is hardcoded here. Loading dotenv again is harmless when
+// server.js has already done it, and makes standalone scripts/tests work too.
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
+
+const REQUIRED_ENV = ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
+const missingEnv = REQUIRED_ENV.filter((k) => !process.env[k]);
+if (missingEnv.length) {
+    throw new Error(
+        `Database configuration missing in .env: ${missingEnv.join(', ')}. ` +
+        'Copy .env.example to .env and fill in the values.'
+    );
+}
+
 // MySQL Configuration
-const USER = "root";
-const PWD = "Djt@2026#";
-const DATABASE = "DJT_POWERTECH_DEV"; 
-const DB_HOST_NAME = '3.110.84.196';
-const PORT = 3306;
-const MAX_POOL_SIZE = 200;
+const USER = process.env.DB_USER;
+const PWD = process.env.DB_PASSWORD;
+const DATABASE = process.env.DB_NAME;
+const DB_HOST_NAME = process.env.DB_HOST;
+const PORT = parseInt(process.env.DB_PORT, 10) || 3306;
+const MAX_POOL_SIZE = parseInt(process.env.DB_MAX_POOL, 10) || 200;
 
 // MySQL Pool Configuration
 const config = {
