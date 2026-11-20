@@ -1,0 +1,3843 @@
+# OCPP 1.6J - ChangeConfiguration
+
+## Description
+
+Updates a configurable parameter in the charging station.
+
+---
+
+# REST API
+
+## Route
+
+```http
+POST /api/v1/chargers/{chargerId}/configuration
+```
+
+Example
+
+```http
+POST /api/v1/chargers/DJT-12-CP1-T6I/configuration
+```
+
+---
+
+# REST Request
+
+```json
+{
+    "key": "HeartbeatInterval",
+    "value": "300"
+}
+```
+
+Example 2
+
+```json
+{
+    "key": "MeterValueSampleInterval",
+    "value": "30"
+}
+```
+
+---
+
+# REST Success Response
+
+```json
+{
+    "success": true,
+    "message": "Configuration change request sent."
+}
+```
+
+---
+
+# REST Failure Response
+
+```json
+{
+    "success": false,
+    "message": "Charging station is offline."
+}
+```
+
+---
+
+# OCPP Request
+
+```json
+[
+    2,
+    "550e8400-e29b-41d4-a716-446655440000",
+    "ChangeConfiguration",
+    {
+        "key": "HeartbeatInterval",
+        "value": "300"
+    }
+]
+```
+
+---
+
+# OCPP Response
+
+```json
+[
+    3,
+    "550e8400-e29b-41d4-a716-446655440000",
+    {
+        "status": "Accepted"
+    }
+]
+```
+
+---
+
+# Possible Response Status
+
+## Accepted
+
+```json
+{
+    "status": "Accepted"
+}
+```
+
+---
+
+## Rejected
+
+```json
+{
+    "status": "Rejected"
+}
+```
+
+---
+
+## RebootRequired
+
+```json
+{
+    "status": "RebootRequired"
+}
+```
+
+---
+
+## NotSupported
+
+```json
+{
+    "status": "NotSupported"
+}
+```
+
+---
+
+# Backend Status
+
+| Event | Status |
+|--------|--------|
+| API Called | CONFIG_UPDATE_REQUESTED |
+| Accepted | CONFIG_UPDATED |
+| RebootRequired | CONFIG_UPDATED_REBOOT_REQUIRED |
+| Rejected | CONFIG_UPDATE_REJECTED |
+| NotSupported | CONFIG_NOT_SUPPORTED |
+
+---
+
+# Complete Flow
+
+```text
+Mobile App
+      │
+      ▼
+POST /configuration
+      │
+      ▼
+Backend
+      │
+      ▼
+ChangeConfiguration.req
+      │
+      ▼
+Charge Point
+      │
+      ▼
+ChangeConfiguration.conf
+      │
+      ▼
+Update Database
+      │
+      ▼
+Return Response
+```
+
+---
+
+# Frequently Used Configuration Keys
+
+| Key | Example Value |
+|-----|---------------|
+| HeartbeatInterval | 300 |
+| MeterValueSampleInterval | 30 |
+| ClockAlignedDataInterval | 900 |
+| ConnectionTimeOut | 60 |
+| WebSocketPingInterval | 30 |
+| AuthorizeRemoteTxRequests | true |
+| LocalAuthorizeOffline | true |
+| LocalPreAuthorize | false |
+| StopTxnSampledData | Energy.Active.Import.Register |
+| StopTxnAlignedData | Energy.Active.Import.Register |
+
+---
+
+# Validation
+
+- Charger must be online.
+- Configuration key must be supported.
+- Value must be valid for the specified key.
+- Handle `RebootRequired` by notifying the user or scheduling a `Reset` operation if appropriate.
+
+---
+
+# Testing
+
+### Request
+
+```json
+{
+    "key": "MeterValueSampleInterval",
+    "value": "60"
+}
+```
+
+### Expected Response
+
+```json
+{
+    "status": "Accepted"
+}
+```
+
+
+# OCPP 1.6J - TriggerMessage
+
+## Description
+
+Requests the charging station to immediately send a specific OCPP message to the CSMS.
+
+---
+
+# REST API
+
+## Route
+
+```http
+POST /api/v1/chargers/{chargerId}/trigger-message
+```
+
+Example
+
+```http
+POST /api/v1/chargers/DJT-12-CP1-T6I/trigger-message
+```
+
+---
+
+# REST Request
+
+## Trigger Heartbeat
+
+```json
+{
+    "requestedMessage": "Heartbeat"
+}
+```
+
+## Trigger StatusNotification
+
+```json
+{
+    "requestedMessage": "StatusNotification",
+    "connectorId": 1
+}
+```
+
+## Trigger MeterValues
+
+```json
+{
+    "requestedMessage": "MeterValues",
+    "connectorId": 1
+}
+```
+
+## Trigger BootNotification
+
+```json
+{
+    "requestedMessage": "BootNotification"
+}
+```
+
+---
+
+# REST Success Response
+
+```json
+{
+    "success": true,
+    "message": "TriggerMessage request sent."
+}
+```
+
+---
+
+# REST Failure Response
+
+```json
+{
+    "success": false,
+    "message": "Charging station is offline."
+}
+```
+
+---
+
+# OCPP Request
+
+## Trigger Heartbeat
+
+```json
+[
+    2,
+    "550e8400-e29b-41d4-a716-446655440000",
+    "TriggerMessage",
+    {
+        "requestedMessage": "Heartbeat"
+    }
+]
+```
+
+---
+
+## Trigger StatusNotification
+
+```json
+[
+    2,
+    "550e8400-e29b-41d4-a716-446655440001",
+    "TriggerMessage",
+    {
+        "requestedMessage": "StatusNotification",
+        "connectorId": 1
+    }
+]
+```
+
+---
+
+## Trigger MeterValues
+
+```json
+[
+    2,
+    "550e8400-e29b-41d4-a716-446655440002",
+    "TriggerMessage",
+    {
+        "requestedMessage": "MeterValues",
+        "connectorId": 1
+    }
+]
+```
+
+---
+
+## OCPP Response
+
+```json
+[
+    3,
+    "550e8400-e29b-41d4-a716-446655440000",
+    {
+        "status": "Accepted"
+    }
+]
+```
+
+---
+
+# Possible Response Status
+
+## Accepted
+
+```json
+{
+    "status": "Accepted"
+}
+```
+
+---
+
+## Rejected
+
+```json
+{
+    "status": "Rejected"
+}
+```
+
+---
+
+## NotImplemented
+
+```json
+{
+    "status": "NotImplemented"
+}
+```
+
+---
+
+# Triggered Messages Received
+
+## Heartbeat
+
+```json
+[
+    2,
+    "msg-1001",
+    "Heartbeat",
+    {}
+]
+```
+
+Response
+
+```json
+[
+    3,
+    "msg-1001",
+    {
+        "currentTime":"2026-07-18T10:30:00Z"
+    }
+]
+```
+
+---
+
+## StatusNotification
+
+```json
+[
+    2,
+    "msg-1002",
+    "StatusNotification",
+    {
+        "connectorId":1,
+        "status":"Charging",
+        "errorCode":"NoError",
+        "timestamp":"2026-07-18T10:30:00Z"
+    }
+]
+```
+
+Response
+
+```json
+[
+    3,
+    "msg-1002",
+    {}
+]
+```
+
+---
+
+## MeterValues
+
+```json
+[
+    2,
+    "msg-1003",
+    "MeterValues",
+    {
+        "connectorId":1,
+        "transactionId":101,
+        "meterValue":[
+            {
+                "timestamp":"2026-07-18T10:30:00Z",
+                "sampledValue":[
+                    {
+                        "measurand":"Energy.Active.Import.Register",
+                        "value":"15.82"
+                    }
+                ]
+            }
+        ]
+    }
+]
+```
+
+Response
+
+```json
+[
+    3,
+    "msg-1003",
+    {}
+]
+```
+
+---
+
+# Backend Status
+
+| Event | Status |
+|---------|--------|
+| API Called | TRIGGER_REQUESTED |
+| Accepted | TRIGGER_ACCEPTED |
+| Rejected | TRIGGER_REJECTED |
+| NotImplemented | TRIGGER_NOT_SUPPORTED |
+| Requested Message Received | COMPLETED |
+
+---
+
+# Complete Flow
+
+```text
+Mobile App
+      │
+      ▼
+POST /trigger-message
+      │
+      ▼
+Backend
+      │
+      ▼
+TriggerMessage.req
+      │
+      ▼
+Charge Point
+      │
+      ▼
+TriggerMessage.conf
+      │
+      ▼
+Requested OCPP Message
+      │
+      ▼
+Backend Processes Response
+```
+
+---
+
+# Supported requestedMessage Values
+
+```text
+BootNotification
+DiagnosticsStatusNotification
+FirmwareStatusNotification
+Heartbeat
+MeterValues
+StatusNotification
+```
+
+---
+
+# Validation
+
+- Charger must be online.
+- WebSocket connection must be active.
+- The charger must support TriggerMessage.
+- connectorId is required only for connector-specific messages.
+
+---
+
+# Testing
+
+### Request
+
+```json
+{
+    "requestedMessage":"StatusNotification",
+    "connectorId":1
+}
+```
+
+### Expected Response
+
+```json
+{
+    "status":"Accepted"
+}
+```
+
+### Expected Follow-up
+
+```text
+StatusNotification received from charger.
+```
+
+# OCPP 1.6J - ChangeAvailability
+
+## Description
+
+The **ChangeAvailability** operation is used to enable or disable a charging station or a specific connector.
+
+If a connector is currently charging:
+
+- The charger finishes the current transaction.
+- Availability changes after the transaction ends.
+
+---
+
+# REST API
+
+## Disable Entire Charger
+
+```http
+POST /api/v1/chargers/{chargerId}/availability
+```
+
+Request
+
+```json
+{
+    "connectorId": 0,
+    "type": "Inoperative"
+}
+```
+
+---
+
+## Disable Connector 1
+
+```http
+POST /api/v1/chargers/{chargerId}/availability
+```
+
+Request
+
+```json
+{
+    "connectorId": 1,
+    "type": "Inoperative"
+}
+```
+
+---
+
+## Enable Connector
+
+```json
+{
+    "connectorId": 1,
+    "type": "Operative"
+}
+```
+
+---
+
+# REST Success Response
+
+```json
+{
+    "success": true,
+    "message": "Availability change request sent."
+}
+```
+
+---
+
+# REST Failure Response
+
+```json
+{
+    "success": false,
+    "message": "Charging station is offline."
+}
+```
+
+---
+
+# OCPP Request
+
+## Entire Charger
+
+```json
+[
+    2,
+    "uuid-1001",
+    "ChangeAvailability",
+    {
+        "connectorId": 0,
+        "type": "Inoperative"
+    }
+]
+```
+
+---
+
+## Connector 1
+
+```json
+[
+    2,
+    "uuid-1002",
+    "ChangeAvailability",
+    {
+        "connectorId": 1,
+        "type": "Inoperative"
+    }
+]
+```
+
+---
+
+## Enable Connector
+
+```json
+[
+    2,
+    "uuid-1003",
+    "ChangeAvailability",
+    {
+        "connectorId": 1,
+        "type": "Operative"
+    }
+]
+```
+
+---
+
+# OCPP Response
+
+```json
+[
+    3,
+    "uuid-1001",
+    {
+        "status":"Accepted"
+    }
+]
+```
+
+---
+
+# Possible Status Values
+
+## Accepted
+
+```json
+{
+    "status":"Accepted"
+}
+```
+
+---
+
+## Rejected
+
+```json
+{
+    "status":"Rejected"
+}
+```
+
+---
+
+## Scheduled
+
+```json
+{
+    "status":"Scheduled"
+}
+```
+
+---
+
+# Meaning
+
+## Accepted
+
+Availability changed immediately.
+
+---
+
+## Scheduled
+
+Connector is currently charging.
+
+Availability will change after transaction completes.
+
+---
+
+## Rejected
+
+Operation failed.
+
+---
+
+# StatusNotification Received
+
+When availability changes, charger sends
+
+```json
+[
+    2,
+    "msg-1001",
+    "StatusNotification",
+    {
+        "connectorId":1,
+        "status":"Unavailable",
+        "errorCode":"NoError",
+        "timestamp":"2026-07-18T10:45:00Z"
+    }
+]
+```
+
+Response
+
+```json
+[
+    3,
+    "msg-1001",
+    {}
+]
+```
+
+---
+
+When connector becomes available
+
+```json
+[
+    2,
+    "msg-1002",
+    "StatusNotification",
+    {
+        "connectorId":1,
+        "status":"Available",
+        "errorCode":"NoError",
+        "timestamp":"2026-07-18T11:10:00Z"
+    }
+]
+```
+
+Response
+
+```json
+[
+    3,
+    "msg-1002",
+    {}
+]
+```
+
+---
+
+# Backend Status Flow
+
+| Event | Status |
+|---------|---------|
+| API Called | AVAILABILITY_REQUESTED |
+| Accepted | AVAILABILITY_CHANGED |
+| Scheduled | WAITING_FOR_TRANSACTION_END |
+| Rejected | AVAILABILITY_FAILED |
+| StatusNotification(Unavailable) | INOPERATIVE |
+| StatusNotification(Available) | OPERATIVE |
+
+---
+
+# Complete Flow
+
+```text
+Mobile App
+      │
+      ▼
+POST /availability
+      │
+      ▼
+Backend
+      │
+      ▼
+ChangeAvailability.req
+      │
+      ▼
+Charge Point
+      │
+      ▼
+ChangeAvailability.conf
+      │
+      ▼
+StatusNotification
+      │
+      ▼
+Database Updated
+```
+
+---
+
+# Multi Connector Examples
+
+## Disable Whole Charger
+
+```json
+{
+    "connectorId":0,
+    "type":"Inoperative"
+}
+```
+
+Affects all connectors.
+
+---
+
+## Disable Connector 2 Only
+
+```json
+{
+    "connectorId":2,
+    "type":"Inoperative"
+}
+```
+
+Connector 1 continues charging.
+
+Connector 2 becomes unavailable.
+
+---
+
+# Validation
+
+- Charger must be online.
+- connectorId = 0 means entire charger.
+- connectorId > 0 means specific connector.
+- Operative enables charging.
+- Inoperative disables charging.
+
+---
+
+# Testing
+
+Request
+
+```json
+{
+    "connectorId":1,
+    "type":"Inoperative"
+}
+```
+
+Expected Response
+
+```json
+{
+    "status":"Accepted"
+}
+```
+
+Expected Follow-up
+
+```text
+StatusNotification
+
+status = Unavailable
+```
+
+
+# OCPP 1.6J - UnlockConnector
+
+## Description
+
+The **UnlockConnector** operation is used to remotely unlock the charging connector when the cable is locked.
+
+Typical use cases:
+
+- Charging completed but connector remains locked
+- Emergency unlock
+- Customer unable to remove cable
+- Charger recovery after abnormal stop
+
+> **Note:** This feature is optional in OCPP 1.6J. The charging station must support it.
+
+---
+
+# REST API
+
+## Route
+
+```http
+POST /api/v1/chargers/{chargerId}/unlock
+```
+
+Example
+
+```http
+POST /api/v1/chargers/DJT-12-CP1-T6I/unlock
+```
+
+---
+
+# REST Request
+
+```json
+{
+    "connectorId": 1
+}
+```
+
+---
+
+# REST Success Response
+
+```json
+{
+    "success": true,
+    "message": "Unlock request sent."
+}
+```
+
+---
+
+# REST Failure Response
+
+```json
+{
+    "success": false,
+    "message": "Charging station is offline."
+}
+```
+
+---
+
+# OCPP Request
+
+```json
+[
+    2,
+    "uuid-1001",
+    "UnlockConnector",
+    {
+        "connectorId": 1
+    }
+]
+```
+
+---
+
+# OCPP Response
+
+```json
+[
+    3,
+    "uuid-1001",
+    {
+        "status": "Unlocked"
+    }
+]
+```
+
+---
+
+# Possible Response Status
+
+## Unlocked
+
+```json
+{
+    "status":"Unlocked"
+}
+```
+
+Meaning:
+
+Connector unlocked successfully.
+
+---
+
+## UnlockFailed
+
+```json
+{
+    "status":"UnlockFailed"
+}
+```
+
+Meaning:
+
+Mechanical unlock failed.
+
+---
+
+## NotSupported
+
+```json
+{
+    "status":"NotSupported"
+}
+```
+
+Meaning:
+
+Charging station does not support remote unlock.
+
+---
+
+# Expected StatusNotification
+
+After unlock
+
+```json
+[
+    2,
+    "msg-1001",
+    "StatusNotification",
+    {
+        "connectorId":1,
+        "status":"Available",
+        "errorCode":"NoError",
+        "timestamp":"2026-07-18T11:00:00Z"
+    }
+]
+```
+
+Response
+
+```json
+[
+    3,
+    "msg-1001",
+    {}
+]
+```
+
+---
+
+# Backend Status Flow
+
+| Event | Status |
+|---------|---------|
+| API Called | UNLOCK_REQUESTED |
+| Unlocked | CONNECTOR_UNLOCKED |
+| UnlockFailed | UNLOCK_FAILED |
+| NotSupported | FEATURE_NOT_SUPPORTED |
+| StatusNotification(Available) | AVAILABLE |
+
+---
+
+# Complete Flow
+
+```text
+Mobile App
+      │
+      ▼
+POST /unlock
+      │
+      ▼
+Backend
+      │
+      ▼
+UnlockConnector.req
+      │
+      ▼
+Charge Point
+      │
+      ▼
+UnlockConnector.conf
+      │
+      ▼
+StatusNotification(Available)
+      │
+      ▼
+Update Database
+```
+
+---
+
+# Multi Connector Example
+
+Unlock Connector 2
+
+```json
+[
+    2,
+    "uuid-1002",
+    "UnlockConnector",
+    {
+        "connectorId":2
+    }
+]
+```
+
+Response
+
+```json
+[
+    3,
+    "uuid-1002",
+    {
+        "status":"Unlocked"
+    }
+]
+```
+
+---
+
+# Validation
+
+- Charger must be online.
+- Connector must exist.
+- Connector should not have an active transaction unless vendor allows unlock.
+- Feature depends on charger firmware support.
+
+---
+
+# Testing
+
+## Request
+
+```json
+{
+    "connectorId":1
+}
+```
+
+## Expected Response
+
+```json
+{
+    "status":"Unlocked"
+}
+```
+
+## Expected Follow-up
+
+```text
+StatusNotification
+
+status = Available
+```
+
+---
+
+# Production Notes
+
+- Always verify there is no active transaction before issuing an unlock request unless performing an emergency operation.
+- Handle `NotSupported` gracefully because many chargers do not implement this optional feature.
+- Log all unlock attempts for audit purposes.
+```
+
+
+# OCPP 1.6J - ClearCache
+
+## Description
+
+The **ClearCache** operation clears the local authorization cache stored in the charging station.
+
+Use this when:
+
+- RFID cards are revoked
+- Authorization data becomes invalid
+- Synchronizing charger with CSMS
+- Security maintenance
+
+---
+
+# REST API
+
+## Route
+
+```http
+POST /api/v1/chargers/{chargerId}/clear-cache
+```
+
+Example
+
+```http
+POST /api/v1/chargers/DJT-12-CP1-T6I/clear-cache
+```
+
+---
+
+# REST Request
+
+```json
+{}
+```
+
+No request body is required.
+
+---
+
+# REST Success Response
+
+```json
+{
+    "success": true,
+    "message": "Clear cache request sent."
+}
+```
+
+---
+
+# REST Failure Response
+
+```json
+{
+    "success": false,
+    "message": "Charging station is offline."
+}
+```
+
+---
+
+# OCPP Request
+
+```json
+[
+    2,
+    "uuid-1001",
+    "ClearCache",
+    {}
+]
+```
+
+---
+
+# OCPP Response
+
+```json
+[
+    3,
+    "uuid-1001",
+    {
+        "status":"Accepted"
+    }
+]
+```
+
+---
+
+# Possible Response Status
+
+## Accepted
+
+```json
+{
+    "status":"Accepted"
+}
+```
+
+Meaning
+
+- Cache cleared successfully.
+
+---
+
+## Rejected
+
+```json
+{
+    "status":"Rejected"
+}
+```
+
+Meaning
+
+- Cache could not be cleared.
+
+---
+
+# Backend Status Flow
+
+| Event | Status |
+|--------|--------|
+| API Called | CLEAR_CACHE_REQUESTED |
+| Accepted | CACHE_CLEARED |
+| Rejected | CACHE_CLEAR_FAILED |
+
+---
+
+# Complete Flow
+
+```text
+Mobile App
+      │
+      ▼
+POST /clear-cache
+      │
+      ▼
+Backend
+      │
+      ▼
+ClearCache.req
+      │
+      ▼
+Charge Point
+      │
+      ▼
+ClearCache.conf
+      │
+      ▼
+Update Database
+```
+
+---
+
+# Validation
+
+- Charger must be online.
+- WebSocket connection must be active.
+- No request payload required.
+
+---
+
+# Testing
+
+Request
+
+```http
+POST /api/v1/chargers/DJT-12-CP1-T6I/clear-cache
+```
+
+Expected OCPP Response
+
+```json
+{
+    "status":"Accepted"
+}
+```
+
+---
+
+# Production Notes
+
+- Does not stop active charging sessions.
+- New authorization requests will be validated again by the CSMS.
+- Useful after updating RFID users or authorization rules.
+- Log every cache clear operation for auditing.
+
+
+
+# OCPP 1.6J - DataTransfer
+
+## Description
+
+The **DataTransfer** operation allows the CSMS and Charge Point to exchange vendor-specific messages that are not part of the OCPP 1.6J standard.
+
+Typical use cases:
+
+- Vendor-specific commands
+- Device diagnostics
+- LED control
+- LCD display messages
+- Payment terminal integration
+- QR Code customization
+- Proprietary charger settings
+
+> **Note:** This feature is vendor-specific. The charger firmware must implement the requested vendor extensions.
+
+---
+
+# REST API
+
+## Route
+
+```http
+POST /api/v1/chargers/{chargerId}/data-transfer
+```
+
+Example
+
+```http
+POST /api/v1/chargers/DJT-12-CP1-T6I/data-transfer
+```
+
+---
+
+# REST Request
+
+```json
+{
+    "vendorId": "DJT",
+    "messageId": "DisplayMessage",
+    "data": {
+        "message": "Welcome to DJT EV Charging"
+    }
+}
+```
+
+---
+
+# REST Success Response
+
+```json
+{
+    "success": true,
+    "message": "DataTransfer request sent."
+}
+```
+
+---
+
+# REST Failure Response
+
+```json
+{
+    "success": false,
+    "message": "Charging station is offline."
+}
+```
+
+---
+
+# OCPP Request
+
+```json
+[
+    2,
+    "uuid-1001",
+    "DataTransfer",
+    {
+        "vendorId": "DJT",
+        "messageId": "DisplayMessage",
+        "data": "{\"message\":\"Welcome to DJT EV Charging\"}"
+    }
+]
+```
+
+> **Important:** In OCPP 1.6J, the `data` field is a **string**. If you're sending JSON, serialize it into a JSON string before sending.
+
+---
+
+# OCPP Response
+
+```json
+[
+    3,
+    "uuid-1001",
+    {
+        "status": "Accepted",
+        "data": "{\"result\":\"Message displayed successfully\"}"
+    }
+]
+```
+
+---
+
+# Possible Response Status
+
+## Accepted
+
+```json
+{
+    "status":"Accepted"
+}
+```
+
+Meaning
+
+Vendor command executed successfully.
+
+---
+
+## Rejected
+
+```json
+{
+    "status":"Rejected"
+}
+```
+
+Meaning
+
+Vendor rejected the request.
+
+---
+
+## UnknownVendorId
+
+```json
+{
+    "status":"UnknownVendorId"
+}
+```
+
+Meaning
+
+Vendor ID is not recognized.
+
+---
+
+## UnknownMessageId
+
+```json
+{
+    "status":"UnknownMessageId"
+}
+```
+
+Meaning
+
+Message ID is not supported.
+
+---
+
+# Backend Status Flow
+
+| Event | Status |
+|--------|--------|
+| API Called | DATA_TRANSFER_REQUESTED |
+| Accepted | DATA_TRANSFER_SUCCESS |
+| Rejected | DATA_TRANSFER_FAILED |
+| UnknownVendorId | INVALID_VENDOR |
+| UnknownMessageId | INVALID_MESSAGE |
+
+---
+
+# Complete Flow
+
+```text
+Mobile App
+      │
+      ▼
+POST /data-transfer
+      │
+      ▼
+Backend
+      │
+      ▼
+DataTransfer.req
+      │
+      ▼
+Charge Point
+      │
+      ▼
+DataTransfer.conf
+      │
+      ▼
+Update Database
+```
+
+---
+
+# Vendor Examples
+
+## Display Message
+
+```json
+{
+    "vendorId":"DJT",
+    "messageId":"DisplayMessage",
+    "data":"{\"message\":\"Charging Started\"}"
+}
+```
+
+---
+
+## Enable Debug Mode
+
+```json
+{
+    "vendorId":"DJT",
+    "messageId":"EnableDebug",
+    "data":"{\"enabled\":true}"
+}
+```
+
+---
+
+## Restart Modem
+
+```json
+{
+    "vendorId":"DJT",
+    "messageId":"RestartModem",
+    "data":"{}"
+}
+```
+
+---
+
+## Set LED Color
+
+```json
+{
+    "vendorId":"DJT",
+    "messageId":"LedControl",
+    "data":"{\"color\":\"GREEN\"}"
+}
+```
+
+---
+
+# Validation
+
+- Charger must be online.
+- WebSocket connection must be active.
+- `vendorId` is mandatory.
+- `messageId` is optional but recommended.
+- `data` must be a string.
+- Actual functionality depends entirely on charger firmware.
+
+---
+
+# Testing
+
+## Request
+
+```json
+{
+    "vendorId":"DJT",
+    "messageId":"DisplayMessage",
+    "data":{
+        "message":"Hello Charger"
+    }
+}
+```
+
+Expected OCPP Request
+
+```json
+[
+    2,
+    "uuid",
+    "DataTransfer",
+    {
+        "vendorId":"DJT",
+        "messageId":"DisplayMessage",
+        "data":"{\"message\":\"Hello Charger\"}"
+    }
+]
+```
+
+Expected Response
+
+```json
+{
+    "status":"Accepted"
+}
+```
+
+---
+
+# Production Notes
+
+- This is **not a standard OCPP feature**; implementation is entirely vendor-specific.
+- Confirm the supported `vendorId` and `messageId` values with the charger manufacturer.
+- Always serialize complex objects into a string before placing them in the `data` field.
+- Log all DataTransfer requests and responses because they are often used for proprietary functionality and troubleshooting.
+
+
+# OCPP 1.6J - ReserveNow
+
+## Description
+
+The **ReserveNow** operation reserves a connector for a specific user before they arrive at the charging station.
+
+Typical use cases:
+
+- User books a charger from the mobile app.
+- Fleet vehicle reservation.
+- VIP reservation.
+- Scheduled charging.
+
+---
+
+# REST API
+
+## Route
+
+```http
+POST /api/v1/chargers/{chargerId}/reserve
+```
+
+Example
+
+```http
+POST /api/v1/chargers/DJT-12-CP1-T6I/reserve
+```
+
+---
+
+# REST Request
+
+```json
+{
+    "connectorId": 1,
+    "expiryDate": "2026-07-20T12:00:00Z",
+    "idTag": "9876543210",
+    "reservationId": 1001,
+    "parentIdTag": "FLEET001"
+}
+```
+
+---
+
+# REST Success Response
+
+```json
+{
+    "success": true,
+    "message": "Reservation request sent."
+}
+```
+
+---
+
+# REST Failure Response
+
+```json
+{
+    "success": false,
+    "message": "Charging station offline."
+}
+```
+
+---
+
+# OCPP Request
+
+```json
+[
+    2,
+    "uuid-1001",
+    "ReserveNow",
+    {
+        "connectorId":1,
+        "expiryDate":"2026-07-20T12:00:00Z",
+        "idTag":"9876543210",
+        "reservationId":1001,
+        "parentIdTag":"FLEET001"
+    }
+]
+```
+
+---
+
+# OCPP Response
+
+```json
+[
+    3,
+    "uuid-1001",
+    {
+        "status":"Accepted"
+    }
+]
+```
+
+---
+
+# Possible Response Status
+
+## Accepted
+
+```json
+{
+    "status":"Accepted"
+}
+```
+
+Meaning
+
+Reservation created.
+
+---
+
+## Faulted
+
+```json
+{
+    "status":"Faulted"
+}
+```
+
+Meaning
+
+Connector is faulted.
+
+---
+
+## Occupied
+
+```json
+{
+    "status":"Occupied"
+}
+```
+
+Meaning
+
+Connector currently charging.
+
+---
+
+## Rejected
+
+```json
+{
+    "status":"Rejected"
+}
+```
+
+Meaning
+
+Reservation rejected.
+
+---
+
+## Unavailable
+
+```json
+{
+    "status":"Unavailable"
+}
+```
+
+Meaning
+
+Connector unavailable.
+
+---
+
+# StatusNotification After Reservation
+
+```json
+[
+    2,
+    "msg-1001",
+    "StatusNotification",
+    {
+        "connectorId":1,
+        "status":"Reserved",
+        "errorCode":"NoError",
+        "timestamp":"2026-07-20T10:00:00Z"
+    }
+]
+```
+
+Response
+
+```json
+[
+    3,
+    "msg-1001",
+    {}
+]
+```
+
+---
+
+# Reservation Expired
+
+```json
+[
+    2,
+    "msg-1002",
+    "StatusNotification",
+    {
+        "connectorId":1,
+        "status":"Available",
+        "errorCode":"NoError"
+    }
+]
+```
+
+---
+
+# User Starts Charging
+
+Sequence
+
+```text
+ReserveNow
+        │
+        ▼
+Reserved
+        │
+Vehicle Arrives
+        │
+Authorize
+        │
+StartTransaction
+        │
+Charging
+```
+
+---
+
+# Backend Status Flow
+
+| Event | Status |
+|--------|---------|
+| API Called | RESERVATION_REQUESTED |
+| Accepted | RESERVED |
+| Occupied | CONNECTOR_BUSY |
+| Faulted | CONNECTOR_FAULTED |
+| Rejected | RESERVATION_FAILED |
+| StatusNotification(Reserved) | RESERVED |
+| StartTransaction | RESERVATION_USED |
+| Expired | RESERVATION_EXPIRED |
+
+---
+
+# Database
+
+## Reservation Table
+
+| Field | Value |
+|--------|------|
+| reservationId | 1001 |
+| chargerId | DJT-12-CP1-T6I |
+| connectorId | 1 |
+| idTag | 9876543210 |
+| expiryDate | 2026-07-20T12:00:00Z |
+| status | RESERVED |
+
+---
+
+# Complete Flow
+
+```text
+Mobile App
+      │
+Reserve Connector
+      │
+      ▼
+Backend
+      │
+ReserveNow.req
+      │
+      ▼
+Charge Point
+      │
+ReserveNow.conf
+      │
+      ▼
+StatusNotification(Reserved)
+      │
+      ▼
+Vehicle Arrives
+      │
+Authorize
+      │
+StartTransaction
+```
+
+---
+
+# Validation
+
+- Charger online.
+- Connector available.
+- Reservation ID unique.
+- Expiry time must be in the future.
+- idTag must be valid.
+
+---
+
+# Testing
+
+Request
+
+```json
+{
+    "connectorId":1,
+    "reservationId":1001,
+    "idTag":"9876543210",
+    "expiryDate":"2026-07-20T12:00:00Z"
+}
+```
+
+Expected Response
+
+```json
+{
+    "status":"Accepted"
+}
+```
+
+Expected Follow-up
+
+```text
+StatusNotification
+
+status = Reserved
+```
+
+---
+
+# Production Notes
+
+- One reservation per connector.
+- Automatically cancel expired reservations.
+- Prevent RemoteStartTransaction from other users while reserved.
+- Verify the reservation owner (`idTag`) before allowing charging.
+- Maintain reservation history for auditing.
+
+
+# OCPP 1.6J - CancelReservation
+
+## Description
+
+The **CancelReservation** operation cancels an existing reservation created using `ReserveNow`.
+
+Typical use cases:
+
+- User cancels booking.
+- Reservation expires.
+- Admin cancels reservation.
+- Reservation reassigned.
+
+---
+
+# REST API
+
+## Route
+
+```http
+POST /api/v1/chargers/{chargerId}/cancel-reservation
+```
+
+Example
+
+```http
+POST /api/v1/chargers/DJT-12-CP1-T6I/cancel-reservation
+```
+
+---
+
+# REST Request
+
+```json
+{
+    "reservationId": 1001
+}
+```
+
+---
+
+# REST Success Response
+
+```json
+{
+    "success": true,
+    "message": "Reservation cancellation request sent."
+}
+```
+
+---
+
+# REST Failure Response
+
+```json
+{
+    "success": false,
+    "message": "Charging station offline."
+}
+```
+
+---
+
+# OCPP Request
+
+```json
+[
+    2,
+    "uuid-1001",
+    "CancelReservation",
+    {
+        "reservationId":1001
+    }
+]
+```
+
+---
+
+# OCPP Response
+
+```json
+[
+    3,
+    "uuid-1001",
+    {
+        "status":"Accepted"
+    }
+]
+```
+
+---
+
+# Possible Response Status
+
+## Accepted
+
+```json
+{
+    "status":"Accepted"
+}
+```
+
+Meaning
+
+Reservation cancelled successfully.
+
+---
+
+## Rejected
+
+```json
+{
+    "status":"Rejected"
+}
+```
+
+Meaning
+
+Reservation not found or cannot be cancelled.
+
+---
+
+# Expected StatusNotification
+
+```json
+[
+    2,
+    "msg-1001",
+    "StatusNotification",
+    {
+        "connectorId":1,
+        "status":"Available",
+        "errorCode":"NoError",
+        "timestamp":"2026-07-20T10:30:00Z"
+    }
+]
+```
+
+Response
+
+```json
+[
+    3,
+    "msg-1001",
+    {}
+]
+```
+
+---
+
+# Backend Status Flow
+
+| Event | Status |
+|--------|---------|
+| API Called | CANCEL_REQUESTED |
+| Accepted | RESERVATION_CANCELLED |
+| Rejected | CANCEL_FAILED |
+| StatusNotification(Available) | AVAILABLE |
+
+---
+
+# Complete Flow
+
+```text
+Mobile App
+      │
+Cancel Reservation
+      │
+      ▼
+Backend
+      │
+CancelReservation.req
+      │
+      ▼
+Charge Point
+      │
+CancelReservation.conf
+      │
+      ▼
+StatusNotification(Available)
+      │
+      ▼
+Database Updated
+```
+
+---
+
+# Validation
+
+- Charger online.
+- Reservation must exist.
+- Reservation must not already be used.
+- Reservation ID must match the charger's reservation.
+
+---
+
+# Testing
+
+Request
+
+```json
+{
+    "reservationId":1001
+}
+```
+
+Expected Response
+
+```json
+{
+    "status":"Accepted"
+}
+```
+
+Expected Follow-up
+
+```text
+StatusNotification
+
+status = Available
+```
+
+---
+
+# Production Notes
+
+- Remove reservation from the database only after receiving `Accepted`.
+- Update connector availability immediately after `StatusNotification(Available)`.
+- Log reservation cancellation events for auditing.
+
+
+# OCPP 1.6J - SendLocalList
+
+## Description
+
+The **SendLocalList** operation updates the charger's local authorization list (Local Authorization Cache).
+
+It allows the charger to authorize users **without contacting the CSMS**, enabling offline charging.
+
+Typical use cases:
+
+- Offline charging
+- Fleet cards
+- RFID card synchronization
+- Network outage support
+
+---
+
+# REST API
+
+## Route
+
+```http
+POST /api/v1/chargers/{chargerId}/local-list
+```
+
+Example
+
+```http
+POST /api/v1/chargers/DJT-12-CP1-T6I/local-list
+```
+
+---
+
+# REST Request
+
+```json
+{
+    "listVersion": 2,
+    "updateType": "Full",
+    "localAuthorizationList": [
+        {
+            "idTag": "9876543210",
+            "idTagInfo": {
+                "status": "Accepted",
+                "expiryDate": "2027-01-01T00:00:00Z",
+                "parentIdTag": "FLEET001"
+            }
+        },
+        {
+            "idTag": "1234567890",
+            "idTagInfo": {
+                "status": "Accepted"
+            }
+        }
+    ]
+}
+```
+
+---
+
+# REST Success Response
+
+```json
+{
+    "success": true,
+    "message": "Local authorization list sent."
+}
+```
+
+---
+
+# REST Failure Response
+
+```json
+{
+    "success": false,
+    "message": "Charging station offline."
+}
+```
+
+---
+
+# OCPP Request
+
+```json
+[
+    2,
+    "uuid-1001",
+    "SendLocalList",
+    {
+        "listVersion":2,
+        "updateType":"Full",
+        "localAuthorizationList":[
+            {
+                "idTag":"9876543210",
+                "idTagInfo":{
+                    "status":"Accepted",
+                    "expiryDate":"2027-01-01T00:00:00Z",
+                    "parentIdTag":"FLEET001"
+                }
+            },
+            {
+                "idTag":"1234567890",
+                "idTagInfo":{
+                    "status":"Accepted"
+                }
+            }
+        ]
+    }
+]
+```
+
+---
+
+# OCPP Response
+
+```json
+[
+    3,
+    "uuid-1001",
+    {
+        "status":"Accepted"
+    }
+]
+```
+
+---
+
+# Possible Response Status
+
+## Accepted
+
+```json
+{
+    "status":"Accepted"
+}
+```
+
+---
+
+## Failed
+
+```json
+{
+    "status":"Failed"
+}
+```
+
+---
+
+## VersionMismatch
+
+```json
+{
+    "status":"VersionMismatch"
+}
+```
+
+---
+
+## NotSupported
+
+```json
+{
+    "status":"NotSupported"
+}
+```
+
+---
+
+# Update Types
+
+## Full
+
+```text
+Deletes existing local list
+Creates new local list
+```
+
+---
+
+## Differential
+
+```text
+Only inserts/updates/deletes changed records
+```
+
+---
+
+# Backend Status Flow
+
+| Event | Status |
+|--------|---------|
+| API Called | LOCAL_LIST_REQUESTED |
+| Accepted | LOCAL_LIST_UPDATED |
+| Failed | LOCAL_LIST_FAILED |
+| VersionMismatch | VERSION_MISMATCH |
+| NotSupported | FEATURE_NOT_SUPPORTED |
+
+---
+
+# Complete Flow
+
+```text
+Admin Portal
+      │
+Update RFID List
+      │
+      ▼
+Backend
+      │
+SendLocalList.req
+      │
+      ▼
+Charge Point
+      │
+SendLocalList.conf
+      │
+      ▼
+Database Updated
+```
+
+---
+
+# Validation
+
+- Charger online.
+- listVersion must increase.
+- idTag must be unique.
+- updateType must be Full or Differential.
+
+---
+
+# Testing
+
+Request
+
+```json
+{
+    "listVersion":2,
+    "updateType":"Full",
+    "localAuthorizationList":[
+        {
+            "idTag":"9876543210",
+            "idTagInfo":{
+                "status":"Accepted"
+            }
+        }
+    ]
+}
+```
+
+Expected Response
+
+```json
+{
+    "status":"Accepted"
+}
+```
+
+---
+
+# Production Notes
+
+- Always increment `listVersion`.
+- Use **Differential** updates whenever possible to reduce payload size.
+- Use **Full** updates only when rebuilding the entire authorization list.
+- Verify that the charger supports Local Authorization before using this feature.
+- Maintain a copy of the current local list and version in your backend.
+
+
+
+# OCPP 1.6J - GetLocalListVersion
+
+## Description
+
+The **GetLocalListVersion** operation retrieves the current version of the charger's Local Authorization List.
+
+This helps the CSMS determine whether it needs to send a new local authorization list using `SendLocalList`.
+
+Typical use cases:
+
+- Verify synchronization between CSMS and Charger.
+- Check local authorization list version.
+- Decide whether to send Full or Differential update.
+- Troubleshooting authorization issues.
+
+---
+
+# REST API
+
+## Route
+
+```http
+GET /api/v1/chargers/{chargerId}/local-list/version
+```
+
+Example
+
+```http
+GET /api/v1/chargers/DJT-12-CP1-T6I/local-list/version
+```
+
+---
+
+# REST Success Response
+
+```json
+{
+    "success": true,
+    "message": "Version request sent."
+}
+```
+
+---
+
+# REST Failure Response
+
+```json
+{
+    "success": false,
+    "message": "Charging station offline."
+}
+```
+
+---
+
+# OCPP Request
+
+```json
+[
+    2,
+    "uuid-1001",
+    "GetLocalListVersion",
+    {}
+]
+```
+
+---
+
+# OCPP Response
+
+```json
+[
+    3,
+    "uuid-1001",
+    {
+        "listVersion": 5
+    }
+]
+```
+
+---
+
+# Response Fields
+
+| Field | Description |
+|--------|-------------|
+| listVersion | Current Local Authorization List version stored in charger |
+
+---
+
+# Backend Processing
+
+If
+
+```text
+CSMS Version == Charger Version
+```
+
+No action required.
+
+---
+
+If
+
+```text
+CSMS Version > Charger Version
+```
+
+Call
+
+```text
+SendLocalList
+```
+
+---
+
+If
+
+```text
+Charger Version > CSMS Version
+```
+
+Investigate synchronization issue.
+
+---
+
+# Backend Status Flow
+
+| Event | Status |
+|--------|---------|
+| API Called | LOCAL_LIST_VERSION_REQUESTED |
+| Response Received | LOCAL_LIST_VERSION_RECEIVED |
+| Version Match | IN_SYNC |
+| Version Mismatch | UPDATE_REQUIRED |
+
+---
+
+# Complete Flow
+
+```text
+Admin Portal
+      │
+Check Version
+      │
+      ▼
+Backend
+      │
+GetLocalListVersion.req
+      │
+      ▼
+Charge Point
+      │
+GetLocalListVersion.conf
+      │
+      ▼
+Compare Versions
+      │
+      ▼
+If Different
+      │
+      ▼
+SendLocalList
+```
+
+---
+
+# Validation
+
+- Charger must be online.
+- WebSocket session must be active.
+
+---
+
+# Testing
+
+Expected OCPP Response
+
+```json
+{
+    "listVersion":5
+}
+```
+
+---
+
+# Production Notes
+
+- Always compare the charger version with the CSMS version before sending `SendLocalList`.
+- Avoid unnecessary Full updates.
+- Store the charger's reported version for future synchronization.
+- Use this API during charger boot or periodic maintenance checks.
+
+
+
+# OCPP 1.6J - SetChargingProfile
+
+## Description
+
+The **SetChargingProfile** operation is used to remotely configure charging limits and schedules for a charging station or connector.
+
+It is the core Smart Charging feature in OCPP 1.6J.
+
+Typical use cases:
+
+- Load Balancing
+- Dynamic Power Management
+- Peak Hour Control
+- Current Limiting
+- Fleet Charging
+- Scheduled Charging
+- Solar Charging Integration
+
+---
+
+# REST API
+
+## Route
+
+```http
+POST /api/v1/chargers/{chargerId}/charging-profile
+```
+
+Example
+
+```http
+POST /api/v1/chargers/DJT-12-CP1-T6I/charging-profile
+```
+
+---
+
+# REST Request
+
+```json
+{
+    "connectorId":1,
+    "csChargingProfiles":{
+        "chargingProfileId":1,
+        "stackLevel":0,
+        "chargingProfilePurpose":"TxProfile",
+        "chargingProfileKind":"Absolute",
+        "recurrencyKind":"Daily",
+        "validFrom":"2026-07-18T10:00:00Z",
+        "validTo":"2026-07-18T18:00:00Z",
+        "chargingSchedule":{
+            "duration":28800,
+            "startSchedule":"2026-07-18T10:00:00Z",
+            "chargingRateUnit":"A",
+            "chargingSchedulePeriod":[
+                {
+                    "startPeriod":0,
+                    "limit":16,
+                    "numberPhases":3
+                },
+                {
+                    "startPeriod":3600,
+                    "limit":10,
+                    "numberPhases":3
+                },
+                {
+                    "startPeriod":7200,
+                    "limit":6,
+                    "numberPhases":3
+                }
+            ],
+            "minChargingRate":6
+        }
+    }
+}
+```
+
+---
+
+# REST Success Response
+
+```json
+{
+    "success":true,
+    "message":"Charging profile sent successfully."
+}
+```
+
+---
+
+# REST Failure Response
+
+```json
+{
+    "success":false,
+    "message":"Charging station offline."
+}
+```
+
+---
+
+# OCPP Request
+
+```json
+[
+    2,
+    "uuid-1001",
+    "SetChargingProfile",
+    {
+        "connectorId":1,
+        "csChargingProfiles":{
+            "chargingProfileId":1,
+            "stackLevel":0,
+            "chargingProfilePurpose":"TxProfile",
+            "chargingProfileKind":"Absolute",
+            "chargingSchedule":{
+                "chargingRateUnit":"A",
+                "chargingSchedulePeriod":[
+                    {
+                        "startPeriod":0,
+                        "limit":16
+                    },
+                    {
+                        "startPeriod":3600,
+                        "limit":10
+                    }
+                ]
+            }
+        }
+    }
+]
+```
+
+---
+
+# OCPP Response
+
+```json
+[
+    3,
+    "uuid-1001",
+    {
+        "status":"Accepted"
+    }
+]
+```
+
+---
+
+# Possible Response Status
+
+## Accepted
+
+```json
+{
+    "status":"Accepted"
+}
+```
+
+Meaning
+
+Charging profile applied.
+
+---
+
+## Rejected
+
+```json
+{
+    "status":"Rejected"
+}
+```
+
+Meaning
+
+Invalid charging profile.
+
+---
+
+## NotSupported
+
+```json
+{
+    "status":"NotSupported"
+}
+```
+
+Meaning
+
+Smart Charging not supported.
+
+---
+
+# ChargingProfilePurpose
+
+## ChargePointMaxProfile
+
+Maximum power for entire charger.
+
+---
+
+## TxDefaultProfile
+
+Default profile for future transactions.
+
+---
+
+## TxProfile
+
+Applies only to current transaction.
+
+---
+
+# ChargingProfileKind
+
+## Absolute
+
+Fixed schedule.
+
+---
+
+## Relative
+
+Starts from transaction start.
+
+---
+
+## Recurring
+
+Daily or Weekly schedule.
+
+---
+
+# ChargingRateUnit
+
+```text
+A   -> Amps
+W   -> Watts
+```
+
+---
+
+# Backend Status Flow
+
+| Event | Status |
+|--------|---------|
+| API Called | PROFILE_REQUESTED |
+| Accepted | PROFILE_APPLIED |
+| Rejected | PROFILE_REJECTED |
+| NotSupported | SMART_CHARGING_NOT_SUPPORTED |
+
+---
+
+# Complete Flow
+
+```text
+Admin Portal
+      │
+Create Charging Profile
+      │
+      ▼
+Backend
+      │
+SetChargingProfile.req
+      │
+      ▼
+Charge Point
+      │
+SetChargingProfile.conf
+      │
+      ▼
+Charging Current Updated
+```
+
+---
+
+# Example Use Cases
+
+## Limit Charger to 16A
+
+```json
+{
+    "limit":16
+}
+```
+
+---
+
+## Night Charging
+
+```text
+22:00 → 06:00
+```
+
+---
+
+## Peak Hours
+
+```text
+09:00-18:00
+
+Limit = 10A
+```
+
+---
+
+## Solar Charging
+
+```text
+Morning
+
+6A
+
+Afternoon
+
+16A
+```
+
+---
+
+## Dynamic Load Balancing
+
+```text
+Connector 1
+
+16A
+
+Connector 2
+
+10A
+
+Connector 3
+
+6A
+```
+
+---
+
+# Validation
+
+- Charger online.
+- Smart Charging supported.
+- connectorId valid.
+- chargingProfileId unique.
+- limit > 0.
+- stackLevel valid.
+- chargingRateUnit supported.
+
+---
+
+# Testing
+
+Request
+
+```json
+{
+    "connectorId":1,
+    "csChargingProfiles":{
+        "chargingProfileId":1,
+        "chargingProfilePurpose":"TxProfile",
+        "chargingProfileKind":"Absolute",
+        "chargingSchedule":{
+            "chargingRateUnit":"A",
+            "chargingSchedulePeriod":[
+                {
+                    "startPeriod":0,
+                    "limit":16
+                }
+            ]
+        }
+    }
+}
+```
+
+Expected Response
+
+```json
+{
+    "status":"Accepted"
+}
+```
+
+---
+
+# Production Notes
+
+- Verify charger supports Smart Charging before sending.
+- Store charging profiles in the database for audit and synchronization.
+- If multiple profiles exist, `stackLevel` determines priority.
+- Use `TxProfile` for an active transaction and `TxDefaultProfile` for future sessions.
+- Always validate the charger's supported rate unit (`A` or `W`) before applying a profile.
+
+
+# OCPP 1.6J - ClearChargingProfile
+
+## Description
+
+The **ClearChargingProfile** operation removes one or more charging profiles previously configured using `SetChargingProfile`.
+
+Typical use cases:
+
+- Remove current limit
+- Remove scheduled charging
+- Remove load balancing profile
+- Restore charger to default behavior
+
+---
+
+# REST API
+
+## Route
+
+```http
+POST /api/v1/chargers/{chargerId}/clear-charging-profile
+```
+
+Example
+
+```http
+POST /api/v1/chargers/DJT-12-CP1-T6I/clear-charging-profile
+```
+
+---
+
+# REST Request
+
+## Remove All Profiles
+
+```json
+{}
+```
+
+---
+
+## Remove Specific Profile
+
+```json
+{
+    "id": 1
+}
+```
+
+---
+
+## Remove by Connector
+
+```json
+{
+    "connectorId": 1
+}
+```
+
+---
+
+## Remove TxProfile
+
+```json
+{
+    "connectorId":1,
+    "chargingProfilePurpose":"TxProfile"
+}
+```
+
+---
+
+## Remove Stack Level
+
+```json
+{
+    "stackLevel":0
+}
+```
+
+---
+
+# OCPP Request
+
+## Remove All
+
+```json
+[
+    2,
+    "uuid-1001",
+    "ClearChargingProfile",
+    {}
+]
+```
+
+---
+
+## Remove by Profile ID
+
+```json
+[
+    2,
+    "uuid-1002",
+    "ClearChargingProfile",
+    {
+        "id":1
+    }
+]
+```
+
+---
+
+## Remove by Connector
+
+```json
+[
+    2,
+    "uuid-1003",
+    "ClearChargingProfile",
+    {
+        "connectorId":1
+    }
+]
+```
+
+---
+
+# OCPP Response
+
+```json
+[
+    3,
+    "uuid-1001",
+    {
+        "status":"Accepted"
+    }
+]
+```
+
+---
+
+# Possible Response Status
+
+## Accepted
+
+```json
+{
+    "status":"Accepted"
+}
+```
+
+Meaning
+
+Charging profile removed successfully.
+
+---
+
+## Unknown
+
+```json
+{
+    "status":"Unknown"
+}
+```
+
+Meaning
+
+Specified charging profile does not exist.
+
+---
+
+# Backend Status Flow
+
+| Event | Status |
+|--------|--------|
+| API Called | PROFILE_CLEAR_REQUESTED |
+| Accepted | PROFILE_CLEARED |
+| Unknown | PROFILE_NOT_FOUND |
+
+---
+
+# Complete Flow
+
+```text
+Admin Portal
+      │
+Clear Charging Profile
+      │
+      ▼
+Backend
+      │
+ClearChargingProfile.req
+      │
+      ▼
+Charge Point
+      │
+ClearChargingProfile.conf
+      │
+      ▼
+Charging Profile Removed
+      │
+      ▼
+Database Updated
+```
+
+---
+
+# Filter Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| id | Remove specific charging profile |
+| connectorId | Remove profiles for connector |
+| stackLevel | Remove profiles at stack level |
+| chargingProfilePurpose | Remove TxProfile / TxDefaultProfile / ChargePointMaxProfile |
+
+---
+
+# Validation
+
+- Charger must be online.
+- Smart Charging must be supported.
+- Filters are optional.
+- Empty request removes all charging profiles.
+
+---
+
+# Testing
+
+Request
+
+```json
+{
+    "connectorId":1
+}
+```
+
+Expected Response
+
+```json
+{
+    "status":"Accepted"
+}
+```
+
+---
+
+# Production Notes
+
+- Use profile ID when removing a single profile.
+- Empty payload clears all charging profiles.
+- Synchronize database after successful removal.
+- Log every profile removal for auditing.
+- If the charger returns `Unknown`, treat it as an idempotent operation if the desired end state is "no profile exists."
+
+
+
+# OCPP 1.6J - GetCompositeSchedule
+
+## Description
+
+Retrieves the effective charging schedule currently applied by the charging station after considering all active charging profiles.
+
+Useful for:
+
+- Smart Charging
+- Load Balancing
+- Current Monitoring
+- EMS Integration
+- Verify Applied Charging Profile
+
+---
+
+# REST API
+
+## Route
+
+```http
+POST /api/v1/chargers/{chargerId}/composite-schedule
+```
+
+Example
+
+```http
+POST /api/v1/chargers/DJT-12-CP1-T6I/composite-schedule
+```
+
+---
+
+# REST Request
+
+```json
+{
+    "connectorId":1,
+    "duration":3600,
+    "chargingRateUnit":"A"
+}
+```
+
+---
+
+# REST Success Response
+
+```json
+{
+    "success":true,
+    "message":"Composite schedule requested."
+}
+```
+
+---
+
+# OCPP Request
+
+```json
+[
+    2,
+    "uuid-1001",
+    "GetCompositeSchedule",
+    {
+        "connectorId":1,
+        "duration":3600,
+        "chargingRateUnit":"A"
+    }
+]
+```
+
+---
+
+# OCPP Response
+
+```json
+[
+    3,
+    "uuid-1001",
+    {
+        "status":"Accepted",
+        "connectorId":1,
+        "scheduleStart":"2026-07-18T10:00:00Z",
+        "chargingSchedule":{
+            "duration":3600,
+            "chargingRateUnit":"A",
+            "chargingSchedulePeriod":[
+                {
+                    "startPeriod":0,
+                    "limit":16,
+                    "numberPhases":3
+                },
+                {
+                    "startPeriod":1800,
+                    "limit":10,
+                    "numberPhases":3
+                }
+            ]
+        }
+    }
+]
+```
+
+---
+
+# Possible Status
+
+Accepted
+
+Rejected
+
+---
+
+# Backend Status
+
+| Event | Status |
+|--------|---------|
+| API Called | COMPOSITE_SCHEDULE_REQUESTED |
+| Accepted | COMPOSITE_SCHEDULE_RECEIVED |
+| Rejected | REQUEST_FAILED |
+
+---
+
+# Complete Flow
+
+```text
+Admin Portal
+      │
+GetCompositeSchedule
+      │
+      ▼
+Backend
+      │
+GetCompositeSchedule.req
+      │
+      ▼
+Charge Point
+      │
+GetCompositeSchedule.conf
+      │
+      ▼
+Display Current Schedule
+```
+
+---
+
+# Validation
+
+- Charger online
+- Smart Charging supported
+- Connector exists
+
+---
+
+# Production Notes
+
+- Use after SetChargingProfile.
+- Shows the actual charging schedule after profile prioritization.
+- Helpful for EMS and Load Balancing dashboards.
+
+
+# OCPP 1.6J - DiagnosticsStatusNotification
+
+## Description
+
+Sent by the charger to report the status of a diagnostics upload initiated by GetDiagnostics.
+
+---
+
+# OCPP Request
+
+```json
+[
+    2,
+    "msg-1001",
+    "DiagnosticsStatusNotification",
+    {
+        "status":"Uploading"
+    }
+]
+```
+
+---
+
+# CSMS Response
+
+```json
+[
+    3,
+    "msg-1001",
+    {}
+]
+```
+
+---
+
+# Possible Status Values
+
+```text
+Idle
+Uploading
+Uploaded
+UploadFailed
+```
+
+---
+
+# Backend Status
+
+| OCPP Status | Database Status |
+|--------------|----------------|
+| Idle | DIAGNOSTICS_IDLE |
+| Uploading | DIAGNOSTICS_UPLOADING |
+| Uploaded | DIAGNOSTICS_COMPLETED |
+| UploadFailed | DIAGNOSTICS_FAILED |
+
+---
+
+# Complete Flow
+
+```text
+GetDiagnostics
+      │
+Accepted
+      │
+Uploading
+      │
+Uploaded
+```
+
+---
+
+# Validation
+
+- Update charger status.
+- Save timestamp.
+- Notify UI using WebSocket.
+
+---
+
+# Production Notes
+
+- Do not mark diagnostics completed until Uploaded is received.
+- UploadFailed should generate an alert.
+
+
+# OCPP 1.6J - FirmwareStatusNotification
+
+## Description
+
+Sent by the charger after UpdateFirmware to indicate firmware download and installation progress.
+
+---
+
+# OCPP Request
+
+## Downloading
+
+```json
+[
+    2,
+    "msg-1001",
+    "FirmwareStatusNotification",
+    {
+        "status":"Downloading"
+    }
+]
+```
+
+Response
+
+```json
+[
+    3,
+    "msg-1001",
+    {}
+]
+```
+
+---
+
+## Downloaded
+
+```json
+[
+    2,
+    "msg-1002",
+    "FirmwareStatusNotification",
+    {
+        "status":"Downloaded"
+    }
+]
+```
+
+---
+
+## Installing
+
+```json
+[
+    2,
+    "msg-1003",
+    "FirmwareStatusNotification",
+    {
+        "status":"Installing"
+    }
+]
+```
+
+---
+
+## Installed
+
+```json
+[
+    2,
+    "msg-1004",
+    "FirmwareStatusNotification",
+    {
+        "status":"Installed"
+    }
+]
+```
+
+---
+
+## DownloadFailed
+
+```json
+[
+    2,
+    "msg-1005",
+    "FirmwareStatusNotification",
+    {
+        "status":"DownloadFailed"
+    }
+]
+```
+
+---
+
+## InstallationFailed
+
+```json
+[
+    2,
+    "msg-1006",
+    "FirmwareStatusNotification",
+    {
+        "status":"InstallationFailed"
+    }
+]
+```
+
+---
+
+# Response
+
+```json
+[
+    3,
+    "<messageId>",
+    {}
+]
+```
+
+---
+
+# Backend Status
+
+| Charger Status | Database Status |
+|----------------|----------------|
+| Downloading | FW_DOWNLOADING |
+| Downloaded | FW_DOWNLOADED |
+| Installing | FW_INSTALLING |
+| Installed | FW_UPDATED |
+| DownloadFailed | FW_DOWNLOAD_FAILED |
+| InstallationFailed | FW_INSTALL_FAILED |
+
+---
+
+# Complete Flow
+
+```text
+UpdateFirmware
+      │
+Accepted
+      │
+Downloading
+      │
+Downloaded
+      │
+Installing
+      │
+Installed
+```
+
+---
+
+# Validation
+
+- Update firmware progress.
+- Push progress to UI.
+- Save timestamps.
+
+---
+
+# Production Notes
+
+- Do not mark firmware upgrade complete until Installed is received.
+- InstallationFailed should trigger an alert.
+- Some chargers automatically reboot after Installed.
+- Wait for BootNotification after reboot before marking the charger online.
+
