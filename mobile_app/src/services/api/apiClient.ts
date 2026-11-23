@@ -26,7 +26,7 @@ function getApiBaseUrl(): string {
   // Override either by setting VITE_API_URL (handled above), e.g. a physical
   // device on your LAN should build with VITE_API_URL=http://<your-ip>:5000/api.
   const LOCAL_URL = 'http://localhost:5000/api';
-  const PROD_URL = 'http://3.110.84.196:5000/api';
+  const PROD_URL = 'http://3.110.46.2:5000/api';
 
   if (import.meta.env.DEV) {
     // An Android emulator resolves `localhost` to itself; the host machine is
