@@ -8,6 +8,7 @@ import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { hydrateLastRoute } from './services/appState';
 import OfflineBanner from './components/OfflineBanner';
+import UpdateGate from './components/UpdateGate';
 
 function App() {
   const [isReady, setIsReady] = useState(false);
@@ -82,6 +83,7 @@ function App() {
   return (
     <I18nextProvider i18n={i18n}>
       <OfflineBanner />
+      <UpdateGate />
       <BrowserRouter basename={__BASE_PATH__ || '/'}>
         <AppRoutes />
       </BrowserRouter>

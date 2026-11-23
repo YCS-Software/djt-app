@@ -25,6 +25,9 @@ router.get('/session-info', (req, res) => {
   res.send('---Phone Auth API Running---');
 });
 
+// App version / forced-update check (public)
+router.use('/app', require('./app/appRtr'));
+
 // Authentication routes
 router.use('/auth', require('./auth/authAppRtr'));
 

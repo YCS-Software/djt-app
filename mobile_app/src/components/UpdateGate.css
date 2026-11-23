@@ -1,0 +1,119 @@
+/* UpdateGate — self-contained colours (matches the app's dark navy theme) so it
+   renders correctly even before/without the theme stylesheet. */
+
+.update-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 10000; /* above the offline banner and every page */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px;
+  padding-top: calc(24px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, #0a1c30 0%, #050d1a 100%);
+  color: #e8f0f7;
+  overflow-y: auto;
+}
+
+.update-gate-card {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+}
+
+.update-gate-icon {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #5eead4;
+  background: rgba(94, 234, 212, 0.12);
+  border: 1px solid rgba(94, 234, 212, 0.35);
+  margin-bottom: 6px;
+}
+
+.update-gate-icon-warn {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+.update-gate-card h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #ffffff;
+}
+
+.update-gate-card p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: #9fbbd4;
+}
+
+
+.update-gate-primary,
+.update-gate-secondary {
+  width: 100%;
+  min-height: 52px;
+  border-radius: 14px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.update-gate-primary {
+  margin-top: 10px;
+  border: none;
+  color: #04121f;
+  background: linear-gradient(135deg, #2dd4bf 0%, #38bdf8 100%);
+}
+
+.update-gate-primary:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.update-gate-secondary {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #e8f0f7;
+  background: transparent;
+}
+
+.update-gate-primary:focus-visible,
+.update-gate-secondary:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
+.update-gate-version {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: #6f8aa6;
+}
+
+.update-gate-spin {
+  animation: update-gate-spin 0.9s linear infinite;
+}
+
+@keyframes update-gate-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .update-gate-spin { animation: none; }
+}
