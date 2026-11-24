@@ -69,7 +69,7 @@ export default function Profile() {
   const menuItems = [
     { icon: HelpCircle, title: 'Help & Support', subtitle: '24/7 assistance', color: 'var(--ev-primary)' },
     { icon: Shield, title: 'Privacy Policy', subtitle: 'Your data is safe', color: 'var(--ev-info)' },
-    { icon: Info, title: 'About', subtitle: 'App version 1.0.0', color: 'var(--ev-text-muted)' },
+    { icon: Info, title: 'About', subtitle: `App version ${__APP_VERSION_NAME__} (build ${__APP_VERSION_CODE__})`, color: 'var(--ev-text-muted)' },
   ];
 
   const formatCurrency = (amount: number) => {
