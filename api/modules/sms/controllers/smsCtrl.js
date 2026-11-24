@@ -1,72 +1,102 @@
 /**
- * SMS Controller
- * HTTP endpoints for sending template-based SMS, managing templates, and
- * viewing the message audit log.
+ * SMS Controller (admin)
+ * Send / preview a template by hand, check the template rows, manage templates,
+ * and read the message log. All sending goes through utils/messageService.
  */
 
 const std = require(appRoot + '/utils/standardMessages');
 const df = require(appRoot + '/utils/dateFormatUtil');
-const sms = require(appRoot + '/utils/smsUtil');
 const smsMdl = require('../models/smsMdl');
+const messages = require(appRoot + '/utils/messageService');
 const cntxtDtls = 'smsCtrl';
+
+function badRequest(res, message, data) {
+    return res.status(std.message['BAD_REQUEST'].code).json({
+        status: std.message['BAD_REQUEST'].code,
+        message: message,
+        data: data || null,
+    });
+}
 
 /*****************************************************************************
 * Function      : sendMessage
-* Description   : Send a templated SMS. Body:
-*                 { template, mobile, variables: { var1: '1234' }, senderId? }
+* Description   : Send one template by hand. Body:
+*                 { template: 'DJT_OTP', mobile: '9876543210', data: { otp: '4821' } }
+*                 `template` is the tmplt_cd in sms_tmplt_lst_t.
 ******************************************************************************/
 exports.sendMessage = function (req, res) {
     const fnm = 'sendMessage';
-    const data = req.body.data ? req.body.data : req.body;
-    const { template, mobile, variables, senderId, usrId } = data;
+    const body = req.body || {};
+    if (!body.template) return badRequest(res, 'template (the template code) is required');
 
-    if (!template || !mobile) {
-        return res.status(std.message['BAD_REQUEST'].code).json({
-            status: std.message['BAD_REQUEST'].code,
-            message: 'template and mobile are required',
-            data: null,
-        });
-    }
-
-    sms.sendTemplateMessage({ template, mobile, variables, senderId, usrId })
+    messages.send(String(body.template), body.mobile, body.data || {})
         .then(function (result) {
-            if (!result.success) {
-                return res.status(std.message['BAD_REQUEST'].code).json({
-                    status: std.message['BAD_REQUEST'].code,
-                    message: result.error || 'Failed to send message',
-                    data: result,
-                });
-            }
+            if (!result.success) return badRequest(res, result.error || 'Failed to send message', result);
             return df.formatSucessRes(req, res, result, cntxtDtls, fnm, {});
         })
         .catch(function (error) {
-            console.error('[sendMessage] Error:', error);
+            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+        });
+};
+
+/*****************************************************************************
+* Function      : preview
+* Description   : Show the final SMS text with real values filled in, without
+*                 sending or logging anything. Same body as sendMessage.
+******************************************************************************/
+exports.preview = function (req, res) {
+    const fnm = 'preview';
+    const body = req.body || {};
+    if (!body.template) return badRequest(res, 'template (the template code) is required');
+
+    messages.preview(String(body.template), body.mobile, body.data || {})
+        .then(function (result) {
+            return df.formatSucessRes(req, res, result, cntxtDtls, fnm, {
+                message: result.error || 'Preview only — nothing was sent',
+            });
+        })
+        .catch(function (error) {
+            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
+        });
+};
+
+/*****************************************************************************
+* Function      : checkSetup
+* Description   : Report mistakes in the template / variable rows.
+******************************************************************************/
+exports.checkSetup = function (req, res) {
+    const fnm = 'checkSetup';
+    messages.checkSetup()
+        .then(function (result) {
+            return df.formatSucessRes(req, res, result, cntxtDtls, fnm, {
+                message: result.ok ? 'No errors found' : result.errors.length + ' error(s) found',
+            });
+        })
+        .catch(function (error) {
             return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
         });
 };
 
 /*****************************************************************************
 * Function      : addTemplate
-* Description   : Insert/upsert a template. Body:
-*                 { providerTemplateId, name, body, senderId?, description? }
+* Description   : Insert/update a template. Body:
+*                 { code, providerTemplateId, body, name?, senderId?, dltTemplateId?, description? }
+*                 Variable rows (sms_tmplt_var_lst_t) are inserted separately.
 ******************************************************************************/
 exports.addTemplate = function (req, res) {
     const fnm = 'addTemplate';
     const data = req.body.data ? req.body.data : req.body;
-    const { providerTemplateId, name, body, senderId, description } = data;
+    const { code, providerTemplateId, dltTemplateId, name, body, senderId, description } = data;
 
-    if (!providerTemplateId || !body) {
-        return res.status(std.message['BAD_REQUEST'].code).json({
-            status: std.message['BAD_REQUEST'].code,
-            message: 'providerTemplateId and body are required',
-            data: null,
-        });
+    if (!code || !providerTemplateId || !body) {
+        return badRequest(res, 'code, providerTemplateId and body are required');
     }
 
-    smsMdl.insertTemplateMdl({ providerTemplateId, name, body, senderId, description })
+    smsMdl.insertTemplateMdl({ code: String(code).trim(), providerTemplateId, dltTemplateId, name, body, senderId, description })
         .then(function (result) {
             return df.formatSucessRes(req, res, {
                 templateId: result.insertId || null,
+                code: String(code).trim(),
                 providerTemplateId,
             }, cntxtDtls, fnm, {});
         })
@@ -78,63 +108,21 @@ exports.addTemplate = function (req, res) {
 
 /*****************************************************************************
 * Function      : listTemplates
-* Description   : List active templates
+* Description   : Active templates, plus the template codes the application
+*                 already sends and the values it passes for each.
 ******************************************************************************/
 exports.listTemplates = function (req, res) {
     const fnm = 'listTemplates';
     smsMdl.listTemplatesMdl()
         .then(function (rows) {
-            return df.formatSucessRes(req, res, rows, cntxtDtls, fnm, {});
+            return df.formatSucessRes(req, res, {
+                templates: rows,
+                sent_by_application: messages.TEMPLATES,
+                common_data_keys: messages.COMMON_KEYS,
+            }, cntxtDtls, fnm, {});
         })
         .catch(function (error) {
             console.error('[listTemplates] Error:', error);
-            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
-        });
-};
-
-/*****************************************************************************
-* Function      : getConfig
-* Description   : Return the DB-backed gateway settings (sender id, country code,
-*                 default OTP template id)
-******************************************************************************/
-exports.getConfig = function (req, res) {
-    const fnm = 'getConfig';
-    sms.clearSettingsCache();
-    sms.getSmsSettings()
-        .then(function (settings) {
-            return df.formatSucessRes(req, res, settings, cntxtDtls, fnm, {});
-        })
-        .catch(function (error) {
-            console.error('[getConfig] Error:', error);
-            return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
-        });
-};
-
-/*****************************************************************************
-* Function      : updateConfig
-* Description   : Upsert a gateway setting. Body: { key, value, description? }
-*                 Keys: DEFAULT_SENDER_ID | DEFAULT_COUNTRY_CODE | DEFAULT_OTP_TEMPLATE_ID
-******************************************************************************/
-exports.updateConfig = function (req, res) {
-    const fnm = 'updateConfig';
-    const data = req.body.data ? req.body.data : req.body;
-    const { key, value, description } = data;
-
-    if (!key) {
-        return res.status(std.message['BAD_REQUEST'].code).json({
-            status: std.message['BAD_REQUEST'].code,
-            message: 'key is required',
-            data: null,
-        });
-    }
-
-    smsMdl.upsertConfigMdl({ key, value, description })
-        .then(function () {
-            sms.clearSettingsCache(); // pick up the new value on next send
-            return df.formatSucessRes(req, res, { key, value }, cntxtDtls, fnm, {});
-        })
-        .catch(function (error) {
-            console.error('[updateConfig] Error:', error);
             return df.formatErrorRes(res, error, cntxtDtls, fnm, {});
         });
 };
@@ -145,7 +133,7 @@ exports.updateConfig = function (req, res) {
 ******************************************************************************/
 exports.getLogs = function (req, res) {
     const fnm = 'getLogs';
-    const mobile = req.query.mobile ? sms.normalizeMobile(req.query.mobile) : null;
+    const mobile = req.query.mobile ? messages.normalizeMobile(req.query.mobile) : null;
 
     smsMdl.getMsgLogsMdl({ mobile, limit: req.query.limit })
         .then(function (rows) {

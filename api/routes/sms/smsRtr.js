@@ -5,22 +5,24 @@ var smsCtrl = require('../../modules/sms/controllers/smsCtrl');
 var accessCtrl = require('../../modules/auth/validators/accessCtrl');
 
 /**
- * SMS Routes — admin only. These can send SMS at the company's cost, change the
- * OTP template, and read the message log (which contains OTP codes).
+ * SMS Routes — admin only. These can send SMS at the company's cost and read
+ * the message log (which contains OTP codes).
  */
 router.use(accessCtrl.verifyToken);
 router.use(accessCtrl.isAdmin);
 
-// Send a templated SMS  { template, mobile, variables: { var1: '1234' } }
+// Send one template by hand  { template: 'DJT_OTP', mobile, data: { otp: '4821' } }
 router.post('/send', smsCtrl.sendMessage);
+
+// Final text with real values filled in; sends nothing  (same body as /send)
+router.post('/preview', smsCtrl.preview);
+
+// Mistakes in the template / variable rows
+router.get('/check', smsCtrl.checkSetup);
 
 // Templates
 router.post('/templates', smsCtrl.addTemplate);
 router.get('/templates', smsCtrl.listTemplates);
-
-// Gateway config (sender id, country code, default OTP template) — stored in DB
-router.get('/config', smsCtrl.getConfig);
-router.post('/config', smsCtrl.updateConfig);
 
 // Audit log  ?mobile=...&limit=...
 router.get('/logs', smsCtrl.getLogs);

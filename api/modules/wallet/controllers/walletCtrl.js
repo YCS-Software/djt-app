@@ -7,6 +7,7 @@ const std = require(appRoot + '/utils/standardMessages');
 const df = require(appRoot + '/utils/dateFormatUtil');
 const walletMdl = require('../models/walletMdl');
 const audit = require(appRoot + '/utils/auditUtil');
+const messages = require(appRoot + '/utils/messageService');
 const cntxtDtls = "walletCtrl";
 
 /*****************************************************************************
@@ -232,6 +233,13 @@ function processAddMoney(wallet, userId, amount, currentBalance, payment_method,
                 userAgent: _ctx.userAgent
             });
 
+            // SMS: money added to the wallet.
+            messages.send('WALLET_CREDITED', null, {
+                userId: userId, amount: parseFloat(amount), balance: balanceAfter,
+                reason: 'Wallet top-up', reference: payment_details?.payment_id || payment_details?.order_id,
+                payment_method: payment_method
+            });
+
             // Return success only after all operations are verified
             return df.formatSucessRes(req, res, {
                 transaction_id: transactionInsertId,
@@ -317,6 +325,13 @@ function processAddMoneyForNewWallet(wallet, userId, amount, payment_method, pay
             newVal: { amount: parseFloat(amount) },
             ip: _ctx.ip,
             userAgent: _ctx.userAgent
+        });
+
+        // SMS: money added to the wallet.
+        messages.send('WALLET_CREDITED', null, {
+            userId: userId, amount: parseFloat(amount), balance: balanceAfter,
+            reason: 'Wallet top-up', reference: payment_details?.payment_id || payment_details?.order_id,
+            payment_method: payment_method
         });
 
         // Return success only after all operations are verified
@@ -450,6 +465,11 @@ exports.transferMoney = function(req, res) {
                     newVal: { amount: parseFloat(amount) },
                     ip: _ctx.ip,
                     userAgent: _ctx.userAgent
+                });
+                // SMS: money deducted from the wallet.
+                messages.send('WALLET_DEBITED', null, {
+                    userId: userId, amount: parseFloat(amount), balance: balanceAfter,
+                    reason: 'Wallet transfer', reference: to_phone
                 });
                 return df.formatSucessRes(req, res, {
                     transaction_id: transactionResults.insertId,

@@ -5,7 +5,7 @@ const config = require(appRoot + '/config/config');
 const df = require(appRoot + '/utils/dateFormatUtil');
 const authAppMdl = require('../models/authAppMdl');
 const audit = require(appRoot + '/utils/auditUtil');
-const sms = require(appRoot + '/utils/smsUtil');
+const messages = require(appRoot + '/utils/messageService');
 const cntxtDtls = "authAppCtrl";
 
 // JWT secret/expiry used for the web admin email+password flow.
@@ -38,12 +38,15 @@ const OTP_TEST_CODE = /^\d{4}$/.test(String(process.env.OTP_TEST_CODE || '')) ? 
 const isTestNumber = (phone) => !!OTP_TEST_CODE && OTP_TEST_NUMBERS.indexOf(String(phone)) !== -1;
 
 /**
- * Create an OTP for `phone`, store it, and deliver it by SMS (MSG91).
+ * Create an OTP for `phone`, store it, and deliver it by SMS using the
+ * OTP_TEMPLATE row in sms_tmplt_lst_t.
  * Resolves { otpId, devOtp } on success. Rejects with a user-facing error
  * (err_status 502) when the SMS could not be handed to the gateway, so the
  * app never tells the user "OTP sent" for a message that will not arrive.
  * `devOtp` is only set when the SMS gateway is in mock mode (no auth key).
  */
+const OTP_TEMPLATE = 'DJT_OTP'; // tmplt_cd in sms_tmplt_lst_t
+
 function issueOtp(phone, usrId) {
     const expiryMinutes = config.otp.expiryMinutes || 5;
     const testLogin = isTestNumber(phone);
@@ -56,10 +59,12 @@ function issueOtp(phone, usrId) {
                 console.log(`[otp] test number ******${String(phone).slice(-4)} — fixed OTP, no SMS sent`);
                 return { otpId: otpId, devOtp: undefined };
             }
-            return sms.sendOTP(phone, otp, { usrId: usrId || undefined })
+            return messages.send(OTP_TEMPLATE, phone, {
+                    otp: otp, expiry_minutes: expiryMinutes, userId: usrId || undefined
+                })
                 .then(function(result) {
-                    if (!result || !result.success) {
-                        console.error(`[otp] SMS send failed for ******${String(phone).slice(-4)}:`, result && result.error);
+                    if (!result.success) {
+                        console.error(`[otp] SMS send failed for ******${String(phone).slice(-4)}: ${result.error || 'unknown error'}`);
                         throw { err_status: 502, err_message: 'We could not send the OTP right now. Please try again in a moment.' };
                     }
                     if (result.mock) {

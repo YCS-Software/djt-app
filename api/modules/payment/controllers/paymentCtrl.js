@@ -20,6 +20,7 @@ const df = require(appRoot + "/utils/dateFormatUtil");
 const rzp = require(appRoot + "/config/razorpay.config");
 const paymentMdl = require("../models/paymentMdl");
 const ledger = require(appRoot + "/api/modules/ledger/services/ledgerService");
+const messages = require(appRoot + "/utils/messageService");
 const cntxtDtls = "paymentCtrl";
 
 function badRequest(res, message) {
@@ -197,6 +198,18 @@ exports.verifyPayment = function (req, res) {
         signature: razorpay_signature,
         jrnlId: jr.jrnlId,
       });
+      // SMS: money added to the wallet.
+      // (Skipped when this call only repeated a credit that was already made.)
+      if (!jr.idempotent) {
+        messages.send("WALLET_CREDITED", null, {
+          userId,
+          amount,
+          balance: newBalance,
+          reason: "Wallet top-up",
+          reference: razorpay_payment_id,
+          payment_method: paymentMethod,
+        });
+      }
 
       return df.formatSucessRes(
         req,

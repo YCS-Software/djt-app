@@ -9,6 +9,7 @@ const df = require(appRoot + '/utils/dateFormatUtil');
 const rzp = require(appRoot + '/config/razorpay.config');
 const mdl = require('../models/ledgerMdl');
 const ledger = require('../services/ledgerService');
+const messages = require(appRoot + '/utils/messageService');
 const cntxtDtls = 'ledgerCtrl';
 
 function badRequest(res, message) {
@@ -136,6 +137,7 @@ exports.razorpayWebhook = async function (req, res) {
         const eventType = body.event;
         const paymentEntity = body.payload && body.payload.payment && body.payload.payment.entity;
 
+        let topup = null; // set when this webhook itself credits a wallet
         const result = await mdl.withTransaction(async (conn) => {
             // Idempotency by Razorpay event id.
             const existing = await mdl.findWebhookByEventId(conn, eventId);
@@ -169,6 +171,10 @@ exports.razorpayWebhook = async function (req, res) {
                         ],
                     }, conn);
                     await mdl.markPayOrderPaid(conn, { payOrderId: order.pay_ordr_id, paymentId: paymentEntity.id, jrnlId: jr.jrnlId });
+                    // Only announce a credit this webhook actually made (not a repeat).
+                    if (!jr.idempotent) {
+                        topup = { userId: order.usr_id, amount, reason: 'Wallet top-up', reference: paymentEntity.id, payment_method: order.pymnt_mthd_cd || 'upi' };
+                    }
                 }
             }
 
@@ -176,6 +182,10 @@ exports.razorpayWebhook = async function (req, res) {
             return { processed: true };
         });
 
+        if (topup) {
+            // After commit, SMS: money added to the wallet.
+            messages.send('WALLET_CREDITED', null, topup);
+        }
         // Always 200 quickly so Razorpay does not retry a handled event.
         return res.status(200).json({ status: 200, message: 'ok', data: result });
     } catch (e) {

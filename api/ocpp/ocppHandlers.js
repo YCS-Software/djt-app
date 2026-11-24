@@ -10,6 +10,7 @@
 
 const walletMdl = require('../modules/wallet/models/walletMdl');
 const ledgerService = require('../modules/ledger/services/ledgerService');
+const messages = require(appRoot + '/utils/messageService');
 
 // transactionId -> starting meter register (kWh) for delta energy calculation
 const txnBaselines = new Map();
@@ -372,6 +373,9 @@ async function finalizeAndSettle(ctx, session, energy, cost) {
     // hold), but the session row reflects true consumption.
     await ocppMdl.finalizeOcppSessionMdl({ sessionId: session.sssn_id, energyKwh: energy, cost });
 
+    // Wallet movement made here, for the SMS below.
+    let credited = 0, debited = 0;
+
     // Prepaid (app-initiated, escrow held) vs charger-initiated (post-pay).
     let hold = null;
     try { hold = await ledgerService.getSessionHold(session.sssn_id); } catch (e) { /* legacy */ }
@@ -381,40 +385,50 @@ async function finalizeAndSettle(ctx, session, energy, cost) {
         try {
             const ownerRows = await ocppMdl.getStationOwnerMdl(session.sttn_id);
             const ownerUserId = ownerRows && ownerRows[0] ? ownerRows[0].ownr_usr_id : null;
-            await ledgerService.chargingSettle({
+            const settled = await ledgerService.chargingSettle({
                 userId: session.usr_id, sessionId: session.sssn_id, stationId: session.sttn_id,
                 ownerUserId, holdAmount: parseFloat(hold.ttl_amt) || 0, consumedAmount: cost,
                 audit: { actnCd: 'charging_payment', userId: session.usr_id },
             });
             await ocppMdl.setSessionPaymentMdl({ sessionId: session.sssn_id, status: 'paid' });
+            if (settled.refund && !settled.refund.idempotent) credited = settled.refundAmount;
         } catch (e) {
             console.error('[OCPP] escrow settle failed:', e.message);
         }
     } else {
         // Charger-initiated post-pay: debit the wallet for the actual cost
-        await settleWallet(ctx, session, cost).catch((e) =>
-            console.error('[OCPP] wallet settle failed:', e.message));
+        debited = await settleWallet(ctx, session, cost).catch((e) => {
+            console.error('[OCPP] wallet settle failed:', e.message);
+            return 0;
+        });
     }
+
+    // SMS: unused prepaid amount added back, or the post-pay cost deducted.
+    const machine = ctx.conn && ctx.conn._machine;
+    const about = { userId: session.usr_id, reference: session.sssn_cd, station_name: (machine && machine.sttn_nm_tx) || '' };
+    if (credited > 0) messages.send('WALLET_CREDITED', null, Object.assign({ amount: credited, reason: 'Charging refund' }, about));
+    if (debited > 0) messages.send('WALLET_DEBITED', null, Object.assign({ amount: debited, reason: 'EV charging' }, about));
 }
 
-// Debit the wallet for a completed session (post-pay model)
+// Debit the wallet for a completed session (post-pay model).
+// Resolves to the amount actually deducted (0 when nothing was taken).
 async function settleWallet(ctx, session, cost) {
     const userId = session.usr_id;
     if (!cost || cost <= 0) {
         await ctx.ocppMdl.setSessionPaymentMdl({ sessionId: session.sssn_id, status: 'paid' });
-        return;
+        return 0;
     }
     const wRows = await walletMdl.getUserWalletMdl({ userId });
     const wallet = wRows && wRows[0];
     if (!wallet) {
         await ctx.ocppMdl.setSessionPaymentMdl({ sessionId: session.sssn_id, status: 'pending' });
-        return;
+        return 0;
     }
     const balance = parseFloat(wallet.blnce_amt) || 0;
     if (balance < cost) {
         // Not enough credit — leave unpaid for later collection
         await ctx.ocppMdl.setSessionPaymentMdl({ sessionId: session.sssn_id, status: 'pending' });
-        return;
+        return 0;
     }
     await walletMdl.deductMoneyMdl({ walletId: wallet.wllt_id, amount: cost, userId });
     const txn = await walletMdl.createTransactionMdl({
@@ -435,6 +449,7 @@ async function settleWallet(ctx, session, cost) {
         status: 'paid',
         transactionId: txn && txn.insertId,
     });
+    return cost;
 }
 
 module.exports = handlers;

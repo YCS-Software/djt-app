@@ -9,9 +9,8 @@
  * Docs: https://docs.msg91.com/reference/send-sms  (POST /api/v5/flow/)
  */
 
-// Only the secret auth key lives in the environment. Sender id, country code and
-// the default OTP template id are stored in the DB (sms_cnfg_t) and resolved by
-// utils/smsUtil.js.
+// Only the secret auth key lives in the environment. Templates and sender ids
+// are rows in sms_tmplt_lst_t; all sending goes through utils/messageService.js.
 const AUTH_KEY = process.env.MSG91_AUTH_KEY || "";
 
 const FLOW_URL = "https://control.msg91.com/api/v5/flow/";

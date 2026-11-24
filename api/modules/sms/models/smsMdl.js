@@ -11,54 +11,6 @@ const sqldb = require(appRoot + '/config/db.config');
 const pool = sqldb.MySQLConPool;
 
 /*****************************************************************************
-* Function      : getConfigMdl
-* Description   : Fetch all active SMS gateway settings (key/value)
-******************************************************************************/
-exports.getConfigMdl = function () {
-    const QRY = `SELECT cnfg_ky_tx, cnfg_vl_tx FROM sms_cnfg_t WHERE a_in = 1`;
-    return pool.query(QRY);
-};
-
-/*****************************************************************************
-* Function      : upsertConfigMdl
-* Description   : Insert or update a single config key/value
-* Arguments     : data { key, value, description? }
-******************************************************************************/
-exports.upsertConfigMdl = function (data) {
-    const QRY = `INSERT INTO sms_cnfg_t (cnfg_ky_tx, cnfg_vl_tx, dscrptn_tx, a_in)
-        VALUES (?, ?, ?, 1)
-        ON DUPLICATE KEY UPDATE
-            cnfg_vl_tx = VALUES(cnfg_vl_tx),
-            dscrptn_tx = COALESCE(VALUES(dscrptn_tx), dscrptn_tx),
-            a_in = 1`;
-    return pool.query(QRY, [data.key, data.value, data.description || null]);
-};
-
-/*****************************************************************************
-* Function      : getTemplateByProviderIdMdl
-* Description   : Fetch an active template by its provider (MSG91) template id
-* Arguments     : providerTemplateId (string)
-******************************************************************************/
-exports.getTemplateByProviderIdMdl = function (providerTemplateId) {
-    const QRY = `SELECT * FROM sms_tmplt_lst_t
-        WHERE prvdr_tmplt_id_tx = ? AND a_in = 1
-        LIMIT 1`;
-    return pool.query(QRY, [providerTemplateId]);
-};
-
-/*****************************************************************************
-* Function      : getTemplateByIdMdl
-* Description   : Fetch an active template by its internal numeric id
-* Arguments     : templateId (number)
-******************************************************************************/
-exports.getTemplateByIdMdl = function (templateId) {
-    const QRY = `SELECT * FROM sms_tmplt_lst_t
-        WHERE tmplt_id = ? AND a_in = 1
-        LIMIT 1`;
-    return pool.query(QRY, [templateId]);
-};
-
-/*****************************************************************************
 * Function      : listTemplatesMdl
 * Description   : List all active templates
 ******************************************************************************/
@@ -70,20 +22,24 @@ exports.listTemplatesMdl = function () {
 /*****************************************************************************
 * Function      : insertTemplateMdl
 * Description   : Insert (or upsert) a template by provider template id
-* Arguments     : data { providerTemplateId, name, body, senderId, provider, description }
+* Arguments     : data { code, providerTemplateId, dltTemplateId, name, body, senderId, provider, description }
 ******************************************************************************/
 exports.insertTemplateMdl = function (data) {
     const QRY = `INSERT INTO sms_tmplt_lst_t
-        (prvdr_tmplt_id_tx, tmplt_nm_tx, body_tx, sndr_id_tx, prvdr_cd, dscrptn_tx, a_in)
-        VALUES (?, ?, ?, ?, ?, ?, 1)
+        (tmplt_cd, prvdr_tmplt_id_tx, dlt_tmplt_id_tx, tmplt_nm_tx, body_tx, sndr_id_tx, prvdr_cd, dscrptn_tx, a_in)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
         ON DUPLICATE KEY UPDATE
+            prvdr_tmplt_id_tx = VALUES(prvdr_tmplt_id_tx),
+            dlt_tmplt_id_tx = COALESCE(VALUES(dlt_tmplt_id_tx), dlt_tmplt_id_tx),
             tmplt_nm_tx = VALUES(tmplt_nm_tx),
             body_tx     = VALUES(body_tx),
             sndr_id_tx  = VALUES(sndr_id_tx),
             dscrptn_tx  = VALUES(dscrptn_tx),
             a_in        = 1`;
     return pool.query(QRY, [
+        data.code,
         data.providerTemplateId,
+        data.dltTemplateId || null,
         data.name || null,
         data.body,
         data.senderId || null,
@@ -153,4 +109,55 @@ exports.getMsgLogsMdl = function (data = {}) {
     }
     const QRY = `SELECT * FROM sms_msg_log_t ORDER BY msg_id DESC LIMIT ${limit}`;
     return pool.query(QRY);
+};
+
+/* ======================================================================
+ * Database-driven messaging (templates by code and their variables)
+ * ====================================================================== */
+
+/*****************************************************************************
+* Function      : getTemplateByCodeMdl
+* Description   : Fetch an active template by its code (e.g. 'DJT_OTP')
+******************************************************************************/
+exports.getTemplateByCodeMdl = function (code) {
+    const QRY = `SELECT * FROM sms_tmplt_lst_t
+        WHERE tmplt_cd = ? AND a_in = 1
+        LIMIT 1`;
+    return pool.query(QRY, [String(code)]);
+};
+
+/*****************************************************************************
+* Function      : getTemplateVarsMdl
+* Description   : Active variable definitions for one template
+******************************************************************************/
+exports.getTemplateVarsMdl = function (templateId) {
+    const QRY = `SELECT var_nm_tx, src_ky_tx, frmt_cd, dflt_vl_tx, mx_lngth_nbr
+        FROM sms_tmplt_var_lst_t
+        WHERE tmplt_id = ? AND a_in = 1
+        ORDER BY var_id`;
+    return pool.query(QRY, [templateId]);
+};
+
+/*****************************************************************************
+* Function      : getUserContactMdl
+* Description   : Name + mobile of a user, used to address messages
+******************************************************************************/
+exports.getUserContactMdl = function (userId) {
+    const QRY = `SELECT usr_id, nm_tx, phn_nmbr_tx FROM usr_lst_t WHERE usr_id = ? LIMIT 1`;
+    return pool.query(QRY, [userId]);
+};
+
+/*****************************************************************************
+* Function      : getSetupSnapshotMdl
+* Description   : Every template and variable row (active or not), for the
+*                 setup checker
+******************************************************************************/
+exports.getSetupSnapshotMdl = async function () {
+    const templates = await pool.query(
+        `SELECT tmplt_id, tmplt_cd, tmplt_nm_tx, prvdr_tmplt_id_tx, body_tx, sndr_id_tx, a_in
+           FROM sms_tmplt_lst_t ORDER BY tmplt_id`);
+    const variables = await pool.query(
+        `SELECT var_id, tmplt_id, var_nm_tx, src_ky_tx, frmt_cd, dflt_vl_tx, mx_lngth_nbr, a_in
+           FROM sms_tmplt_var_lst_t ORDER BY tmplt_id, var_id`);
+    return { templates, variables };
 };

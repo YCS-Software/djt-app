@@ -12,6 +12,7 @@ const qrUtil = require(appRoot + '/utils/qrUtil');
 const audit = require(appRoot + '/utils/auditUtil');
 const ocppServer = require(appRoot + '/api/ocpp/ocppServer');
 const ledgerService = require(appRoot + '/api/modules/ledger/services/ledgerService');
+const messages = require(appRoot + '/utils/messageService');
 const cntxtDtls = "sessionCtrl";
 
 const config = require(appRoot + '/config/config');
@@ -510,6 +511,7 @@ exports.startSession = function(req, res) {
                                                         userId: _ctx.userId, action: 'session_start_rejected', entityType: 'session', entityId: sessionId,
                                                         newVal: { reason: rs.message, refunded: totalAmountToDeduct }, ip: _ctx.ip, userAgent: _ctx.userAgent
                                                     });
+                                                    // No SMS: the hold was reversed in full before any "deducted" SMS went out.
                                                     const err = new Error(rs.message || 'Charging could not be started');
                                                     err._userMessage = true;
                                                     throw err;
@@ -537,6 +539,12 @@ exports.startSession = function(req, res) {
                                             audit.writeAudit({
                                                 userId: _ctx.userId, action: 'session_payment', entityType: 'session', entityId: sessionId,
                                                 newVal: { amount: totalAmountToDeduct, via: 'ledger_hold' }, ip: _ctx.ip, userAgent: _ctx.userAgent
+                                            });
+                                            // SMS: money deducted from the wallet (charging prepayment).
+                                            messages.send('WALLET_DEBITED', null, {
+                                                userId: userId, amount: totalAmountToDeduct,
+                                                reason: 'EV charging', reference: sessionCode,
+                                                station_name: station.sttn_nm_tx
                                             });
                                             return df.formatSucessRes(req, res, {
                                                 session_id: sessionId,
@@ -631,12 +639,13 @@ exports.stopSession = async function(req, res) {
         // Resolve the station owner (vendor) for the split
         const stnRows = await stationMdl.getStationByIdMdl({ stationId: session.sttn_id });
         const ownerUserId = (stnRows && stnRows[0] && stnRows[0].ownr_usr_id) ? stnRows[0].ownr_usr_id : null;
+        const stationName = (stnRows && stnRows[0] && stnRows[0].sttn_nm_tx) || '';
 
         // Finalize the session row
         await sessionMdl.stopSessionMdl({ sessionId: session_id, energyConsumed: consumedUnits, totalCost: consumedCost });
 
         const hold = await ledgerService.getSessionHold(session_id);
-        let refundAmount = 0, splitInfo = null;
+        let refundAmount = 0, splitInfo = null, refundCredited = false;
 
         if (hold) {
             // NEW flow: escrow exists -> split consumed (vendor%/DJT%) + refund unused,
@@ -648,6 +657,7 @@ exports.stopSession = async function(req, res) {
             });
             await sessionMdl.updatePaymentStatusMdl({ sessionId: session_id, status: 'paid', transactionId: null });
             refundAmount = settle.refundAmount;
+            refundCredited = !!settle.refund && !settle.refund.idempotent;
             consumedCost = settle.consumedAmount;
             splitInfo = settle.commission;
         } else {
@@ -666,6 +676,7 @@ exports.stopSession = async function(req, res) {
                         description: `Charging session refund - ${session.sssn_cd || 'Session ' + session_id}`,
                         status: 'completed', referenceId: String(session_id), referenceType: 'session',
                     });
+                    refundCredited = true;
                 }
             }
             await sessionMdl.updatePaymentStatusMdl({ sessionId: session_id, status: 'paid', transactionId: null });
@@ -677,6 +688,14 @@ exports.stopSession = async function(req, res) {
             newVal: { energy: consumedUnits, cost: consumedCost, refund: refundAmount, ownerUserId, legacy: !hold, commission: splitInfo },
             ip: _ctx.ip, userAgent: _ctx.userAgent
         });
+
+        // SMS: the unused prepaid amount was added back to the wallet.
+        if (refundCredited && refundAmount > 0) {
+            messages.send('WALLET_CREDITED', null, {
+                userId, amount: refundAmount, reason: 'Charging refund',
+                reference: session.sssn_cd, station_name: stationName
+            });
+        }
 
         return df.formatSucessRes(req, res, {
             session_id: session_id,
