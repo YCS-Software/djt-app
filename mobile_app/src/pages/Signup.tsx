@@ -70,7 +70,7 @@ const Signup = () => {
         setError(response.message || 'Failed to send OTP');
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to send OTP. Please try again.');
+      setError(err?.message || 'Failed to send OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -147,7 +147,7 @@ const Signup = () => {
         setError(verifyResponse.message || 'Invalid OTP');
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed. Please try again.');
+      setError(err?.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }

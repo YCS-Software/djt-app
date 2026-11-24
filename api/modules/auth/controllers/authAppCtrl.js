@@ -147,6 +147,7 @@ exports.sendOTP = function(req, res) {
 exports.sendSignupOTP = function(req, res) {
     let data = req.body.data ? req.body.data : req.body;
     var fnm = "sendSignupOTP";
+    df.errorsInBody(res); // the app shows our message only on HTTP 200
     
     const { phonenumber } = data;
     
@@ -209,6 +210,7 @@ exports.sendSignupOTP = function(req, res) {
 exports.verifyOTP = function(req, res) {
     let data = req.body.data ? req.body.data : req.body;
     var fnm = "verifyOTP";
+    df.errorsInBody(res); // the app shows our message only on HTTP 200
     
     const { phno, otp, otpID, usr_id } = data;
     

@@ -19,6 +19,7 @@ const cntxtDtls = "registerCtrl";
 exports.register = function(req, res) {
     let data = req.body.data ? req.body.data : req.body;
     var fnm = "register";
+    df.errorsInBody(res); // the app shows our message only on HTTP 200
     
     const { phone, name, email } = data;
     // Role: 'customer' (default) or 'owner' (EV station owner)

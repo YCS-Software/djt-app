@@ -240,7 +240,14 @@ async function cleanup() {
 
     await q(`UPDATE sms_tmplt_lst_t SET a_in = 0 WHERE tmplt_cd = ?`, [OTP]);
     h = await post('/auth/app/signup/otp', { phonenumber: M_OTP });
-    check('API: OTP template switched off in DB -> clear failure, not a false "sent"', h.http === 502, h);
+    check('API: OTP template switched off in DB -> clear failure in the body, not a false "sent"', h.http === 200 && h.json.status === 502 && /could not send the OTP/.test(h.json.message), h);
+    const taken = (await q("SELECT phn_nmbr_tx FROM usr_lst_t WHERE a_in = 1 AND CHAR_LENGTH(phn_nmbr_tx) = 10 ORDER BY usr_id LIMIT 1"))[0];
+    if (taken) {
+      h = await post('/auth/app/signup/otp', { phonenumber: taken.phn_nmbr_tx });
+      check('API: signup with a registered number -> HTTP 200 carrying status 409 and the reason', h.http === 200 && h.json.status === 409 && /already registered/.test(h.json.message), h);
+      h = await post('/auth/register', { phone: taken.phn_nmbr_tx, name: 'X' });
+      check('API: register with a registered number -> HTTP 200 carrying status 409 and the reason', h.http === 200 && h.json.status === 409 && /already exists/.test(h.json.message), h);
+    }
     chk = await messages.checkSetup();
     check('checkSetup: warns loudly when the OTP template is not active', chk.errors.some((e) => e.includes(OTP) && e.includes('cannot receive their OTP')), chk.errors);
     await q(`UPDATE sms_tmplt_lst_t SET a_in = 1 WHERE tmplt_cd = ?`, [OTP]);

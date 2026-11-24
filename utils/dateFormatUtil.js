@@ -92,6 +92,18 @@ exports.formatSucessRes = function(req, res, data, cntxtDtls, fnm, options) {
  * @param {Object} options - Additional options
  * @returns {Object} - Formatted error response
  */
+/**
+ * Make this response always go out as HTTP 200, with the real result code kept
+ * in the JSON body ({ status: 409, message: '...' }).
+ * Used by the app's signup endpoints: the released app only shows the server's
+ * message when the HTTP status is 200, and otherwise shows a generic error.
+ */
+exports.errorsInBody = function(res) {
+    const setStatus = res.status.bind(res);
+    res.status = function() { return setStatus(200); };
+    return res;
+};
+
 exports.formatErrorRes = function(res, error, cntxtDtls, fnm, options) {
     // Check if response was already sent
     if (res.headersSent) {
